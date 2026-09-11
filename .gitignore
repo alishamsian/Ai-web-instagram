@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local mock database
+.data
+
+# persisted Instagram media (local fallback when Supabase/R2 unset)
+/public/media

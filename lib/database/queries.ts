@@ -1,0 +1,139 @@
+import { isSupabaseConfigured } from "@/lib/config/env";
+import {
+  isSupabaseSchemaReady,
+  mapWebsiteRow,
+  mapDomainRow,
+  type WebsiteRow,
+  type DomainRow,
+} from "@/lib/database/supabase-store";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { readStore } from "@/lib/database/store";
+import type { DomainRecord, WebsiteRecord } from "@/types/website";
+
+export async function getWebsiteById(
+  id: string,
+): Promise<WebsiteRecord | null> {
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { data, error } = await db
+      .from("websites")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapWebsiteRow(data as WebsiteRow);
+  }
+  const store = await readStore();
+  return store.websites.find((w) => w.id === id) ?? null;
+}
+
+export async function getWebsiteForWorkspace(
+  id: string,
+  workspaceId: string,
+): Promise<WebsiteRecord | null> {
+  const site = await getWebsiteById(id);
+  if (!site || site.workspaceId !== workspaceId) return null;
+  return site;
+}
+
+export async function getPublishedWebsiteBySlug(
+  slug: string,
+): Promise<WebsiteRecord | null> {
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { data, error } = await db
+      .from("websites")
+      .select("*")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapWebsiteRow(data as WebsiteRow);
+  }
+  const store = await readStore();
+  return (
+    store.websites.find((w) => w.slug === slug && w.status === "published") ??
+    null
+  );
+}
+
+export async function getDomainsForWebsite(
+  websiteId: string,
+): Promise<DomainRecord[]> {
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { data, error } = await db
+      .from("domains")
+      .select("*")
+      .eq("website_id", websiteId);
+    if (error || !data) return [];
+    return data.map((row) => mapDomainRow(row as DomainRow));
+  }
+  const store = await readStore();
+  return (store.domains ?? []).filter((d) => d.websiteId === websiteId);
+}
+
+export async function getPublishedSlugByCustomHost(
+  host: string,
+): Promise<string | null> {
+  const normalized = host.split(":")[0].toLowerCase();
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { data, error } = await db
+      .from("domains")
+      .select("host, website_id, websites!inner(slug, status)")
+      .eq("host", normalized)
+      .maybeSingle();
+    if (error || !data) return null;
+    const website = data.websites as unknown as {
+      slug: string;
+      status: string;
+    };
+    if (website.status !== "published") return null;
+    return website.slug;
+  }
+  const store = await readStore();
+  const domain = (store.domains ?? []).find((d) => d.host === normalized);
+  if (!domain) return null;
+  const site = store.websites.find(
+    (w) => w.id === domain.websiteId && w.status === "published",
+  );
+  return site?.slug ?? null;
+}
+
+export async function countWebsitesForWorkspace(workspaceId: string) {
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { count, error } = await db
+      .from("websites")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId);
+    if (error) return 0;
+    return count ?? 0;
+  }
+  const store = await readStore();
+  return store.websites.filter((w) => w.workspaceId === workspaceId).length;
+}
+
+export async function listPublishedWebsiteSlugs(): Promise<
+  { slug: string; updatedAt: string }[]
+> {
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { data, error } = await db
+      .from("websites")
+      .select("slug, updated_at")
+      .eq("status", "published")
+      .order("updated_at", { ascending: false })
+      .limit(5000);
+    if (error || !data) return [];
+    return data.map((row) => ({
+      slug: row.slug as string,
+      updatedAt: row.updated_at as string,
+    }));
+  }
+  const store = await readStore();
+  return store.websites
+    .filter((w) => w.status === "published")
+    .map((w) => ({ slug: w.slug, updatedAt: w.updatedAt }));
+}
