@@ -18,6 +18,7 @@ import {
   IconProducts,
   IconWebsite,
   forwardArrow,
+  type AppIcon,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
@@ -33,10 +34,7 @@ const STAGE_ORDER: ImportJobStage[] = [
 
 const CLIENT_TIMEOUT_MS = 3 * 60 * 1000;
 
-const STAGE_ICON: Record<
-  ImportJobStage,
-  typeof IconInstagram
-> = {
+const STAGE_ICON: Record<ImportJobStage, AppIcon> = {
   connecting: IconInstagram,
   profile_found: IconInstagram,
   reading_content: IconAnalyzing,

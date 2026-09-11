@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentType,
   type RefObject,
 } from "react";
 import {
@@ -31,6 +30,7 @@ import {
   IconServicesCategory,
   IconWebsite,
   X,
+  type AppIcon,
 } from "@/components/icons";
 import { BadgeCheck, Battery, Clapperboard, Grid3X3, Signal, UserSquare2, Wifi } from "lucide-react";
 import {
@@ -1681,7 +1681,7 @@ function PaneLabel({
   tone,
 }: {
   children: string;
-  icon: ComponentType<{ size?: number; className?: string }>;
+  icon: AppIcon;
   tone: "ig" | "web";
 }) {
   return (

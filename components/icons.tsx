@@ -41,6 +41,15 @@ import {
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
+import type { ComponentType, ReactElement } from "react";
+
+/** Unified icon component type — Lucide + custom glyphs. */
+export type AppIcon = ComponentType<{
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+  "aria-hidden"?: boolean | "true" | "false";
+}>;
 
 /* ─── Product story: Instagram → AI → Website ─────────────────────────── */
 
@@ -54,7 +63,7 @@ export function InstagramGlyph({
   strokeWidth = 1.75,
   className,
   ...props
-}: Omit<LucideProps, "ref">) {
+}: Omit<LucideProps, "ref">): ReactElement {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -77,48 +86,48 @@ export function InstagramGlyph({
 }
 
 /** Stage 1 — the profile you already built. */
-export const IconInstagram = InstagramGlyph;
+export const IconInstagram: AppIcon = InstagramGlyph;
 /** Stage 2 — brand understanding. Sparkles is the single AI voice. */
-export const IconAI: LucideIcon = Sparkles;
+export const IconAI = Sparkles as AppIcon;
 /** Stage 2, working state — reading the profile. */
-export const IconAnalyzing: LucideIcon = ScanSearch;
+export const IconAnalyzing = ScanSearch as AppIcon;
 /** Stage 3 — the generated website. */
-export const IconWebsite: LucideIcon = Monitor;
+export const IconWebsite = Monitor as AppIcon;
 
 /* ─── Brand intelligence fields ───────────────────────────────────────── */
 
-export const IconBusinessType: LucideIcon = Store;
-export const IconPersonality: LucideIcon = Sparkles;
-export const IconVisualStyle: LucideIcon = Palette;
-export const IconProducts: LucideIcon = Package;
-export const IconServices: LucideIcon = BriefcaseBusiness;
-export const IconThemes: LucideIcon = Tags;
-export const IconSections: LucideIcon = Layout;
+export const IconBusinessType = Store as AppIcon;
+export const IconPersonality = Sparkles as AppIcon;
+export const IconVisualStyle = Palette as AppIcon;
+export const IconProducts = Package as AppIcon;
+export const IconServices = BriefcaseBusiness as AppIcon;
+export const IconThemes = Tags as AppIcon;
+export const IconSections = Layout as AppIcon;
 
 /* ─── Feature anchors ─────────────────────────────────────────────────── */
 
-export const IconDomain: LucideIcon = Globe;
-export const IconCopy: LucideIcon = Sparkles;
-export const IconPhotos = InstagramGlyph;
-export const IconMobile: LucideIcon = Smartphone;
-export const IconSEO: LucideIcon = SearchCheck;
-export const IconAnalytics: LucideIcon = ChartNoAxesCombined;
+export const IconDomain = Globe as AppIcon;
+export const IconCopy = Sparkles as AppIcon;
+export const IconPhotos: AppIcon = InstagramGlyph;
+export const IconMobile = Smartphone as AppIcon;
+export const IconSEO = SearchCheck as AppIcon;
+export const IconAnalytics = ChartNoAxesCombined as AppIcon;
 
 /* ─── Customization controls ──────────────────────────────────────────── */
 
-export const IconColors: LucideIcon = Palette;
-export const IconTypography: LucideIcon = Type;
-export const IconLayout: LucideIcon = Layout;
-export const IconPanels: LucideIcon = PanelsTopLeft;
-export const IconContent: LucideIcon = TextCursorInput;
+export const IconColors = Palette as AppIcon;
+export const IconTypography = Type as AppIcon;
+export const IconLayout = Layout as AppIcon;
+export const IconPanels = PanelsTopLeft as AppIcon;
+export const IconContent = TextCursorInput as AppIcon;
 
 /* ─── Showcase categories ─────────────────────────────────────────────── */
 
-export const IconFashion: LucideIcon = Shirt;
-export const IconRestaurant: LucideIcon = Utensils;
-export const IconBeauty: LucideIcon = Sparkles;
-export const IconServicesCategory: LucideIcon = BriefcaseBusiness;
-export const IconCreator = InstagramGlyph;
+export const IconFashion = Shirt as AppIcon;
+export const IconRestaurant = Utensils as AppIcon;
+export const IconBeauty = Sparkles as AppIcon;
+export const IconServicesCategory = BriefcaseBusiness as AppIcon;
+export const IconCreator: AppIcon = InstagramGlyph;
 
 /* ─── Interface ───────────────────────────────────────────────────────── */
 
@@ -156,6 +165,6 @@ export type IconSize = keyof typeof ICON_SIZE;
  * Direction-aware forward arrow. RTL locales read right-to-left, so "next"
  * points the other way.
  */
-export function forwardArrow(locale: string): LucideIcon {
-  return locale === "fa" ? ArrowLeft : ArrowRight;
+export function forwardArrow(locale: string): AppIcon {
+  return (locale === "fa" ? ArrowLeft : ArrowRight) as AppIcon;
 }

@@ -24,6 +24,7 @@ import {
   IconInstagram,
   IconLayout,
   IconWebsite,
+  type AppIcon,
 } from "@/components/icons";
 import { INSTAGRAM_DEMO_BRAND } from "@/lib/demo/instagram-demo";
 import type { Dictionary } from "@/lib/i18n/dictionary";
@@ -303,7 +304,7 @@ export function DashboardShowcase({
   const navItems = useMemo(
     () =>
       [
-        { id: "overview" as const, icon: LayoutDashboard },
+        { id: "overview" as const, icon: LayoutDashboard as AppIcon },
         { id: "content" as const, icon: IconContent },
         { id: "analytics" as const, icon: IconAnalytics },
         { id: "domains" as const, icon: IconDomain },
@@ -506,7 +507,7 @@ export function DashboardShowcase({
 
 type NavItem = {
   id: DashPanel;
-  icon: typeof LayoutDashboard;
+  icon: AppIcon;
 };
 
 function MobileDashPhone({

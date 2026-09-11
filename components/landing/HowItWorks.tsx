@@ -7,13 +7,13 @@ import {
   IconAI,
   IconInstagram,
   IconWebsite,
-  type LucideIcon,
+  type AppIcon,
 } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import { cn } from "@/lib/utils";
 
-const STEP_ICONS: LucideIcon[] = [IconInstagram, IconAI, IconWebsite];
+const STEP_ICONS: AppIcon[] = [IconInstagram, IconAI, IconWebsite];
 
 export function HowItWorks({
   dict,
@@ -188,7 +188,7 @@ function StepMarker({
   index: number;
   show: boolean;
   reduce: boolean;
-  Icon: LucideIcon;
+  Icon: AppIcon;
 }) {
   return (
     <motion.div
