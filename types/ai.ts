@@ -10,6 +10,8 @@ export interface Product {
   currency: string | null;
   imageIds: string[];
   confidence: number;
+  /** When true, product is hidden from the public storefront. */
+  hidden?: boolean;
 }
 
 export interface Service {

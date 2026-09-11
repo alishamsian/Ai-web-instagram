@@ -73,6 +73,74 @@ export async function getDomainsForWebsite(
   return (store.domains ?? []).filter((d) => d.websiteId === websiteId);
 }
 
+export type WebsiteVersionSummary = {
+  id: string;
+  version: number;
+  createdAt: string;
+  brandName?: string;
+  template?: string;
+  productCount?: number;
+  seoTitle?: string;
+};
+
+function summarizeVersionConfig(config: unknown): Pick<
+  WebsiteVersionSummary,
+  "brandName" | "template" | "productCount" | "seoTitle"
+> {
+  const c = config as {
+    brand?: { name?: string };
+    template?: string;
+    content?: { products?: { items?: unknown[] } };
+    seo?: { title?: string };
+  } | null;
+  if (!c) return {};
+  return {
+    brandName: c.brand?.name,
+    template: c.template,
+    productCount: c.content?.products?.items?.length ?? 0,
+    seoTitle: c.seo?.title,
+  };
+}
+
+/** Lightweight version list with snapshot fields for diffs. */
+export async function getWebsiteVersionSummaries(
+  websiteId: string,
+  workspaceId: string,
+  limit = 5,
+): Promise<WebsiteVersionSummary[]> {
+  const site = await getWebsiteForWorkspace(websiteId, workspaceId);
+  if (!site) return [];
+
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { data, error } = await db
+      .from("website_versions")
+      .select("id, version, created_at, config")
+      .eq("website_id", websiteId)
+      .order("version", { ascending: false })
+      .limit(limit);
+    if (error || !data) return [];
+    return data.map((row) => ({
+      id: row.id as string,
+      version: row.version as number,
+      createdAt: row.created_at as string,
+      ...summarizeVersionConfig(row.config),
+    }));
+  }
+
+  const store = await readStore();
+  return store.versions
+    .filter((item) => item.websiteId === websiteId)
+    .sort((a, b) => b.version - a.version)
+    .slice(0, limit)
+    .map((item) => ({
+      id: item.id,
+      version: item.version,
+      createdAt: item.createdAt,
+      ...summarizeVersionConfig(item.config),
+    }));
+}
+
 export async function getPublishedSlugByCustomHost(
   host: string,
 ): Promise<string | null> {

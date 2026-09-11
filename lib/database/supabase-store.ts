@@ -134,7 +134,7 @@ function mapWorkspace(row: {
   };
 }
 
-function mapJob(row: JobRow): ImportJob {
+export function mapJob(row: JobRow): ImportJob {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -158,7 +158,7 @@ function mapJob(row: JobRow): ImportJob {
   };
 }
 
-function mapImport(row: ImportRow): InstagramImport {
+export function mapImport(row: ImportRow): InstagramImport {
   const data = (row.data ?? {}) as Partial<InstagramImport>;
   return {
     id: row.id,
@@ -216,7 +216,10 @@ async function readTableStore(): Promise<AppStore> {
       db.from("import_jobs").select("*").order("created_at", { ascending: false }),
       db.from("instagram_imports").select("*").order("updated_at", { ascending: false }),
       db.from("websites").select("*").order("updated_at", { ascending: false }),
-      db.from("website_versions").select("*").order("created_at", { ascending: false }),
+      db.from("website_versions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(300),
       db.from("domains").select("*").order("created_at", { ascending: false }),
     ]);
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { readStore, writeStore } from "@/lib/database/store";
+import { createId } from "@/lib/utils";
 
 export async function GET(
   _request: Request,
@@ -59,7 +60,7 @@ export async function POST(
     website.updatedAt = new Date().toISOString();
     website.version += 1;
     store.versions.push({
-      id: `${website.id}_v${website.version}`,
+      id: createId("ver"),
       websiteId: website.id,
       version: website.version,
       config: website.config,

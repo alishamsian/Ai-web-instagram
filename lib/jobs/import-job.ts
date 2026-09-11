@@ -15,7 +15,9 @@ import type { ImportJob, ImportJobStage } from "@/types/jobs";
 import { countWebsitesForWorkspace } from "@/lib/database/queries";
 import { planLimits } from "@/lib/config/plans";
 import type { PlanId } from "@/lib/config/plans";
-import { IMPORT_POSTS_LIMIT } from "@/lib/config/import";
+import { IMPORT_POSTS_LIMIT, IMPORT_STALE_MS } from "@/lib/config/import";
+
+export { IMPORT_STALE_MS };
 
 const STAGES: ImportJobStage[] = [
   "connecting",
@@ -26,9 +28,6 @@ const STAGES: ImportJobStage[] = [
   "creating_website",
   "ready",
 ];
-
-/** Jobs stuck in progress longer than this are marked failed. */
-export const IMPORT_STALE_MS = 2.5 * 60 * 1000;
 
 function now() {
   return new Date().toISOString();

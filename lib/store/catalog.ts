@@ -31,7 +31,9 @@ export function categoryLabel(
 
 export function getStoreCatalog(config: WebsiteConfig): StoreCatalogProduct[] {
   const locale = config.settings.language;
-  const raw = config.content.products?.items ?? [];
+  const raw = (config.content.products?.items ?? []).filter(
+    (item) => !item.hidden,
+  );
 
   return raw.map((item, index) =>
     enrichProduct(ensureCatalogProduct(item, index, locale), index, locale),

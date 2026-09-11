@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createId } from "@/lib/utils";
 import { readStore, writeStore } from "@/lib/database/store";
@@ -19,21 +20,33 @@ async function loadWorkspaceForUser(userId: string, email: string, name: string 
 
   if (schemaReady) {
     const db = getSupabaseAdmin();
-    await db.from("profiles").upsert({
-      id: userId,
-      email,
-      name: displayName,
-    });
 
-    const { data: workspace } = await db
-      .from("workspaces")
-      .select("*")
-      .eq("owner_id", userId)
-      .order("created_at")
-      .limit(1)
-      .maybeSingle();
+    // Read-only on the hot path. Create profile/workspace only when missing —
+    // never upsert on every page render (that + Auth refresh was rate-limiting us).
+    const [{ data: profile }, { data: workspace }] = await Promise.all([
+      db
+        .from("profiles")
+        .select("id, email, name, avatar_url, created_at")
+        .eq("id", userId)
+        .maybeSingle(),
+      db
+        .from("workspaces")
+        .select("*")
+        .eq("owner_id", userId)
+        .order("created_at")
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
     let workspaceRow = workspace;
+    if (!profile) {
+      await db.from("profiles").upsert({
+        id: userId,
+        email,
+        name: displayName,
+      });
+    }
+
     if (!workspaceRow) {
       const inserted = await db
         .from("workspaces")
@@ -54,10 +67,10 @@ async function loadWorkspaceForUser(userId: string, email: string, name: string 
     return {
       user: {
         id: userId,
-        email,
-        name: displayName,
-        avatarUrl: null,
-        createdAt: new Date().toISOString(),
+        email: profile?.email ?? email,
+        name: profile?.name ?? displayName,
+        avatarUrl: profile?.avatar_url ?? null,
+        createdAt: profile?.created_at ?? new Date().toISOString(),
       },
       workspace: {
         id: workspaceRow.id,
@@ -117,21 +130,25 @@ async function getLegacyFileSession(): Promise<Session | null> {
   return { user, workspace };
 }
 
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async (): Promise<Session | null> => {
   if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user?.email) return null;
-    return loadWorkspaceForUser(
-      data.user.id,
-      data.user.email.toLowerCase(),
-      (data.user.user_metadata?.name as string | undefined) ?? null,
-    );
+    try {
+      const supabase = await createClient();
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user?.email) return null;
+      return loadWorkspaceForUser(
+        data.user.id,
+        data.user.email.toLowerCase(),
+        (data.user.user_metadata?.name as string | undefined) ?? null,
+      );
+    } catch {
+      return null;
+    }
   }
 
   // Local file-store only — never use insecure email cookie when Supabase is on.
   return getLegacyFileSession();
-}
+});
 
 export async function requireSession() {
   const session = await getSession();

@@ -6,6 +6,10 @@ import { getWebsiteForWorkspace } from "@/lib/database/queries";
 import { planLimits } from "@/lib/config/plans";
 import { parseLocale } from "@/lib/i18n/paths";
 import { requirePersistence } from "@/lib/config/runtime";
+import { isSupabaseConfigured } from "@/lib/config/env";
+import { isSupabaseSchemaReady } from "@/lib/database/supabase-store";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { readStore } from "@/lib/database/store";
 
 /**
  * Re-import Instagram content for an existing website (smart sync).
@@ -48,9 +52,47 @@ export async function POST(
     url?: string;
   };
   const locale = parseLocale(body.locale);
-  const sourceUrl =
-    body.url ||
-    `https://instagram.com/${website.slug.replace(/[^a-z0-9._]/gi, "")}`;
+
+  let sourceUrl = body.url?.trim() || "";
+  if (!sourceUrl && website.importId) {
+    if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+      const db = getSupabaseAdmin();
+      const { data } = await db
+        .from("instagram_imports")
+        .select("source_url, username")
+        .eq("id", website.importId)
+        .maybeSingle();
+      if (data?.source_url) {
+        sourceUrl = data.source_url as string;
+      } else if (data?.username) {
+        sourceUrl = `https://instagram.com/${data.username}`;
+      }
+    } else {
+      const store = await readStore();
+      const imported = store.imports.find((item) => item.id === website.importId);
+      if (imported?.sourceUrl) sourceUrl = imported.sourceUrl;
+      else if (imported?.username) {
+        sourceUrl = `https://instagram.com/${imported.username}`;
+      }
+    }
+  }
+  if (!sourceUrl) {
+    const contactIg = website.config.content.contact?.info?.instagram;
+    if (contactIg) {
+      sourceUrl = contactIg.startsWith("http")
+        ? contactIg
+        : `https://instagram.com/${contactIg.replace(/^@/, "")}`;
+    }
+  }
+  if (!sourceUrl) {
+    return NextResponse.json(
+      {
+        error: "NO_SOURCE",
+        message: "No Instagram source linked to this website.",
+      },
+      { status: 400 },
+    );
+  }
 
   try {
     const job = await createImportJob({

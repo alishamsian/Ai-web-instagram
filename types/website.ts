@@ -55,6 +55,11 @@ export interface AboutConfig {
 export interface ProductSectionConfig {
   title: string;
   items: Product[];
+  /** Defaults applied to newly created products and optional bulk fill. */
+  defaults?: {
+    category?: string;
+    currency?: string | null;
+  };
 }
 
 export interface ServiceSectionConfig {

@@ -56,7 +56,9 @@ export function findCatalogProduct(
   config: WebsiteConfig,
   productSlugParam: string,
 ): CatalogProduct | undefined {
-  const items = config.content.products?.items ?? [];
+  const items = (config.content.products?.items ?? []).filter(
+    (item) => !item.hidden,
+  );
   const locale = config.settings.language;
   const catalog = items.map((item, index) =>
     ensureCatalogProduct(item, index, locale),

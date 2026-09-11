@@ -22,6 +22,7 @@ export const productSchema = z.object({
   currency: z.string().nullable().default(null),
   imageIds: z.array(z.string()).default([]),
   confidence: z.number().min(0).max(1).default(0.5),
+  hidden: z.boolean().optional().default(false),
 });
 
 export const serviceSchema = z.object({

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { WebsiteConfig, WebsiteRecord } from "@/types/website";
 import { WebsiteRenderer } from "@/components/website/WebsiteRenderer";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ export function EditorShell({
 }) {
   const dict = getDictionary(locale);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tabs = editorTabs(dict);
   const canRemoveBranding = plan === "pro";
   const canCustomDomain = plan === "pro";
@@ -74,7 +75,12 @@ export function EditorShell({
     polishWebsiteConfig(cloneConfig(website.config)),
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [tab, setTab] = useState<EditorTab>("brand");
+  const initialTab = searchParams.get("tab");
+  const [tab, setTab] = useState<EditorTab>(
+    initialTab && tabs.some((t) => t.id === initialTab)
+      ? (initialTab as EditorTab)
+      : "brand",
+  );
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [panelOpen, setPanelOpen] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -254,7 +260,7 @@ export function EditorShell({
         </button>
 
         <Link
-          href={`/${locale}/dashboard/website`}
+          href={`/${locale}/dashboard/website?id=${website.id}`}
           className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft size={15} />

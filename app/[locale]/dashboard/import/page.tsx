@@ -12,9 +12,11 @@ import { Button } from "@/components/ui/button";
 import {
   EmptyState,
   PageHeader,
+  PageStack,
   Panel,
   StatusBadge,
 } from "@/components/dashboard/ui";
+import { AtSign } from "lucide-react";
 
 function jobTone(status: string) {
   if (status === "completed") return "success" as const;
@@ -48,7 +50,7 @@ export default async function ImportPage({
   ] as const;
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <PageStack>
       <PageHeader
         eyebrow={dict.dashboard.navMain}
         title={dict.dashboard.importTitle}
@@ -64,6 +66,7 @@ export default async function ImportPage({
         <EmptyState
           title={dict.dashboard.importEmpty}
           body={dict.dashboard.importEmptyBody}
+          icon={<AtSign className="size-5" aria-hidden />}
           action={
             <Button asChild>
               <Link href={`/${locale}/create`}>{dict.dashboard.startImport}</Link>
@@ -72,7 +75,10 @@ export default async function ImportPage({
         />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <Panel title={dict.dashboard.import}>
+          <Panel
+            title={dict.dashboard.import}
+            description={locale === "fa" ? "وضعیت جاب‌های اخیر" : "Recent job status"}
+          >
             <ul className="divide-y divide-border">
               {jobs.map((job) => {
                 const site = websites.find((item) => item.id === job.websiteId);
@@ -162,7 +168,12 @@ export default async function ImportPage({
             </ul>
           </Panel>
 
-          <Panel title={dict.dashboard.content}>
+          <Panel
+            title={dict.dashboard.content}
+            description={
+              locale === "fa" ? "پروفایل‌های واردشده" : "Imported profiles"
+            }
+          >
             <ul className="divide-y divide-border">
               {imports.map((item) => (
                 <li key={item.id} className="px-5 py-4">
@@ -201,6 +212,6 @@ export default async function ImportPage({
           </Panel>
         </div>
       )}
-    </div>
+    </PageStack>
   );
 }

@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Link2,
   Settings,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 const ICONS = {
   dashboard: LayoutDashboard,
   website: Globe,
+  orders: ShoppingBag,
   import: AtSign,
   content: Images,
   analytics: ChartNoAxesColumn,
@@ -33,6 +35,10 @@ export type DashboardNavItem = {
   label: string;
   icon: DashboardNavIcon;
   group: "main" | "growth" | "account";
+  badge?: string;
+  badgeTone?: "default" | "alert";
+  /** Path prefix for active state when href has query params */
+  match?: string;
 };
 
 export function DashboardNav({
@@ -52,29 +58,29 @@ export function DashboardNav({
   ];
 
   return (
-    <nav
-      className="flex gap-1 overflow-x-auto px-3 py-3 md:block md:space-y-5 md:overflow-visible md:px-3 md:py-4"
-      aria-label="Dashboard"
-    >
+    <nav className="hidden space-y-5 px-3 py-4 md:block" aria-label="Dashboard">
       {groups.map((group) => {
         const groupItems = items.filter((item) => item.group === group.id);
         if (groupItems.length === 0) return null;
         return (
-          <div key={group.id} className="contents md:block">
-            <p className="mb-1.5 hidden px-3 text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase md:block">
+          <div key={group.id}>
+            <p className="mb-1.5 px-3 text-[10px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
               {group.label}
             </p>
-            <ul className="contents gap-1 md:flex md:flex-col md:gap-0.5">
+            <ul className="flex flex-col gap-0.5">
               {groupItems.map((item) => {
+                const pathOnly = item.href.split("?")[0]!;
+                const matchBase = item.match ?? pathOnly;
                 const href = `/${locale}/${item.href}`;
                 const active =
-                  item.href === "dashboard"
+                  matchBase === "dashboard"
                     ? pathname === `/${locale}/dashboard` ||
                       pathname === `/${locale}/dashboard/`
-                    : pathname === href || pathname.startsWith(`${href}/`);
+                    : pathname === `/${locale}/${matchBase}` ||
+                      pathname.startsWith(`/${locale}/${matchBase}/`);
                 const Icon: LucideIcon = ICONS[item.icon];
                 return (
-                  <li key={item.href} className="contents md:block">
+                  <li key={`${item.icon}-${pathOnly}`}>
                     <Link
                       href={href}
                       className={cn(
@@ -86,7 +92,21 @@ export function DashboardNav({
                       aria-current={active ? "page" : undefined}
                     >
                       <Icon className="size-4 shrink-0" aria-hidden />
-                      <span className="whitespace-nowrap">{item.label}</span>
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.badge ? (
+                        <span
+                          className={cn(
+                            "rounded-md px-1.5 py-0.5 text-[10px] font-medium",
+                            item.badgeTone === "alert" && !active
+                              ? "bg-emerald-500/15 text-emerald-800"
+                              : active
+                                ? "bg-white/15 text-white"
+                                : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {item.badge}
+                        </span>
+                      ) : null}
                     </Link>
                   </li>
                 );

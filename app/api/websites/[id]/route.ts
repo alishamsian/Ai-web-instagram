@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { readStore, writeStore } from "@/lib/database/store";
 import { allocateUniqueSlug } from "@/lib/website/slug";
 import { planLimits } from "@/lib/config/plans";
+import { createId } from "@/lib/utils";
 import type { WebsiteConfig } from "@/types/website";
 
 export async function GET(
@@ -77,7 +78,7 @@ export async function PATCH(
       website.updatedAt = new Date().toISOString();
       website.version += 1;
       store.versions.push({
-        id: `${website.id}_v${website.version}`,
+        id: createId("ver"),
         websiteId: website.id,
         version: website.version,
         config: nextConfig,

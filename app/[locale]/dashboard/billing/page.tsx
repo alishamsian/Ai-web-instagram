@@ -7,6 +7,7 @@ import { parseLocale } from "@/lib/i18n/paths";
 import { Button } from "@/components/ui/button";
 import {
   PageHeader,
+  PageStack,
   Panel,
   StatusBadge,
 } from "@/components/dashboard/ui";
@@ -26,7 +27,7 @@ export default async function BillingPage({
   const current = session.workspace.plan === "pro" ? "pro" : "free";
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <PageStack>
       <PageHeader
         eyebrow={dict.dashboard.navAccount}
         title={dict.dashboard.billingTitle}
@@ -35,6 +36,11 @@ export default async function BillingPage({
 
       <Panel
         title={dict.dashboard.currentPlan}
+        description={
+          current === "pro"
+            ? dict.dashboard.billingBody
+            : dict.dashboard.freeForever
+        }
         action={
           <StatusBadge tone="accent">
             {current === "pro"
@@ -49,7 +55,9 @@ export default async function BillingPage({
       >
         <div className="px-5 py-5 text-sm text-muted-foreground">
           {current === "pro"
-            ? dict.dashboard.billingBody
+            ? locale === "fa"
+              ? "همه قابلیت‌های حرفه‌ای برای این ورک‌اسپیس فعال است."
+              : "All Pro capabilities are active on this workspace."
             : dict.dashboard.freeForever}
         </div>
       </Panel>
@@ -64,7 +72,7 @@ export default async function BillingPage({
             <article
               key={plan.id}
               className={cn(
-                "relative overflow-hidden rounded-[1.5rem] border bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.02)]",
+                "relative overflow-hidden rounded-2xl border bg-white p-6 shadow-[0_1px_0_rgba(0,0,0,0.02)]",
                 active ? "border-ink" : "border-border",
                 featured && "ring-1 ring-ink/10",
               )}
@@ -135,6 +143,6 @@ export default async function BillingPage({
           );
         })}
       </div>
-    </div>
+    </PageStack>
   );
 }

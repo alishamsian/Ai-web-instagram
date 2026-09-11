@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { countWebsitesForWorkspace } from "@/lib/database/queries";
 import { getSession } from "@/lib/auth/session";
+import { planUsageLabel } from "@/lib/dashboard/data";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { parseLocale } from "@/lib/i18n/paths";
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/dashboard/SignOutButton";
 import { PasswordChangeForm } from "@/components/dashboard/PasswordChangeForm";
+import { WorkspaceNameForm } from "@/components/dashboard/WorkspaceNameForm";
 import {
+  KeyValue,
   PageHeader,
+  PageStack,
   Panel,
   StatusBadge,
 } from "@/components/dashboard/ui";
@@ -21,18 +26,20 @@ export default async function SettingsPage({
   const dict = getDictionary(locale);
   const session = await getSession();
   if (!session) redirect(`/${locale}/login`);
+  const siteCount = await countWebsitesForWorkspace(session.workspace.id);
+  const isFa = locale === "fa";
 
   const planLabel =
     session.workspace.plan === "pro"
-      ? locale === "fa"
+      ? isFa
         ? "حرفه‌ای"
         : "Pro"
-      : locale === "fa"
+      : isFa
         ? "شروع"
         : "Starter";
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <PageStack>
       <PageHeader
         eyebrow={dict.dashboard.navAccount}
         title={dict.dashboard.settingsTitle}
@@ -42,44 +49,35 @@ export default async function SettingsPage({
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title={dict.dashboard.profile}>
           <dl className="divide-y divide-border">
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <dt className="text-xs text-muted-foreground">{dict.dashboard.name}</dt>
-              <dd className="text-sm text-ink">
-                {session.user.name || "—"}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <dt className="text-xs text-muted-foreground">{dict.dashboard.email}</dt>
-              <dd className="truncate text-sm text-ink">{session.user.email}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <dt className="text-xs text-muted-foreground">
-                {dict.dashboard.language}
-              </dt>
-              <dd className="text-sm text-ink">
-                {locale === "fa" ? "فارسی" : "English"}
-              </dd>
-            </div>
+            <KeyValue label={dict.dashboard.name} value={session.user.name || "—"} />
+            <KeyValue label={dict.dashboard.email} value={session.user.email} />
+            <KeyValue
+              label={dict.dashboard.language}
+              value={isFa ? "فارسی" : "English"}
+            />
           </dl>
           <div className="border-t border-border p-4 md:hidden">
             <SignOutButton label={dict.dashboard.signOut} locale={locale} />
           </div>
         </Panel>
 
-        <Panel title={dict.dashboard.workspace}>
-          <dl className="divide-y divide-border">
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <dt className="text-xs text-muted-foreground">
-                {dict.dashboard.workspace}
-              </dt>
-              <dd className="text-sm text-ink">{session.workspace.name}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <dt className="text-xs text-muted-foreground">{dict.dashboard.plan}</dt>
-              <dd>
-                <StatusBadge tone="accent">{planLabel}</StatusBadge>
-              </dd>
-            </div>
+        <Panel
+          title={dict.dashboard.workspace}
+          description={isFa ? "نام و ظرفیت فضای کاری" : "Name and capacity"}
+        >
+          <WorkspaceNameForm
+            initialName={session.workspace.name}
+            locale={locale}
+          />
+          <dl className="divide-y divide-border border-t border-border">
+            <KeyValue
+              label={dict.dashboard.plan}
+              value={<StatusBadge tone="accent">{planLabel}</StatusBadge>}
+            />
+            <KeyValue
+              label={isFa ? "ظرفیت سایت" : "Site capacity"}
+              value={planUsageLabel(session.workspace.plan, siteCount, locale)}
+            />
           </dl>
           <div className="border-t border-border p-4">
             <Button asChild className="w-full" variant="outline">
@@ -90,10 +88,38 @@ export default async function SettingsPage({
           </div>
         </Panel>
 
-        <Panel title={locale === "fa" ? "امنیت" : "Security"}>
+        <Panel title={isFa ? "امنیت" : "Security"}>
           <PasswordChangeForm locale={locale} />
         </Panel>
+
+        <Panel
+          title={isFa ? "دسترسی سریع" : "Shortcuts"}
+          description={isFa ? "میانبر به بخش‌های پرتکرار" : "Jump to frequent areas"}
+        >
+          <div className="flex flex-wrap gap-2 p-5">
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/${locale}/dashboard/orders`}>
+                {isFa ? "سفارش‌ها" : "Orders"}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/${locale}/dashboard/domains`}>
+                {dict.dashboard.domains}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/${locale}/dashboard/content`}>
+                {dict.dashboard.content}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/${locale}/dashboard/analytics`}>
+                {dict.dashboard.analytics}
+              </Link>
+            </Button>
+          </div>
+        </Panel>
       </div>
-    </div>
+    </PageStack>
   );
 }
