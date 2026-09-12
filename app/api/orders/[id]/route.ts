@@ -3,8 +3,13 @@ import { getSession } from "@/lib/auth/session";
 import { isSupabaseConfigured } from "@/lib/config/env";
 import { isSupabaseSchemaReady } from "@/lib/database/supabase-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { ORDER_STATUSES, normalizeOrderStatus } from "@/lib/orders/status";
 
-const ALLOWED = new Set(["new", "seen", "done", "archived"]);
+const ALLOWED = new Set<string>([
+  ...ORDER_STATUSES,
+  "seen", // legacy
+  "done", // legacy
+]);
 
 export async function PATCH(
   request: Request,
@@ -15,10 +20,11 @@ export async function PATCH(
 
   const { id } = await params;
   const body = (await request.json().catch(() => ({}))) as { status?: string };
-  const status = body.status?.trim();
-  if (!status || !ALLOWED.has(status)) {
+  const raw = body.status?.trim();
+  if (!raw || !ALLOWED.has(raw)) {
     return NextResponse.json({ error: "INVALID_STATUS" }, { status: 400 });
   }
+  const status = normalizeOrderStatus(raw);
 
   if (!(isSupabaseConfigured() && (await isSupabaseSchemaReady()))) {
     return NextResponse.json({ error: "STORE_UNAVAILABLE" }, { status: 503 });

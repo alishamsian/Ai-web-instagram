@@ -10,6 +10,7 @@ export function PublishButton({
   publishLabel,
   unpublishLabel,
   locale = "en",
+  blockers,
   onPublished,
 }: {
   websiteId: string;
@@ -17,6 +18,8 @@ export function PublishButton({
   publishLabel: string;
   unpublishLabel: string;
   locale?: "fa" | "en";
+  /** Incomplete non-optional readiness items — confirm before publish. */
+  blockers?: { label: string; href?: string }[];
   onPublished?: () => void;
 }) {
   const router = useRouter();
@@ -30,6 +33,14 @@ export function PublishButton({
         isFa
           ? "لغو انتشار، لینک عمومی را قطع می‌کند. مطمئنی؟"
           : "Unpublishing takes the public link offline. Continue?",
+      );
+      if (!ok) return;
+    } else if (blockers && blockers.length > 0) {
+      const list = blockers.map((b) => `• ${b.label}`).join("\n");
+      const ok = window.confirm(
+        isFa
+          ? `قبل از انتشار چند مورد ناقص است:\n${list}\n\nبا این حال منتشر شود؟`
+          : `Some setup is incomplete:\n${list}\n\nPublish anyway?`,
       );
       if (!ok) return;
     }
@@ -47,6 +58,14 @@ export function PublishButton({
           message?: string;
           error?: string;
         };
+        if (payload.error === "NO_PRODUCTS") {
+          setError(
+            isFa
+              ? "حداقل یک محصول لازم است."
+              : "Add at least one product first.",
+          );
+          return;
+        }
         setError(
           payload.message ||
             (isFa ? "انتشار ناموفق بود." : "Publish failed."),

@@ -27,6 +27,7 @@ export type StoreOrderRow = {
   channel: string;
   status: string;
   customerNote: string | null;
+  customerContact: string | null;
   items: { name: string; qty: number; price?: number | null }[];
   createdAt: string;
 };
@@ -113,19 +114,42 @@ export async function getWorkspaceOrders(
 ): Promise<StoreOrderRow[]> {
   if (!(isSupabaseConfigured() && (await isSupabaseSchemaReady()))) return [];
   const db = getSupabaseAdmin();
-  const { data, error } = await db
+  const primary = await db
     .from("store_orders")
-    .select("id, website_id, channel, status, items, customer_note, created_at")
+    .select(
+      "id, website_id, channel, status, items, customer_note, customer_contact, created_at",
+    )
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (error || !data) return [];
-  return data.map((row) => ({
+
+  const rows =
+    primary.error && /customer_contact/i.test(primary.error.message)
+      ? (
+          await db
+            .from("store_orders")
+            .select(
+              "id, website_id, channel, status, items, customer_note, created_at",
+            )
+            .eq("workspace_id", workspaceId)
+            .order("created_at", { ascending: false })
+            .limit(limit)
+        ).data
+      : primary.error
+        ? null
+        : primary.data;
+
+  if (!rows) return [];
+  return rows.map((row) => ({
     id: row.id as string,
     websiteId: row.website_id as string,
     channel: (row.channel as string) || "manual",
     status: (row.status as string) || "new",
     customerNote: (row.customer_note as string | null) ?? null,
+    customerContact:
+      ((row as { customer_contact?: string | null }).customer_contact as
+        | string
+        | null) ?? null,
     items: (row.items as StoreOrderRow["items"]) ?? [],
     createdAt: row.created_at as string,
   }));
@@ -347,7 +371,7 @@ export function buildSiteReadiness(input: {
     {
       id: "domain",
       done: input.hasDomain,
-      href: `/${input.locale}/dashboard/domains`,
+      href: `/${input.locale}/dashboard/website?id=${id}&section=domain`,
       labelFa: "دامنه اختصاصی (اختیاری)",
       labelEn: "Custom domain (optional)",
     },

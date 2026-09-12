@@ -29,7 +29,7 @@ const MORE_LINKS = [
   { href: "dashboard/content", icon: Images, fa: "محتوا", en: "Content" },
   { href: "dashboard/import", icon: AtSign, fa: "ورود", en: "Import" },
   { href: "dashboard/analytics", icon: ChartNoAxesColumn, fa: "آمار", en: "Analytics" },
-  { href: "dashboard/domains", icon: Link2, fa: "دامنه", en: "Domains" },
+  { href: "dashboard/website?section=domain", icon: Link2, fa: "دامنه", en: "Domains" },
   { href: "dashboard/settings", icon: Settings, fa: "تنظیمات", en: "Settings" },
   { href: "dashboard/billing", icon: CreditCard, fa: "صورتحساب", en: "Billing" },
 ] as const;

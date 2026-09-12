@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/dashboard/ui";
+import {
+  customerStatusMessage,
+  nextOrderStatus,
+  nextOrderStatusLabel,
+  normalizeOrderStatus,
+  orderStatusLabel,
+  orderStatusTone,
+} from "@/lib/orders/status";
 import { cn } from "@/lib/utils";
 
 function waLink(phone: string | null | undefined, text: string) {
@@ -19,28 +27,33 @@ export function OrderActions({
   status,
   locale,
   whatsapp,
+  customerContact,
+  brandName,
   summary,
 }: {
   orderId: string;
   status: string;
   locale: "fa" | "en";
   whatsapp?: string | null;
+  customerContact?: string | null;
+  brandName?: string;
   summary: string;
 }) {
   const isFa = locale === "fa";
   const router = useRouter();
-  const [current, setCurrent] = useState(status);
+  const [current, setCurrent] = useState(normalizeOrderStatus(status));
   const [pending, setPending] = useState(false);
 
-  const tone =
-    current === "done"
-      ? ("success" as const)
-      : current === "seen"
-        ? ("accent" as const)
-        : ("warning" as const);
-
-  const next =
-    current === "new" ? "seen" : current === "seen" ? "done" : null;
+  const tone = orderStatusTone(current);
+  const next = nextOrderStatus(current);
+  const contactPhone = customerContact || whatsapp;
+  const message = customerStatusMessage({
+    status: current === "new" ? "confirmed" : current,
+    summary,
+    brandName: brandName || (isFa ? "فروشگاه" : "Store"),
+    locale,
+  });
+  const chat = waLink(contactPhone, message);
 
   async function setStatus(nextStatus: string) {
     setPending(true);
@@ -51,20 +64,15 @@ export function OrderActions({
     });
     setPending(false);
     if (!response.ok) return;
-    setCurrent(nextStatus);
+    setCurrent(normalizeOrderStatus(nextStatus));
     router.refresh();
   }
 
-  const chat = waLink(
-    whatsapp,
-    isFa
-      ? `سلام، درباره سفارش: ${summary}`
-      : `Hi, about your order: ${summary}`,
-  );
-
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <StatusBadge tone={tone}>{current}</StatusBadge>
+      <StatusBadge tone={tone}>
+        {orderStatusLabel(current, locale)}
+      </StatusBadge>
       {next ? (
         <Button
           type="button"
@@ -73,26 +81,18 @@ export function OrderActions({
           disabled={pending}
           onClick={() => void setStatus(next)}
         >
-          {pending
-            ? "…"
-            : next === "seen"
-              ? isFa
-                ? "دیدم"
-                : "Mark seen"
-              : isFa
-                ? "انجام شد"
-                : "Done"}
+          {pending ? "…" : nextOrderStatusLabel(next, locale)}
         </Button>
       ) : null}
       {chat ? (
         <Button asChild size="sm" variant="ghost">
           <a href={chat} target="_blank" rel="noreferrer">
-            WhatsApp
+            {isFa ? "پیام به مشتری" : "Message customer"}
             <ExternalLink className="size-3 opacity-60" aria-hidden />
           </a>
         </Button>
       ) : null}
-      {current === "done" ? (
+      {current === "delivered" ? (
         <button
           type="button"
           className={cn("text-[11px] text-muted-foreground hover:text-ink")}

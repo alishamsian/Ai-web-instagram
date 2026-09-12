@@ -6,30 +6,32 @@ export function StatusBadge({
   children,
   className,
 }: {
-  tone: "neutral" | "success" | "warning" | "danger" | "accent";
+  /** `default` is an alias for `neutral` (used by order actions). */
+  tone: "neutral" | "default" | "success" | "warning" | "danger" | "accent";
   children: ReactNode;
   className?: string;
 }) {
+  const resolved = tone === "default" ? "neutral" : tone;
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide",
-        tone === "neutral" && "bg-muted text-muted-foreground",
-        tone === "success" && "bg-emerald-500/12 text-emerald-700",
-        tone === "warning" && "bg-amber-500/14 text-amber-800",
-        tone === "danger" && "bg-red-500/12 text-red-700",
-        tone === "accent" && "bg-ink/8 text-ink",
+        resolved === "neutral" && "bg-muted text-muted-foreground",
+        resolved === "success" && "bg-emerald-500/12 text-emerald-700",
+        resolved === "warning" && "bg-amber-500/14 text-amber-800",
+        resolved === "danger" && "bg-red-500/12 text-red-700",
+        resolved === "accent" && "bg-ink/8 text-ink",
         className,
       )}
     >
       <span
         className={cn(
           "size-1.5 rounded-full",
-          tone === "neutral" && "bg-muted-foreground/50",
-          tone === "success" && "bg-emerald-500",
-          tone === "warning" && "bg-amber-500",
-          tone === "danger" && "bg-red-500",
-          tone === "accent" && "bg-ink",
+          resolved === "neutral" && "bg-muted-foreground/50",
+          resolved === "success" && "bg-emerald-500",
+          resolved === "warning" && "bg-amber-500",
+          resolved === "danger" && "bg-red-500",
+          resolved === "accent" && "bg-ink",
         )}
         aria-hidden
       />
@@ -87,11 +89,13 @@ export function EmptyState({
   body,
   action,
   icon,
+  steps,
 }: {
   title: string;
   body?: string;
   action?: ReactNode;
   icon?: ReactNode;
+  steps?: { label: string; href?: string; done?: boolean }[];
 }) {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-[linear-gradient(165deg,#fff_0%,#fafafa_55%,#f5f5f5_100%)] px-6 py-14 text-center md:px-10">
@@ -106,6 +110,50 @@ export function EmptyState({
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
           {body}
         </p>
+      ) : null}
+      {steps && steps.length > 0 ? (
+        <ol className="mx-auto mt-6 max-w-sm space-y-2 text-start">
+          {steps.map((step, index) => {
+            const content = (
+              <span className="flex items-start gap-2.5 text-sm">
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium tabular-nums",
+                    step.done
+                      ? "bg-emerald-500/15 text-emerald-800"
+                      : "bg-ink/8 text-ink",
+                  )}
+                >
+                  {step.done ? "✓" : index + 1}
+                </span>
+                <span
+                  className={cn(
+                    "leading-5",
+                    step.done
+                      ? "text-muted-foreground line-through"
+                      : "text-ink",
+                  )}
+                >
+                  {step.label}
+                </span>
+              </span>
+            );
+            return (
+              <li key={`${step.label}-${index}`}>
+                {step.href && !step.done ? (
+                  <a
+                    href={step.href}
+                    className="block rounded-xl px-3 py-2 transition-colors hover:bg-white"
+                  >
+                    {content}
+                  </a>
+                ) : (
+                  <div className="px-3 py-2">{content}</div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       ) : null}
       {action ? <div className="mt-7 flex justify-center gap-2">{action}</div> : null}
     </div>

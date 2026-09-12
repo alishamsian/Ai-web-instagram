@@ -30,12 +30,19 @@ describe("dashboard smoke — core happy path helpers", () => {
     expect(isProPlan("free")).toBe(false);
   });
 
-  it("order status flow is new → seen → done", () => {
+  it("order status flow is new → confirmed → shipped → delivered", () => {
     const next = (status: string) =>
-      status === "new" ? "seen" : status === "seen" ? "done" : null;
-    expect(next("new")).toBe("seen");
-    expect(next("seen")).toBe("done");
-    expect(next("done")).toBe(null);
+      status === "new"
+        ? "confirmed"
+        : status === "confirmed"
+          ? "shipped"
+          : status === "shipped"
+            ? "delivered"
+            : null;
+    expect(next("new")).toBe("confirmed");
+    expect(next("confirmed")).toBe("shipped");
+    expect(next("shipped")).toBe("delivered");
+    expect(next("delivered")).toBe(null);
   });
 
   it("import stale window is finite and > 1 minute", () => {

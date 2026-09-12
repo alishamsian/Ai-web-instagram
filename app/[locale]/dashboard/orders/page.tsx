@@ -43,6 +43,8 @@ export default async function OrdersPage({
       site.config.content.contact?.info?.whatsapp ?? null,
     ]),
   );
+  const primary = websites[0] ?? null;
+  const published = websites.some((s) => s.status === "published");
 
   return (
     <PageStack>
@@ -61,17 +63,51 @@ export default async function OrdersPage({
           title={isFa ? "هنوز سفارشی نیست" : "No orders yet"}
           body={
             isFa
-              ? "بعد از انتشار فروشگاه، سفارش‌های مشتریان اینجا می‌آید."
-              : "After you publish the store, customer intents appear here."
+              ? "با انتشار فروشگاه و اشتراک لینک بیو، سفارش‌ها اینجا می‌آیند."
+              : "Publish your store and share the bio link — orders land here."
           }
           icon={<ShoppingBag className="size-5" aria-hidden />}
+          steps={[
+            {
+              label: isFa ? "انتشار فروشگاه" : "Publish the store",
+              href: primary
+                ? `/${locale}/dashboard/website?id=${primary.id}`
+                : `/${locale}/create`,
+              done: published,
+            },
+            {
+              label: isFa ? "افزودن یا بررسی محصولات" : "Add or review products",
+              href: primary
+                ? `/${locale}/dashboard/content?id=${primary.id}`
+                : `/${locale}/create`,
+              done: Boolean(
+                primary?.config.content.products?.items?.length,
+              ),
+            },
+            {
+              label: isFa
+                ? "اشتراک لینک بیو در اینستاگرام"
+                : "Share bio link on Instagram",
+              href: primary
+                ? `/${locale}/dashboard/website?id=${primary.id}`
+                : undefined,
+              done: false,
+            },
+          ]}
           action={
-            websites[0] ? (
-              <Button asChild>
-                <Link href={`/${locale}/dashboard/website?id=${websites[0].id}`}>
-                  {dict.dashboard.openSite}
-                </Link>
-              </Button>
+            primary ? (
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button asChild>
+                  <Link href={`/${locale}/dashboard/website?id=${primary.id}`}>
+                    {published ? dict.dashboard.openSite : dict.dashboard.publish}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/${locale}/dashboard/content?id=${primary.id}`}>
+                    {dict.dashboard.content}
+                  </Link>
+                </Button>
+              </div>
             ) : (
               <Button asChild>
                 <Link href={`/${locale}/create`}>{dict.dashboard.emptyCta}</Link>
@@ -113,6 +149,8 @@ export default async function OrdersPage({
                     status={order.status}
                     locale={locale}
                     whatsapp={whatsappBySite.get(order.websiteId)}
+                    customerContact={order.customerContact}
+                    brandName={siteName.get(order.websiteId)}
                     summary={summary || order.channel}
                   />
                 </li>

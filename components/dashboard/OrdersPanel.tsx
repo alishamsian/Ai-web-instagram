@@ -2,17 +2,22 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/dashboard/ui";
 import { OrderActions } from "@/components/dashboard/OrderActions";
 import { formatRelativeTime, type StoreOrderRow } from "@/lib/dashboard/data";
+import { orderStatusTone } from "@/lib/orders/status";
 
 export function OrdersPanel({
   orders,
   locale,
   siteHref,
+  contentHref,
   whatsappBySite,
+  brandNameBySite,
 }: {
   orders: StoreOrderRow[];
   locale: "fa" | "en";
   siteHref?: string;
+  contentHref?: string;
   whatsappBySite?: Map<string, string | null>;
+  brandNameBySite?: Map<string, string>;
 }) {
   const isFa = locale === "fa";
 
@@ -43,17 +48,51 @@ export function OrdersPanel({
           </p>
           <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-muted-foreground">
             {isFa
-              ? "بعد از انتشار فروشگاه، سفارش‌ها اینجا می‌آیند."
-              : "They appear here after customers check out on your live store."}
+              ? "بعد از انتشار و آماده‌کردن محصولات، سفارش‌ها اینجا می‌آیند."
+              : "They appear after you publish and stock products."}
           </p>
-          {siteHref ? (
-            <Link
-              href={siteHref}
-              className="mt-4 inline-flex rounded-xl bg-ink px-3 py-2 text-xs font-medium text-white"
-            >
-              {isFa ? "رفتن به سایت" : "Open site hub"}
-            </Link>
-          ) : null}
+          <ol className="mx-auto mt-4 max-w-xs space-y-1.5 text-start text-[11px] text-muted-foreground">
+            <li>
+              {siteHref ? (
+                <Link href={siteHref} className="underline-offset-2 hover:underline">
+                  {isFa ? "۱. انتشار فروشگاه" : "1. Publish store"}
+                </Link>
+              ) : (
+                <span>{isFa ? "۱. انتشار فروشگاه" : "1. Publish store"}</span>
+              )}
+            </li>
+            <li>
+              {contentHref ? (
+                <Link
+                  href={contentHref}
+                  className="underline-offset-2 hover:underline"
+                >
+                  {isFa ? "۲. افزودن محصول" : "2. Add products"}
+                </Link>
+              ) : (
+                <span>{isFa ? "۲. افزودن محصول" : "2. Add products"}</span>
+              )}
+            </li>
+            <li>{isFa ? "۳. اشتراک لینک بیو" : "3. Share bio link"}</li>
+          </ol>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {siteHref ? (
+              <Link
+                href={siteHref}
+                className="inline-flex rounded-xl bg-ink px-3 py-2 text-xs font-medium text-white"
+              >
+                {isFa ? "انتشار" : "Publish"}
+              </Link>
+            ) : null}
+            {contentHref ? (
+              <Link
+                href={contentHref}
+                className="inline-flex rounded-xl bg-white px-3 py-2 text-xs font-medium text-ink ring-1 ring-border"
+              >
+                {isFa ? "محصولات" : "Products"}
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : (
         <ul className="divide-y divide-border">
@@ -61,14 +100,7 @@ export function OrdersPanel({
             const summary = order.items
               .map((item) => `${item.name} ×${item.qty}`)
               .join(isFa ? "، " : ", ");
-            const tone =
-              order.status === "done"
-                ? ("success" as const)
-                : order.status === "seen"
-                  ? ("accent" as const)
-                  : order.status === "new"
-                    ? ("warning" as const)
-                    : ("neutral" as const);
+            const tone = orderStatusTone(order.status);
             return (
               <li key={order.id} className="space-y-2.5 px-5 py-3.5">
                 <div className="flex items-start justify-between gap-3">
@@ -81,13 +113,17 @@ export function OrdersPanel({
                       {formatRelativeTime(order.createdAt, locale)}
                     </p>
                   </div>
-                  <StatusBadge tone={tone}>{order.status}</StatusBadge>
+                  <StatusBadge tone={tone === "neutral" ? "default" : tone}>
+                    {order.status}
+                  </StatusBadge>
                 </div>
                 <OrderActions
                   orderId={order.id}
                   status={order.status}
                   locale={locale}
                   whatsapp={whatsappBySite?.get(order.websiteId)}
+                  customerContact={order.customerContact}
+                  brandName={brandNameBySite?.get(order.websiteId)}
                   summary={summary || order.channel}
                 />
               </li>

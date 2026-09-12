@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BarChart3, Eye, MousePointerClick, Share2 } from "lucide-react";
+import { BarChart3, Eye, MousePointerClick, Package, Share2 } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import {
   getWorkspaceAnalytics,
@@ -39,6 +39,10 @@ export default async function AnalyticsPage({
   const sortedSeries = [...analytics.series].sort((a, b) =>
     a.date.localeCompare(b.date),
   );
+  const topProducts = analytics.byPath
+    .filter((row) => row.path.startsWith("/p/"))
+    .slice(0, 6);
+  const primary = published[0] ?? websites[0] ?? null;
 
   return (
     <PageStack>
@@ -53,10 +57,34 @@ export default async function AnalyticsPage({
           title={dict.dashboard.analyticsEmpty}
           body={dict.dashboard.analyticsEmptyBody}
           icon={<BarChart3 className="size-5" aria-hidden />}
+          steps={[
+            {
+              label: isFa ? "فروشگاه را منتشر کن" : "Publish your store",
+              href: primary
+                ? `/${locale}/dashboard/website?id=${primary.id}`
+                : `/${locale}/create`,
+              done: false,
+            },
+            {
+              label: isFa
+                ? "لینک بیو را در اینستاگرام بگذار"
+                : "Share the bio link on Instagram",
+              href: primary
+                ? `/${locale}/dashboard/website?id=${primary.id}`
+                : undefined,
+              done: false,
+            },
+            {
+              label: isFa
+                ? "بازدیدها اینجا ظاهر می‌شوند"
+                : "Visits will show up here",
+              done: false,
+            },
+          ]}
           action={
-            websites[0] ? (
+            primary ? (
               <Button asChild>
-                <Link href={`/${locale}/dashboard/website?id=${websites[0].id}`}>
+                <Link href={`/${locale}/dashboard/website?id=${primary.id}`}>
                   {dict.dashboard.publish}
                 </Link>
               </Button>
@@ -65,6 +93,47 @@ export default async function AnalyticsPage({
                 <Link href={`/${locale}/create`}>{dict.dashboard.emptyCta}</Link>
               </Button>
             )
+          }
+        />
+      ) : analytics.total === 0 ? (
+        <EmptyState
+          title={
+            isFa ? "هنوز بازدیدی نیست" : "No visits yet"
+          }
+          body={
+            isFa
+              ? "سایت منتشر شده — لینک بیو را به اشتراک بگذار تا آمار جمع شود."
+              : "Your site is live — share the bio link to start collecting stats."
+          }
+          icon={<BarChart3 className="size-5" aria-hidden />}
+          steps={[
+            {
+              label: isFa ? "سایت منتشر شده" : "Site published",
+              done: true,
+            },
+            {
+              label: isFa
+                ? "کپی لینک بیو و گذاشتن در اینستاگرام"
+                : "Copy bio link into Instagram",
+              href: primary
+                ? `/${locale}/dashboard/website?id=${primary.id}`
+                : undefined,
+            },
+            {
+              label: isFa ? "QR را در استوری بگذار" : "Post the QR in a story",
+              href: primary
+                ? `/${locale}/dashboard/website?id=${primary.id}`
+                : undefined,
+            },
+          ]}
+          action={
+            primary ? (
+              <Button asChild>
+                <Link href={`/${locale}/dashboard/website?id=${primary.id}`}>
+                  {isFa ? "رفتن به لینک بیو" : "Open bio tools"}
+                </Link>
+              </Button>
+            ) : null
           }
         />
       ) : (
@@ -78,26 +147,21 @@ export default async function AnalyticsPage({
             />
             <StatCard
               label={dict.dashboard.analyticsSources}
-              value={String(analytics.byPath.length)}
-              hint={isFa ? "مسیرهای دیده‌شده" : "Paths seen"}
+              value={String(analytics.byReferrer.length)}
+              hint={isFa ? "منابع ترافیک" : "Traffic sources"}
               icon={<Share2 className="size-4" aria-hidden />}
+            />
+            <StatCard
+              label={isFa ? "محصولات برتر" : "Top products"}
+              value={String(topProducts.length)}
+              hint={isFa ? "مسیرهای /p/" : "/p/ paths"}
+              icon={<Package className="size-4" aria-hidden />}
             />
             <StatCard
               label={dict.dashboard.analyticsTopPages}
               value={String(published.length)}
               hint={dict.dashboard.statsHintPublished}
               icon={<MousePointerClick className="size-4" aria-hidden />}
-            />
-            <StatCard
-              label={dict.dashboard.plan}
-              value={
-                session.workspace.plan === "pro"
-                  ? "Pro"
-                  : isFa
-                    ? "شروع"
-                    : "Starter"
-              }
-              icon={<BarChart3 className="size-4" aria-hidden />}
             />
           </div>
 
@@ -154,6 +218,42 @@ export default async function AnalyticsPage({
               ) : null}
             </div>
           </Panel>
+
+          {topProducts.length ? (
+            <Panel
+              title={isFa ? "محصولات برتر" : "Top products"}
+              description={
+                isFa
+                  ? "بازدید صفحات محصول (/p/)"
+                  : "Product page views (/p/)"
+              }
+              action={
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/${locale}/dashboard/content`}>
+                    {dict.dashboard.content}
+                  </Link>
+                </Button>
+              }
+            >
+              <ul className="divide-y divide-border">
+                {topProducts.map((row) => (
+                  <li key={row.path}>
+                    <Link
+                      href={`/${locale}/dashboard/content`}
+                      className="flex items-center justify-between gap-3 px-5 py-3.5 text-sm transition-colors hover:bg-[#fafafa]"
+                    >
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {row.path}
+                      </span>
+                      <span className="tabular-nums font-medium text-ink">
+                        {row.count}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          ) : null}
 
           {analytics.byReferrer.length ? (
             <Panel

@@ -83,13 +83,6 @@ export default async function DashboardLayout({
       group: "growth",
     },
     {
-      href: "dashboard/domains",
-      icon: "domains",
-      label: dict.dashboard.domains,
-      group: "growth",
-      badge: isPro ? undefined : "Pro",
-    },
-    {
       href: "dashboard/settings",
       icon: "settings",
       label: dict.dashboard.settings,

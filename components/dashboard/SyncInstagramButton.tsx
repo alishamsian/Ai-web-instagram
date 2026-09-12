@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,31 @@ export function SyncInstagramButton({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [estimatedNew, setEstimatedNew] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/websites/${websiteId}/sync/preview`,
+        );
+        if (!response.ok || cancelled) return;
+        const payload = (await response.json()) as {
+          estimatedNew?: number;
+        };
+        if (!cancelled && typeof payload.estimatedNew === "number") {
+          setEstimatedNew(payload.estimatedNew);
+        }
+      } catch {
+        /* ignore preview failures */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [websiteId, enabled]);
 
   async function onClick() {
     setPending(true);
@@ -59,7 +84,10 @@ export function SyncInstagramButton({
       );
       return;
     }
-    setMessage(isFa ? "جاب همگام‌سازی شروع شد." : "Sync job started.");
+    setMessage(
+      isFa ? "جاب همگام‌سازی شروع شد." : "Sync job started.",
+    );
+    setEstimatedNew(0);
     router.refresh();
   }
 
@@ -72,6 +100,13 @@ export function SyncInstagramButton({
       : isFa
         ? "همگام‌سازی اینستاگرام"
         : "Sync Instagram";
+
+  const badge =
+    enabled && estimatedNew != null && estimatedNew > 0
+      ? isFa
+        ? `${estimatedNew.toLocaleString("fa-IR")} جدید`
+        : `${estimatedNew} new`
+      : null;
 
   return (
     <div className={cn("inline-flex flex-col gap-1", className)}>
@@ -88,13 +123,19 @@ export function SyncInstagramButton({
             : undefined
         }
         onClick={() => void onClick()}
+        className="relative"
       >
         {label}
         {!enabled ? (
           <span className="ms-1 text-[10px] opacity-70">Pro</span>
         ) : null}
+        {badge ? (
+          <span className="ms-1.5 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
+            {badge}
+          </span>
+        ) : null}
       </Button>
-      {message && !compact ? (
+      {message ? (
         <p className="max-w-[14rem] text-[11px] leading-4 text-muted-foreground">
           {message}
         </p>

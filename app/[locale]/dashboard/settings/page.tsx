@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { countWebsitesForWorkspace } from "@/lib/database/queries";
 import { getSession } from "@/lib/auth/session";
 import { planUsageLabel } from "@/lib/dashboard/data";
+import { getWorkspaceNotificationSettings } from "@/lib/orders/notify";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { parseLocale } from "@/lib/i18n/paths";
 import { Button } from "@/components/ui/button";
 import { SignOutButton } from "@/components/dashboard/SignOutButton";
 import { PasswordChangeForm } from "@/components/dashboard/PasswordChangeForm";
 import { WorkspaceNameForm } from "@/components/dashboard/WorkspaceNameForm";
+import { NotificationSettingsForm } from "@/components/dashboard/NotificationSettingsForm";
 import {
   KeyValue,
   PageHeader,
@@ -26,7 +28,10 @@ export default async function SettingsPage({
   const dict = getDictionary(locale);
   const session = await getSession();
   if (!session) redirect(`/${locale}/login`);
-  const siteCount = await countWebsitesForWorkspace(session.workspace.id);
+  const [siteCount, notificationSettings] = await Promise.all([
+    countWebsitesForWorkspace(session.workspace.id),
+    getWorkspaceNotificationSettings(session.workspace.id),
+  ]);
   const isFa = locale === "fa";
 
   const planLabel =
@@ -88,6 +93,20 @@ export default async function SettingsPage({
           </div>
         </Panel>
 
+        <Panel
+          title={isFa ? "اعلان سفارش" : "Order notifications"}
+          description={
+            isFa
+              ? "ایمیل، تلگرام و واتساپ برای سفارش جدید"
+              : "Email, Telegram, and WhatsApp for new orders"
+          }
+        >
+          <NotificationSettingsForm
+            locale={locale}
+            initial={notificationSettings}
+          />
+        </Panel>
+
         <Panel title={isFa ? "امنیت" : "Security"}>
           <PasswordChangeForm locale={locale} />
         </Panel>
@@ -103,7 +122,13 @@ export default async function SettingsPage({
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href={`/${locale}/dashboard/domains`}>
+              <Link
+                href={
+                  siteCount > 0
+                    ? `/${locale}/dashboard/website?section=domain`
+                    : `/${locale}/dashboard/website`
+                }
+              >
                 {dict.dashboard.domains}
               </Link>
             </Button>

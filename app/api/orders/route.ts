@@ -3,6 +3,7 @@ import { isSupabaseConfigured } from "@/lib/config/env";
 import { isSupabaseSchemaReady } from "@/lib/database/supabase-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getPublishedWebsiteBySlug, getWebsiteById } from "@/lib/database/queries";
+import { notifyNewOrder } from "@/lib/orders/notify";
 
 type OrderItem = { name: string; qty: number; price?: number | null };
 
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
     slug?: string;
     channel?: string;
     note?: string;
+    customerContact?: string;
     items?: OrderItem[];
   };
 
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
       workspace_id: site.workspaceId,
       channel: (body.channel || "checkout").slice(0, 40),
       customer_note: body.note?.slice(0, 500) ?? null,
+      customer_contact: body.customerContact?.slice(0, 80) ?? null,
       items,
       status: "new",
     })
@@ -64,8 +67,47 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: "STORE_FAILED", message: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "STORE_FAILED", message: error.message },
+      { status: 500 },
+    );
   }
+
+  const locale = site.config.settings.language;
+  const summary = items
+    .map((i) => `${i.name} ×${i.qty}`)
+    .join(locale === "fa" ? "، " : ", ")
+    .slice(0, 240);
+
+  const { data: workspace } = await db
+    .from("workspaces")
+    .select("owner_id")
+    .eq("id", site.workspaceId)
+    .maybeSingle();
+  let ownerEmail: string | null = null;
+  if (workspace?.owner_id) {
+    const { data: profile } = await db
+      .from("profiles")
+      .select("email")
+      .eq("id", workspace.owner_id)
+      .maybeSingle();
+    ownerEmail = profile?.email ?? null;
+  }
+
+  const appUrl = (
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  ).replace(/\/$/, "");
+
+  void notifyNewOrder({
+    workspaceId: site.workspaceId,
+    ownerEmail,
+    brandName: site.config.brand.name,
+    summary,
+    orderId: data.id as string,
+    locale,
+    storeWhatsapp: site.config.content.contact?.info?.whatsapp,
+    dashboardOrdersUrl: `${appUrl}/${locale}/dashboard/orders`,
+  });
 
   return NextResponse.json({ ok: true, stored: true, id: data.id });
 }

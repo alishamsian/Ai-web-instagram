@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Loader2, Upload } from "lucide-react";
+import { Camera, ImagePlus, Images, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,8 @@ export function MediaUploadZone({
   onUploaded: (items: UploadedMediaItem[]) => void;
 }) {
   const isFa = locale === "fa";
-  const inputRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -76,17 +77,21 @@ export function MediaUploadZone({
       setError(isFa ? "آپلود ناموفق بود." : "Upload failed.");
     } finally {
       setPending(false);
-      if (inputRef.current) inputRef.current.value = "";
+      if (galleryRef.current) galleryRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
     }
   }
+
+  const accept =
+    "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime";
 
   if (compact) {
     return (
       <div>
         <input
-          ref={inputRef}
+          ref={galleryRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+          accept={accept}
           multiple
           className="hidden"
           onChange={(e) => {
@@ -98,7 +103,7 @@ export function MediaUploadZone({
           size="sm"
           variant="outline"
           disabled={disabled || pending}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => galleryRef.current?.click()}
         >
           {pending ? (
             <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -117,19 +122,55 @@ export function MediaUploadZone({
   return (
     <div>
       <input
-        ref={inputRef}
+        ref={galleryRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+        accept={accept}
         multiple
         className="hidden"
         onChange={(e) => {
           if (e.target.files) void uploadFiles(e.target.files);
         }}
       />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) void uploadFiles(e.target.files);
+        }}
+      />
+
+      {/* Mobile: clear camera / gallery actions */}
+      <div className="mb-3 grid grid-cols-2 gap-2 md:hidden">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={disabled || pending}
+          onClick={() => cameraRef.current?.click()}
+        >
+          <Camera className="size-3.5" aria-hidden />
+          {isFa ? "دوربین" : "Camera"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={disabled || pending}
+          onClick={() => galleryRef.current?.click()}
+        >
+          <Images className="size-3.5" aria-hidden />
+          {isFa ? "گالری" : "Gallery"}
+        </Button>
+      </div>
+
+      {/* Desktop: drag-drop zone */}
       <button
         type="button"
         disabled={disabled || pending}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => galleryRef.current?.click()}
         onDragEnter={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -144,7 +185,7 @@ export function MediaUploadZone({
           }
         }}
         className={cn(
-          "flex w-full flex-col items-center justify-center gap-2 rounded-[1.35rem] border border-dashed px-6 py-10 text-center transition-colors",
+          "hidden w-full flex-col items-center justify-center gap-2 rounded-[1.35rem] border border-dashed px-6 py-10 text-center transition-colors md:flex",
           dragging
             ? "border-ink bg-white"
             : "border-border/80 bg-white/60 hover:border-ink/40 hover:bg-white",
@@ -173,6 +214,15 @@ export function MediaUploadZone({
             : "Drag & drop or click. JPG/PNG/WebP/GIF and MP4/WebM — up to 12 files."}
         </p>
       </button>
+
+      {/* Mobile status when uploading */}
+      {pending ? (
+        <p className="mt-2 flex items-center justify-center gap-2 text-[12px] text-muted-foreground md:hidden">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          {isFa ? "در حال آپلود…" : "Uploading…"}
+        </p>
+      ) : null}
+
       {error ? (
         <p className="mt-2 text-[12px] text-amber-800">{error}</p>
       ) : null}

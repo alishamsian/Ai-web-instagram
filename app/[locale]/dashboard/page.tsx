@@ -258,9 +258,19 @@ export default async function DashboardPage({
               orders={orders}
               locale={locale}
               whatsappBySite={whatsappBySite}
+              brandNameBySite={
+                new Map(
+                  websites.map((site) => [site.id, site.config.brand.name]),
+                )
+              }
               siteHref={
                 website
                   ? `/${locale}/dashboard/website?id=${website.id}`
+                  : undefined
+              }
+              contentHref={
+                website
+                  ? `/${locale}/dashboard/content?id=${website.id}`
                   : undefined
               }
             />

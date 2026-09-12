@@ -18,6 +18,8 @@ create table if not exists workspaces (
   owner_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   plan text not null default 'free',
+  -- Owner prefs: emailEnabled, telegramEnabled, telegramChatId, whatsappNotify
+  notification_settings jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -294,6 +296,7 @@ create table if not exists store_orders (
   workspace_id uuid not null references workspaces(id) on delete cascade,
   channel text not null default 'manual',
   customer_note text,
+  customer_contact text,
   items jsonb not null default '[]'::jsonb,
   status text not null default 'new',
   created_at timestamptz not null default now()

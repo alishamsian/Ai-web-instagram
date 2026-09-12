@@ -18,6 +18,7 @@ import {
   EyeOff,
   GripVertical,
   ImagePlus,
+  MoreHorizontal,
   Package,
   Percent,
   Plus,
@@ -1008,15 +1009,240 @@ export function ContentStudio({
         ) : null}
 
         {selected.size > 0 ? (
-          <div className="space-y-2.5 rounded-2xl border border-border bg-white px-3.5 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-ink">
-                {selected.size} {isFa ? "انتخاب‌شده" : "selected"}
-              </span>
-              <div className="ms-auto flex flex-wrap gap-1.5">
+          <>
+            {/* Desktop selection bar */}
+            <div className="hidden space-y-2.5 rounded-2xl border border-border bg-white px-3.5 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.06)] md:block">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-ink">
+                  {selected.size} {isFa ? "انتخاب‌شده" : "selected"}
+                </span>
+                <div className="ms-auto flex flex-wrap gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => startReview([...selected], "price")}
+                  >
+                    <Wand2 className="size-3.5" aria-hidden />
+                    {isFa ? "ویرایش سریع" : "Quick edit"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => void suggestPricesForSelection([...selected])}
+                  >
+                    <Sparkles className="size-3.5" aria-hidden />
+                    {isFa ? "پیشنهاد قیمت" : "Suggest prices"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => void applyDefaultsToSelected()}
+                  >
+                    <Copy className="size-3.5" aria-hidden />
+                    {isFa ? "اعمال قالب" : "Apply defaults"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bulkTool === "price" ? "soft" : "ghost"}
+                    onClick={() =>
+                      setBulkTool((t) => (t === "price" ? null : "price"))
+                    }
+                  >
+                    {isFa ? "قیمت گروهی" : "Bulk price"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bulkTool === "category" ? "soft" : "ghost"}
+                    onClick={() =>
+                      setBulkTool((t) => (t === "category" ? null : "category"))
+                    }
+                  >
+                    {isFa ? "دسته" : "Category"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={bulkTool === "currency" ? "soft" : "ghost"}
+                    onClick={() =>
+                      setBulkTool((t) => (t === "currency" ? null : "currency"))
+                    }
+                  >
+                    {isFa ? "واحد" : "Currency"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void bulk({ hidden: true })}
+                  >
+                    <EyeOff className="size-3.5" aria-hidden />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void bulk({ hidden: false })}
+                  >
+                    <Eye className="size-3.5" aria-hidden />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void bulk({ delete: true })}
+                  >
+                    {isFa ? "حذف" : "Delete"}
+                  </Button>
+                  <button
+                    type="button"
+                    className="px-2 text-xs text-muted-foreground hover:text-ink"
+                    onClick={() => {
+                      setSelected(new Set());
+                      setBulkTool(null);
+                    }}
+                  >
+                    {isFa ? "لغو" : "Clear"}
+                  </button>
+                </div>
+              </div>
+
+              {bulkTool === "category" ? (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-2.5">
+                  <Input
+                    className="h-8 max-w-[200px]"
+                    value={bulkCategory}
+                    onChange={(e) => setBulkCategory(e.target.value)}
+                    placeholder={isFa ? "نام دسته…" : "Category name…"}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!bulkCategory.trim() || pending}
+                    onClick={() => void bulk({ category: bulkCategory.trim() })}
+                  >
+                    {isFa ? "اعمال به همه" : "Apply to all"}
+                  </Button>
+                </div>
+              ) : null}
+              {bulkTool === "currency" ? (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-2.5">
+                  {["IRT", "USD", "EUR"].map((c) => (
+                    <Button
+                      key={c}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={pending}
+                      onClick={() => {
+                        void bulk({ currency: c });
+                      }}
+                    >
+                      {c}
+                    </Button>
+                  ))}
+                  <Input
+                    className="h-8 w-24"
+                    value={bulkCurrency}
+                    onChange={(e) => setBulkCurrency(e.target.value)}
+                    placeholder="…"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!bulkCurrency.trim() || pending}
+                    onClick={() => void bulk({ currency: bulkCurrency.trim() })}
+                  >
+                    {isFa ? "اعمال" : "Apply"}
+                  </Button>
+                </div>
+              ) : null}
+              {bulkTool === "price" ? (
+                <div className="flex flex-wrap items-end gap-3 border-t border-border/70 pt-2.5">
+                  <label className="text-[11px] text-muted-foreground">
+                    {isFa ? "قیمت یکسان" : "Same price"}
+                    <Input
+                      className="mt-1 h-8 w-32"
+                      type="number"
+                      value={bulkPrice}
+                      onChange={(e) => setBulkPrice(e.target.value)}
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={bulkPrice === "" || pending}
+                    onClick={() =>
+                      void bulk({
+                        price:
+                          bulkPrice.trim() === ""
+                            ? null
+                            : Number(bulkPrice),
+                      })
+                    }
+                  >
+                    {isFa ? "اعمال قیمت" : "Set price"}
+                  </Button>
+                  <span className="hidden h-6 w-px bg-border sm:block" />
+                  <label className="text-[11px] text-muted-foreground">
+                    {isFa ? "درصد تغییر" : "% change"}
+                    <div className="mt-1 flex gap-1.5">
+                      <Input
+                        className="h-8 w-20"
+                        type="number"
+                        value={pricePercent}
+                        onChange={(e) => setPricePercent(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() =>
+                          void applyPricePercent(Number(pricePercent) || 0)
+                        }
+                      >
+                        <Percent className="size-3.5" aria-hidden />
+                        {isFa ? "اعمال" : "Apply"}
+                      </Button>
+                    </div>
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => void roundSelectedPrices()}
+                  >
+                    {isFa ? "گرد کردن" : "Round"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => startReview([...selected], "price")}
+                  >
+                    {isFa ? "دونه‌دونه" : "One by one"}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Mobile fixed bar above tab bar */}
+            <div className="fixed inset-x-0 bottom-[4.75rem] z-30 border-t border-border bg-white/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur-md md:hidden">
+              <div className="flex items-center gap-2">
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-ink">
+                  {selected.size}
+                </span>
                 <Button
                   type="button"
                   size="sm"
+                  className="flex-1"
                   onClick={() => startReview([...selected], "price")}
                 >
                   <Wand2 className="size-3.5" aria-hidden />
@@ -1026,212 +1252,164 @@ export function ContentStudio({
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="flex-1"
                   disabled={pending}
                   onClick={() => void suggestPricesForSelection([...selected])}
                 >
                   <Sparkles className="size-3.5" aria-hidden />
                   {isFa ? "پیشنهاد قیمت" : "Suggest prices"}
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() => void applyDefaultsToSelected()}
-                >
-                  <Copy className="size-3.5" aria-hidden />
-                  {isFa ? "اعمال قالب" : "Apply defaults"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={bulkTool === "price" ? "soft" : "ghost"}
-                  onClick={() =>
-                    setBulkTool((t) => (t === "price" ? null : "price"))
-                  }
-                >
-                  {isFa ? "قیمت گروهی" : "Bulk price"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={bulkTool === "category" ? "soft" : "ghost"}
-                  onClick={() =>
-                    setBulkTool((t) => (t === "category" ? null : "category"))
-                  }
-                >
-                  {isFa ? "دسته" : "Category"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={bulkTool === "currency" ? "soft" : "ghost"}
-                  onClick={() =>
-                    setBulkTool((t) => (t === "currency" ? null : "currency"))
-                  }
-                >
-                  {isFa ? "واحد" : "Currency"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void bulk({ hidden: true })}
-                >
-                  <EyeOff className="size-3.5" aria-hidden />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void bulk({ hidden: false })}
-                >
-                  <Eye className="size-3.5" aria-hidden />
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void bulk({ delete: true })}
-                >
-                  {isFa ? "حذف" : "Delete"}
-                </Button>
-                <button
-                  type="button"
-                  className="px-2 text-xs text-muted-foreground hover:text-ink"
-                  onClick={() => {
-                    setSelected(new Set());
-                    setBulkTool(null);
-                  }}
-                >
-                  {isFa ? "لغو" : "Clear"}
-                </button>
-              </div>
-            </div>
-
-            {bulkTool === "category" ? (
-              <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-2.5">
-                <Input
-                  className="h-8 max-w-[200px]"
-                  value={bulkCategory}
-                  onChange={(e) => setBulkCategory(e.target.value)}
-                  placeholder={isFa ? "نام دسته…" : "Category name…"}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={!bulkCategory.trim() || pending}
-                  onClick={() => void bulk({ category: bulkCategory.trim() })}
-                >
-                  {isFa ? "اعمال به همه" : "Apply to all"}
-                </Button>
-              </div>
-            ) : null}
-
-            {bulkTool === "currency" ? (
-              <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-2.5">
-                {(isFa ? ["IRT", "USD", "EUR"] : ["USD", "EUR", "IRT"]).map(
-                  (c) => (
+                <details className="relative shrink-0">
+                  <summary className="flex size-9 list-none cursor-pointer items-center justify-center rounded-[10px] border border-border bg-white text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+                    <MoreHorizontal className="size-4" aria-hidden />
+                  </summary>
+                  <div className="absolute end-0 bottom-[calc(100%+0.5rem)] z-40 w-48 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
                     <button
-                      key={c}
                       type="button"
-                      className="rounded-full bg-[#f4f4f2] px-3 py-1 text-[11px] font-medium hover:bg-ink hover:text-white"
-                      onClick={() => {
-                        setBulkCurrency(c);
-                        void bulk({ currency: c });
-                      }}
-                    >
-                      {c}
-                    </button>
-                  ),
-                )}
-                <Input
-                  className="h-8 w-24"
-                  value={bulkCurrency}
-                  onChange={(e) => setBulkCurrency(e.target.value)}
-                  placeholder={isFa ? "سفارشی" : "Custom"}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={!bulkCurrency.trim() || pending}
-                  onClick={() => void bulk({ currency: bulkCurrency.trim() })}
-                >
-                  {isFa ? "اعمال" : "Apply"}
-                </Button>
-              </div>
-            ) : null}
-
-            {bulkTool === "price" ? (
-              <div className="flex flex-wrap items-end gap-3 border-t border-border/70 pt-2.5">
-                <label className="text-[11px] text-muted-foreground">
-                  {isFa ? "قیمت یکسان" : "Same price"}
-                  <Input
-                    className="mt-1 h-8 w-32"
-                    type="number"
-                    value={bulkPrice}
-                    onChange={(e) => setBulkPrice(e.target.value)}
-                  />
-                </label>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={bulkPrice === "" || pending}
-                  onClick={() =>
-                    void bulk({
-                      price:
-                        bulkPrice.trim() === ""
-                          ? null
-                          : Number(bulkPrice),
-                    })
-                  }
-                >
-                  {isFa ? "اعمال" : "Set"}
-                </Button>
-                <span className="hidden h-6 w-px bg-border sm:block" />
-                <label className="text-[11px] text-muted-foreground">
-                  {isFa ? "درصد تغییر" : "% change"}
-                  <div className="mt-1 flex gap-1.5">
-                    <Input
-                      className="h-8 w-20"
-                      type="number"
-                      value={pricePercent}
-                      onChange={(e) => setPricePercent(e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-xs hover:bg-muted"
                       disabled={pending}
+                      onClick={() => void applyDefaultsToSelected()}
+                    >
+                      <Copy className="size-3.5" aria-hidden />
+                      {isFa ? "اعمال قالب" : "Apply defaults"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-xs hover:bg-muted"
                       onClick={() =>
-                        void applyPricePercent(Number(pricePercent) || 0)
+                        setBulkTool((t) => (t === "price" ? null : "price"))
                       }
                     >
                       <Percent className="size-3.5" aria-hidden />
-                      {isFa ? "اعمال" : "Apply"}
-                    </Button>
+                      {isFa ? "قیمت گروهی" : "Bulk price"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-xs hover:bg-muted"
+                      onClick={() =>
+                        setBulkTool((t) =>
+                          t === "category" ? null : "category",
+                        )
+                      }
+                    >
+                      {isFa ? "دسته" : "Category"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-xs hover:bg-muted"
+                      onClick={() =>
+                        setBulkTool((t) =>
+                          t === "currency" ? null : "currency",
+                        )
+                      }
+                    >
+                      {isFa ? "واحد" : "Currency"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-xs hover:bg-muted"
+                      onClick={() => void bulk({ hidden: true })}
+                    >
+                      <EyeOff className="size-3.5" aria-hidden />
+                      {isFa ? "مخفی" : "Hide"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-xs hover:bg-muted"
+                      onClick={() => void bulk({ hidden: false })}
+                    >
+                      <Eye className="size-3.5" aria-hidden />
+                      {isFa ? "نمایش" : "Show"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-xs text-red-700 hover:bg-muted"
+                      onClick={() => void bulk({ delete: true })}
+                    >
+                      {isFa ? "حذف" : "Delete"}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-start text-xs text-muted-foreground hover:bg-muted"
+                      onClick={() => {
+                        setSelected(new Set());
+                        setBulkTool(null);
+                      }}
+                    >
+                      <X className="size-3.5" aria-hidden />
+                      {isFa ? "لغو انتخاب" : "Clear"}
+                    </button>
                   </div>
-                </label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() => void roundSelectedPrices()}
-                >
-                  {isFa ? "گرد کردن" : "Round"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => startReview([...selected], "price")}
-                >
-                  {isFa ? "دونه‌دونه" : "One by one"}
-                </Button>
+                </details>
               </div>
-            ) : null}
-          </div>
+              {bulkTool ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/70 pt-2">
+                  {bulkTool === "category" ? (
+                    <>
+                      <Input
+                        className="h-8 min-w-0 flex-1"
+                        value={bulkCategory}
+                        onChange={(e) => setBulkCategory(e.target.value)}
+                        placeholder={isFa ? "نام دسته…" : "Category name…"}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!bulkCategory.trim() || pending}
+                        onClick={() =>
+                          void bulk({ category: bulkCategory.trim() })
+                        }
+                      >
+                        {isFa ? "اعمال" : "Apply"}
+                      </Button>
+                    </>
+                  ) : null}
+                  {bulkTool === "currency" ? (
+                    <>
+                      {["IRT", "USD", "EUR"].map((c) => (
+                        <Button
+                          key={c}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={pending}
+                          onClick={() => void bulk({ currency: c })}
+                        >
+                          {c}
+                        </Button>
+                      ))}
+                    </>
+                  ) : null}
+                  {bulkTool === "price" ? (
+                    <>
+                      <Input
+                        className="h-8 w-28"
+                        type="number"
+                        value={bulkPrice}
+                        onChange={(e) => setBulkPrice(e.target.value)}
+                        placeholder={isFa ? "قیمت" : "Price"}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={bulkPrice === "" || pending}
+                        onClick={() =>
+                          void bulk({
+                            price:
+                              bulkPrice.trim() === ""
+                                ? null
+                                : Number(bulkPrice),
+                          })
+                        }
+                      >
+                        {isFa ? "اعمال" : "Apply"}
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </>
         ) : null}
       </div>
 

@@ -20,6 +20,7 @@ import { SiteSlugForm } from "@/components/dashboard/SiteSlugForm";
 import { SyncInstagramButton } from "@/components/dashboard/SyncInstagramButton";
 import { SiteImage } from "@/components/website/SiteImage";
 import { SoftBanner, StatusBadge } from "@/components/dashboard/ui";
+import { HashDetailsOpener } from "@/components/dashboard/HashDetailsOpener";
 import {
   formatRelativeTime,
   versionDiffLabel,
@@ -90,6 +91,14 @@ export function WebsiteHubView({
   const doneCount = readiness.filter((s) => s.done).length;
   const blockPublish = !published && productsCount === 0;
   const showReadiness = incomplete.length > 0;
+  const publishBlockers = readiness
+    .filter(
+      (step) => !step.done && (step.id === "products" || step.id === "whatsapp"),
+    )
+    .map((step) => ({
+      label: isFa ? step.labelFa : step.labelEn,
+      href: step.href,
+    }));
 
   const nextStep = blockPublish
     ? isFa
@@ -109,6 +118,7 @@ export function WebsiteHubView({
 
   return (
     <div className="space-y-6">
+      <HashDetailsOpener id="domain" />
       {blockPublish ? (
         <SoftBanner tone="warning">
           {isFa
@@ -272,16 +282,10 @@ export function WebsiteHubView({
                     publishLabel={dict.dashboard.publish}
                     unpublishLabel={dict.dashboard.unpublish}
                     locale={locale}
+                    blockers={publishBlockers}
                   />
                 ) : (
-                  <>
-                    <ShareLinkButton url={liveUrl} locale={locale} />
-                    <BioLinkButton
-                      url={liveUrl}
-                      brandName={website.config.brand.name}
-                      locale={locale}
-                    />
-                  </>
+                  <ShareLinkButton url={liveUrl} locale={locale} />
                 )}
                 <Button
                   asChild
@@ -306,6 +310,35 @@ export function WebsiteHubView({
                   </Button>
                 )}
               </div>
+
+              {published ? (
+                <div className="rounded-2xl border border-border/80 bg-[#fafaf8] p-3.5 sm:p-4">
+                  <p className="text-[11px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                    {isFa ? "لینک بیو و QR" : "Bio link & QR"}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {isFa
+                      ? "در بیوی اینستاگرام بگذار و برای استوری چاپ کن."
+                      : "Paste into Instagram bio and print for stories."}
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
+                    <div className="flex flex-wrap gap-2">
+                      <BioLinkButton
+                        url={liveUrl}
+                        brandName={website.config.brand.name}
+                        locale={locale}
+                      />
+                      <ShareLinkButton url={liveUrl} locale={locale} />
+                    </div>
+                    <SiteQrCard
+                      url={liveUrl}
+                      brandName={website.config.brand.name}
+                      locale={locale}
+                      prominent
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               {/* Destinations as text rail */}
               <nav className="flex flex-wrap gap-x-1 gap-y-1 text-xs">
@@ -367,7 +400,7 @@ export function WebsiteHubView({
                   </Button>
                 ) : null}
                 <Button asChild size="sm" variant="ghost">
-                  <Link href={`/${locale}/dashboard/domains`}>
+                  <Link href={`?id=${website.id}&section=domain`}>
                     {dict.dashboard.domains}
                   </Link>
                 </Button>
@@ -441,6 +474,7 @@ export function WebsiteHubView({
         </div>
 
         <Accordion
+          id="domain"
           title={isFa ? "اسلاگ، QR و دامنه" : "Slug, QR & domain"}
           defaultOpen={false}
         >
@@ -609,17 +643,20 @@ function Accordion({
   children,
   defaultOpen = false,
   last = false,
+  id,
 }: {
   title: string;
   children: ReactNode;
   defaultOpen?: boolean;
   last?: boolean;
+  id?: string;
 }) {
   return (
     <details
+      id={id}
       open={defaultOpen || undefined}
       className={cn(
-        "group border-border open:bg-[#fafafa]/60",
+        "group scroll-mt-24 border-border open:bg-[#fafafa]/60",
         !last && "border-b",
       )}
     >
