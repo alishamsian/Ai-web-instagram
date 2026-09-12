@@ -29,10 +29,13 @@ export function categoryLabel(
   return fallback ?? (isFa ? "مجموعه" : "Collection");
 }
 
-export function getStoreCatalog(config: WebsiteConfig): StoreCatalogProduct[] {
+export function getStoreCatalog(
+  config: WebsiteConfig,
+  options?: { includeHidden?: boolean },
+): StoreCatalogProduct[] {
   const locale = config.settings.language;
   const raw = (config.content.products?.items ?? []).filter(
-    (item) => !item.hidden,
+    (item) => options?.includeHidden || !item.hidden,
   );
 
   return raw.map((item, index) =>

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { isSupabaseConfigured } from "@/lib/config/env";
 import {
   isSupabaseSchemaReady,
@@ -10,26 +11,32 @@ import {
 } from "@/lib/database/supabase-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readStore } from "@/lib/database/store";
-import { planLimits } from "@/lib/config/plans";
 import type { ImportJob } from "@/types/jobs";
 import type { InstagramImport } from "@/types/instagram";
 import type { WebsiteRecord } from "@/types/website";
+import {
+  classifyReferrer,
+  formatRelativeTime,
+  planUsageLabel,
+  siteCoverUrl,
+  siteLogoUrl,
+  type SetupStep,
+  type StoreOrderRow,
+} from "@/lib/dashboard/format";
+
+export type { SetupStep, StoreOrderRow };
+export {
+  classifyReferrer,
+  formatRelativeTime,
+  planUsageLabel,
+  siteCoverUrl,
+  siteLogoUrl,
+};
 
 export type WorkspaceDashboardData = {
   websites: WebsiteRecord[];
   imports: InstagramImport[];
   jobs: ImportJob[];
-};
-
-export type StoreOrderRow = {
-  id: string;
-  websiteId: string;
-  channel: string;
-  status: string;
-  customerNote: string | null;
-  customerContact: string | null;
-  items: { name: string; qty: number; price?: number | null }[];
-  createdAt: string;
 };
 
 export type DashboardAnalytics = {
@@ -39,8 +46,7 @@ export type DashboardAnalytics = {
   byReferrer: { source: string; count: number }[];
 };
 
-/** Workspace-scoped dashboard fetch — never loads website_versions. */
-export async function getWorkspaceDashboardData(
+async function fetchWorkspaceDashboardData(
   workspaceId: string,
 ): Promise<WorkspaceDashboardData> {
   if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
@@ -96,6 +102,137 @@ export async function getWorkspaceDashboardData(
     );
 
   return { websites, imports, jobs };
+}
+
+/**
+ * Workspace dashboard bundle.
+ * Request-deduped via React.cache + short cross-navigation cache.
+ */
+export const getWorkspaceDashboardData = cache(
+  async (workspaceId: string): Promise<WorkspaceDashboardData> => {
+    if (!(isSupabaseConfigured() && (await isSupabaseSchemaReady()))) {
+      return fetchWorkspaceDashboardData(workspaceId);
+    }
+    const { unstable_cache } = await import("next/cache");
+    return unstable_cache(
+      () => fetchWorkspaceDashboardData(workspaceId),
+      [`workspace-dashboard-${workspaceId}`],
+      {
+        revalidate: 20,
+        tags: [`workspace-dashboard-${workspaceId}`],
+      },
+    )();
+  },
+);
+
+/** Websites only — skips heavy Instagram import JSON blobs. */
+export const getWorkspaceWebsites = cache(
+  async (workspaceId: string): Promise<WebsiteRecord[]> => {
+    if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+      const { unstable_cache } = await import("next/cache");
+      return unstable_cache(
+        async () => {
+          const db = getSupabaseAdmin();
+          const { data } = await db
+            .from("websites")
+            .select("*")
+            .eq("workspace_id", workspaceId)
+            .order("updated_at", { ascending: false });
+          return (data ?? []).map((row) => mapWebsiteRow(row as WebsiteRow));
+        },
+        [`workspace-websites-${workspaceId}`],
+        { revalidate: 20, tags: [`workspace-dashboard-${workspaceId}`] },
+      )();
+    }
+    const data = await fetchWorkspaceDashboardData(workspaceId);
+    return data.websites;
+  },
+);
+
+/** Light import rows for channel connection UI (no posts/media blobs). */
+export const getWorkspaceImportHandles = cache(
+  async (
+    workspaceId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      workspaceId: string;
+      username: string;
+      createdAt: string;
+      updatedAt: string;
+      profile: InstagramImport["profile"] | null;
+    }>
+  > => {
+    if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+      const { unstable_cache } = await import("next/cache");
+      return unstable_cache(
+        async () => {
+          const db = getSupabaseAdmin();
+          const { data } = await db
+            .from("instagram_imports")
+            .select(
+              "id, workspace_id, username, created_at, updated_at, profile:data->profile",
+            )
+            .eq("workspace_id", workspaceId)
+            .order("updated_at", { ascending: false });
+
+          return (data ?? []).map((row) => {
+            const r = row as {
+              id: string;
+              workspace_id: string;
+              username: string;
+              created_at: string;
+              updated_at: string;
+              profile?: InstagramImport["profile"] | null;
+            };
+            return {
+              id: r.id,
+              workspaceId: r.workspace_id,
+              username: r.username,
+              createdAt: r.created_at,
+              updatedAt: r.updated_at,
+              profile: r.profile ?? null,
+            };
+          });
+        },
+        [`workspace-import-handles-${workspaceId}`],
+        { revalidate: 20, tags: [`workspace-dashboard-${workspaceId}`] },
+      )();
+    }
+    const data = await fetchWorkspaceDashboardData(workspaceId);
+    return data.imports.map((imp) => ({
+      id: imp.id,
+      workspaceId: imp.workspaceId,
+      username: imp.username,
+      createdAt: imp.createdAt,
+      updatedAt: imp.updatedAt,
+      profile: imp.profile ?? null,
+    }));
+  },
+);
+
+/** Nav badge metrics — must stay fast on every layout render. */
+export async function getCachedNavMetrics(workspaceId: string) {
+  const { countWebsitesForWorkspace } = await import("@/lib/database/queries");
+  if (!(isSupabaseConfigured() && (await isSupabaseSchemaReady()))) {
+    const [siteCount, freshOrders] = await Promise.all([
+      countWebsitesForWorkspace(workspaceId),
+      countFreshNewOrders(workspaceId, 24),
+    ]);
+    return { siteCount, freshOrders };
+  }
+  const { unstable_cache } = await import("next/cache");
+  return unstable_cache(
+    async () => {
+      const [siteCount, freshOrders] = await Promise.all([
+        countWebsitesForWorkspace(workspaceId),
+        countFreshNewOrders(workspaceId, 24),
+      ]);
+      return { siteCount, freshOrders };
+    },
+    [`nav-metrics-${workspaceId}`],
+    { revalidate: 15, tags: [`nav-metrics-${workspaceId}`] },
+  )();
 }
 
 export function getActiveImportJob(jobs: ImportJob[]) {
@@ -235,21 +372,6 @@ export async function getWorkspaceAnalytics(
   };
 }
 
-export function classifyReferrer(referrer: string | null | undefined): string {
-  if (!referrer?.trim()) return "direct";
-  try {
-    const host = new URL(referrer).hostname.replace(/^www\./, "").toLowerCase();
-    if (host.includes("instagram")) return "instagram";
-    if (host.includes("t.me") || host.includes("telegram")) return "telegram";
-    if (host.includes("google")) return "google";
-    if (host.includes("twitter") || host.includes("x.com")) return "x";
-    if (host.includes("facebook") || host.includes("fb.")) return "facebook";
-    return host || "other";
-  } catch {
-    return "other";
-  }
-}
-
 /** Per-website visit totals for the last N days. */
 export async function getWebsiteVisitCounts(
   websiteIds: string[],
@@ -273,14 +395,6 @@ export async function getWebsiteVisitCounts(
   }
   return result;
 }
-
-export type SetupStep = {
-  id: string;
-  done: boolean;
-  href: string;
-  labelFa: string;
-  labelEn: string;
-};
 
 export function buildSetupChecklist(input: {
   locale: "fa" | "en";
@@ -371,7 +485,7 @@ export function buildSiteReadiness(input: {
     {
       id: "domain",
       done: input.hasDomain,
-      href: `/${input.locale}/dashboard/website?id=${id}&section=domain`,
+      href: `/${input.locale}/dashboard/domains?id=${id}`,
       labelFa: "دامنه اختصاصی (اختیاری)",
       labelEn: "Custom domain (optional)",
     },
@@ -429,47 +543,6 @@ export function versionDiffLabel(
     bits.push("SEO");
   }
   return bits.length ? bits.join(isFa ? " · " : " · ") : null;
-}
-
-export function planUsageLabel(
-  plan: string | undefined,
-  siteCount: number,
-  locale: "fa" | "en",
-) {
-  const limits = planLimits(plan);
-  if (locale === "fa") {
-    return `${siteCount} از ${limits.maxWebsites} سایت`;
-  }
-  return `${siteCount} of ${limits.maxWebsites} sites`;
-}
-
-export function siteCoverUrl(site: WebsiteRecord): string | null {
-  if (site.config.brand.logo) return site.config.brand.logo;
-  const heroId = site.config.content.hero.imageId;
-  if (heroId && site.config.media[heroId]?.url) {
-    return site.config.media[heroId].url;
-  }
-  const gallery = site.config.content.gallery?.imageIds ?? [];
-  for (const id of gallery) {
-    if (site.config.media[id]?.url) return site.config.media[id].url;
-  }
-  const firstMedia = Object.values(site.config.media)[0];
-  return firstMedia?.url ?? null;
-}
-
-export function formatRelativeTime(iso: string, locale: "fa" | "en") {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.max(0, Math.round(diff / 60_000));
-  if (mins < 1) return locale === "fa" ? "همین الان" : "Just now";
-  if (mins < 60) {
-    return locale === "fa" ? `${mins} دقیقه پیش` : `${mins}m ago`;
-  }
-  const hours = Math.round(mins / 60);
-  if (hours < 24) {
-    return locale === "fa" ? `${hours} ساعت پیش` : `${hours}h ago`;
-  }
-  const days = Math.round(hours / 24);
-  return locale === "fa" ? `${days} روز پیش` : `${days}d ago`;
 }
 
 export function jobStageLabel(

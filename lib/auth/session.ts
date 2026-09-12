@@ -14,7 +14,11 @@ import type { Session, User, Workspace } from "@/types/user";
 const LEGACY_SESSION_COOKIE = "vitrin_session";
 const DEMO_EMAIL = "demo@vitrin.app";
 
-async function loadWorkspaceForUser(userId: string, email: string, name: string | null) {
+async function loadWorkspaceForUserUncached(
+  userId: string,
+  email: string,
+  name: string | null,
+) {
   const schemaReady = await isSupabaseSchemaReady();
   const displayName = name ?? email.split("@")[0];
 
@@ -119,6 +123,23 @@ async function loadWorkspaceForUser(userId: string, email: string, name: string 
   return created.session;
 }
 
+/** Short cache — profile/workspace barely change between navigations. */
+async function loadWorkspaceForUser(
+  userId: string,
+  email: string,
+  name: string | null,
+) {
+  if (!isSupabaseConfigured() || !(await isSupabaseSchemaReady())) {
+    return loadWorkspaceForUserUncached(userId, email, name);
+  }
+  const { unstable_cache } = await import("next/cache");
+  return unstable_cache(
+    () => loadWorkspaceForUserUncached(userId, email, name),
+    [`session-workspace-${userId}`],
+    { revalidate: 60, tags: [`session-workspace-${userId}`] },
+  )();
+}
+
 async function getLegacyFileSession(): Promise<Session | null> {
   const jar = await cookies();
   const userId = jar.get(LEGACY_SESSION_COOKIE)?.value;
@@ -134,6 +155,23 @@ export const getSession = cache(async (): Promise<Session | null> => {
   if (isSupabaseConfigured()) {
     try {
       const supabase = await createClient();
+      // Prefer local JWT claims (middleware already refreshed) — skips Auth HTTP round-trip.
+      const { data: claimsData } = await supabase.auth.getClaims();
+      const claims = claimsData?.claims as
+        | {
+            sub?: string;
+            email?: string;
+            user_metadata?: { name?: string };
+          }
+        | undefined;
+      if (claims?.sub && claims.email) {
+        return loadWorkspaceForUser(
+          claims.sub,
+          claims.email.toLowerCase(),
+          claims.user_metadata?.name ?? null,
+        );
+      }
+
       const { data, error } = await supabase.auth.getUser();
       if (error || !data.user?.email) return null;
       return loadWorkspaceForUser(

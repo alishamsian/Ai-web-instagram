@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { AppStore } from "@/lib/database/store";
 import { readBlobStore, writeBlobStore } from "@/lib/database/supabase-blob-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -73,7 +74,7 @@ function isMissingRelation(error: { message?: string; code?: string } | null) {
 }
 
 /** True when `supabase/schema.sql` has been applied. */
-export async function isSupabaseSchemaReady() {
+export const isSupabaseSchemaReady = cache(async () => {
   if (schemaReadyCache !== null) return schemaReadyCache;
   try {
     const db = getSupabaseAdmin();
@@ -96,7 +97,7 @@ export async function isSupabaseSchemaReady() {
     );
     return false;
   }
-}
+});
 
 export function resetSupabaseSchemaCache() {
   schemaReadyCache = null;

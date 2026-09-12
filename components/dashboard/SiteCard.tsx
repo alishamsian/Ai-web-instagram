@@ -3,7 +3,7 @@ import { SiteImage } from "@/components/website/SiteImage";
 import { StatusBadge } from "@/components/dashboard/ui";
 import { Button } from "@/components/ui/button";
 import { ShareLinkButton } from "@/components/dashboard/ShareLinkButton";
-import { siteCoverUrl } from "@/lib/dashboard/data";
+import { siteCoverUrl } from "@/lib/dashboard/format";
 import { publishedSiteUrl } from "@/lib/config/runtime";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";

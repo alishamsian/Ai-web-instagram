@@ -94,7 +94,7 @@ function rewriteToSite(request: NextRequest, slug: string) {
   return updateSession(request, NextResponse.rewrite(url));
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host");
   const sub = subdomainSlug(host);

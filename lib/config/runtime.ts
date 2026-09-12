@@ -70,7 +70,10 @@ export function assertJobWorkerAuthorized(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   const bearer = header.startsWith("Bearer ") ? header.slice(7) : "";
   const alt = request.headers.get("x-job-secret") ?? "";
-  return bearer === secret || alt === secret;
+  if (bearer === secret || alt === secret) return true;
+  // Vercel Cron invokes with CRON_SECRET bearer when configured.
+  const vercelCron = request.headers.get("x-vercel-cron");
+  return Boolean(vercelCron && bearer === secret);
 }
 
 /**

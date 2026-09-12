@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { PostPublishDialog } from "@/components/dashboard/PostPublishDialog";
 
 export function PublishButton({
   websiteId,
@@ -12,6 +13,8 @@ export function PublishButton({
   locale = "en",
   blockers,
   onPublished,
+  brandName,
+  slug,
 }: {
   websiteId: string;
   published: boolean;
@@ -21,11 +24,14 @@ export function PublishButton({
   /** Incomplete non-optional readiness items — confirm before publish. */
   blockers?: { label: string; href?: string }[];
   onPublished?: () => void;
+  brandName?: string;
+  slug?: string;
 }) {
   const router = useRouter();
   const isFa = locale === "fa";
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [celebrate, setCelebrate] = useState(false);
 
   async function toggle() {
     if (published) {
@@ -72,7 +78,10 @@ export function PublishButton({
         );
         return;
       }
-      if (!published) onPublished?.();
+      if (!published) {
+        onPublished?.();
+        if (brandName && slug) setCelebrate(true);
+      }
       router.refresh();
     } catch {
       setError(isFa ? "اتصال قطع شد." : "Network error.");
@@ -96,6 +105,16 @@ export function PublishButton({
         <p className="max-w-[12rem] text-[11px] leading-4 text-red-700">
           {error}
         </p>
+      ) : null}
+      {brandName && slug ? (
+        <PostPublishDialog
+          open={celebrate}
+          onClose={() => setCelebrate(false)}
+          locale={locale}
+          brandName={brandName}
+          slug={slug}
+          websiteId={websiteId}
+        />
       ) : null}
     </div>
   );

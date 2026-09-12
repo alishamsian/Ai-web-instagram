@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SetupStep } from "@/lib/dashboard/data";
+import type { SetupStep } from "@/lib/dashboard/format";
 
 export function SetupChecklist({
   steps,

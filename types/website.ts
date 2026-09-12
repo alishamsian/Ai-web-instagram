@@ -102,6 +102,10 @@ export interface SectionConfig {
   id: string;
   type: WebsiteSectionType;
   visible: boolean;
+  /** Visual variant for section renderers (e.g. hero split/overlay). */
+  variant?: string;
+  /** Lightweight section settings — prefer typed fields in content when possible. */
+  settings?: Record<string, unknown>;
 }
 
 export interface WebsiteSettings {

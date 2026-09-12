@@ -21,6 +21,7 @@ export default async function PreviewPage({
   return (
     <WebsiteRenderer
       config={website.config}
+      mode="preview"
       basePath={`/${locale}/preview/${websiteId}`}
     />
   );

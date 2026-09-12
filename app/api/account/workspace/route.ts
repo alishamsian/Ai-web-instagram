@@ -23,6 +23,8 @@ export async function PATCH(request: Request) {
     if (error) {
       return NextResponse.json({ error: "STORE_FAILED" }, { status: 500 });
     }
+    const { revalidateTag } = await import("next/cache");
+    revalidateTag(`session-workspace-${session.user.id}`, "max");
   } else {
     await writeStore((store) => {
       const ws = store.workspaces.find((item) => item.id === session.workspace.id);

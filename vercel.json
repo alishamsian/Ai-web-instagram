@@ -3,6 +3,10 @@
     {
       "path": "/api/jobs/process",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/publishing/process-due",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { WebsiteConfig } from "@/types/website";
+import type { WebsiteRenderMode } from "@/components/editor/EditContext";
 import {
   AboutSection,
   ContactSection,
@@ -16,6 +17,8 @@ import { ProductPageView } from "@/components/website/ProductPage";
 import { WebsiteShell } from "@/components/website/shell";
 import { SiteNavProvider } from "@/components/website/SiteNavContext";
 import { StoreTemplate } from "@/components/store/StoreTemplate";
+import { EditorSectionFrame } from "@/components/editor/EditorSectionFrame";
+import { sectionLabel } from "@/components/editor/editor-utils";
 import { polishWebsiteConfig } from "@/lib/website/polish";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +41,7 @@ export function WebsiteRenderer({
   basePath = "",
   productSlug,
   websiteId,
+  mode = "published",
   onProductNavigate,
   onHomeNavigate,
 }: {
@@ -45,10 +49,12 @@ export function WebsiteRenderer({
   basePath?: string;
   productSlug?: string;
   websiteId?: string;
+  mode?: WebsiteRenderMode;
   onProductNavigate?: (slug: string) => void;
   onHomeNavigate?: () => void;
 }) {
   const view = polishWebsiteConfig(config);
+  const locale = view.settings.language;
 
   return (
     <SiteNavProvider
@@ -63,6 +69,7 @@ export function WebsiteRenderer({
           config={view}
           productSlug={productSlug}
           websiteId={websiteId}
+          mode={mode}
         />
       ) : (
         <WebsiteShell
@@ -73,11 +80,30 @@ export function WebsiteRenderer({
             <ProductPageView config={view} productSlug={productSlug} />
           ) : (
             view.sections
-              .filter((section) => section.visible)
+              .filter((section) => section.visible || mode === "editor")
               .map((section) => {
                 const Comp = sectionMap[section.type as keyof typeof sectionMap];
                 if (!Comp) return null;
-                return <Comp key={section.id} config={view} />;
+                const body = (
+                  <div
+                    className={cn(
+                      !section.visible && mode === "editor" && "opacity-45",
+                    )}
+                  >
+                    <Comp config={view} />
+                  </div>
+                );
+                if (mode !== "editor") return <div key={section.id}>{body}</div>;
+                return (
+                  <EditorSectionFrame
+                    key={section.id}
+                    sectionId={section.id}
+                    label={sectionLabel(section.type, locale)}
+                    settings={section.settings}
+                  >
+                    {body}
+                  </EditorSectionFrame>
+                );
               })
           )}
         </WebsiteShell>

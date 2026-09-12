@@ -4,12 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   AtSign,
+  CalendarDays,
   ChartNoAxesColumn,
   CreditCard,
+  FileText,
   Globe,
   Images,
   LayoutDashboard,
   Link2,
+  ListTodo,
+  Radio,
   Settings,
   ShoppingBag,
   type LucideIcon,
@@ -22,6 +26,10 @@ const ICONS = {
   orders: ShoppingBag,
   import: AtSign,
   content: Images,
+  posts: FileText,
+  calendar: CalendarDays,
+  queue: ListTodo,
+  channels: Radio,
   analytics: ChartNoAxesColumn,
   domains: Link2,
   settings: Settings,
@@ -39,6 +47,8 @@ export type DashboardNavItem = {
   badgeTone?: "default" | "alert";
   /** Path prefix for active state when href has query params */
   match?: string;
+  /** When true, only exact path match (no nested routes) */
+  exact?: boolean;
 };
 
 export function DashboardNav({
@@ -76,8 +86,11 @@ export function DashboardNav({
                   matchBase === "dashboard"
                     ? pathname === `/${locale}/dashboard` ||
                       pathname === `/${locale}/dashboard/`
-                    : pathname === `/${locale}/${matchBase}` ||
-                      pathname.startsWith(`/${locale}/${matchBase}/`);
+                    : item.exact
+                      ? pathname === `/${locale}/${matchBase}` ||
+                        pathname === `/${locale}/${matchBase}/`
+                      : pathname === `/${locale}/${matchBase}` ||
+                        pathname.startsWith(`/${locale}/${matchBase}/`);
                 const Icon: LucideIcon = ICONS[item.icon];
                 return (
                   <li key={`${item.icon}-${pathOnly}`}>
@@ -90,6 +103,7 @@ export function DashboardNav({
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                       aria-current={active ? "page" : undefined}
+                      prefetch
                     >
                       <Icon className="size-4 shrink-0" aria-hidden />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>

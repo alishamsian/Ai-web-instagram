@@ -20,6 +20,7 @@ create table if not exists workspaces (
   plan text not null default 'free',
   -- Owner prefs: emailEnabled, telegramEnabled, telegramChatId, whatsappNotify
   notification_settings jsonb not null default '{}'::jsonb,
+  onboarding_metrics jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -316,3 +317,73 @@ alter table waitlist enable row level security;
 grant select on table page_views to authenticated;
 grant select on table store_orders to authenticated;
 grant all on table page_views, store_orders, waitlist to service_role;
+
+-- Publishing channels / content / publications (see migrations/20260912140000_*)
+create table if not exists publishing_channels (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  type text not null check (type in ('website', 'telegram', 'instagram', 'whatsapp')),
+  name text not null,
+  identifier text,
+  status text not null default 'disconnected'
+    check (status in ('connected', 'disconnected', 'error', 'coming_soon')),
+  avatar text,
+  metadata jsonb not null default '{}'::jsonb,
+  connected_at timestamptz,
+  last_activity_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists content_items (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  source text not null check (source in ('instagram', 'manual', 'generated')),
+  type text not null check (type in ('post', 'reel', 'product', 'article', 'announcement')),
+  title text,
+  caption text,
+  external_id text,
+  ai_analysis jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists content_media_assets (
+  id uuid primary key default gen_random_uuid(),
+  content_id uuid not null references content_items(id) on delete cascade,
+  type text not null check (type in ('image', 'video')),
+  url text not null,
+  thumbnail_url text,
+  alt text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists publications (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  content_id uuid not null references content_items(id) on delete cascade,
+  channel_id uuid not null references publishing_channels(id) on delete cascade,
+  channel_type text not null,
+  status text not null default 'draft'
+    check (status in ('draft', 'scheduled', 'publishing', 'published', 'failed')),
+  adapted_title text,
+  adapted_caption text,
+  scheduled_at timestamptz,
+  published_at timestamptz,
+  error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists workspace_notifications (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  kind text not null,
+  title text not null,
+  body text,
+  href text,
+  tone text not null default 'neutral',
+  read_at timestamptz,
+  meta jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);

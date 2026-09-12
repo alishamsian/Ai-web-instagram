@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BioLinkButton } from "@/components/dashboard/BioLinkButton";
-import { DomainConnectForm } from "@/components/dashboard/DomainConnectForm";
 import { LivePhonePreview } from "@/components/dashboard/LivePhonePreview";
 import { PublishButton } from "@/components/dashboard/PublishButton";
 import { SetPrimarySiteButton } from "@/components/dashboard/SetPrimarySiteButton";
@@ -21,8 +20,8 @@ import { SyncInstagramButton } from "@/components/dashboard/SyncInstagramButton"
 import { SiteImage } from "@/components/website/SiteImage";
 import { SoftBanner, StatusBadge } from "@/components/dashboard/ui";
 import { HashDetailsOpener } from "@/components/dashboard/HashDetailsOpener";
+import { formatRelativeTime } from "@/lib/dashboard/format";
 import {
-  formatRelativeTime,
   versionDiffLabel,
   type SiteReadinessStep,
 } from "@/lib/dashboard/data";
@@ -232,21 +231,33 @@ export function WebsiteHubView({
               </div>
 
               {/* Health as quiet meta — not a card */}
-              <p className="text-[12px] leading-5 text-muted-foreground">
-                <span className="tabular-nums text-ink">{visits24h}</span>{" "}
-                {isFa ? "بازدید امروز" : "today"}
-                <span className="mx-2 text-border">·</span>
-                <span className="tabular-nums text-ink">{visits}</span>{" "}
-                {isFa ? "۱۴ روز" : "14d"}
-                <span className="mx-2 text-border">·</span>
-                {health.lastOrderLabel
-                  ? `${isFa ? "سفارش" : "Order"} ${health.lastOrderLabel}`
-                  : isFa
-                    ? "بدون سفارش"
-                    : "No orders"}
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-5 text-muted-foreground">
+                <span>
+                  <span className="tabular-nums text-ink">{visits24h}</span>{" "}
+                  {isFa ? "بازدید امروز" : "today"}
+                </span>
+                <span className="text-border" aria-hidden>
+                  ·
+                </span>
+                <span>
+                  <span className="tabular-nums text-ink">{visits}</span>{" "}
+                  {isFa ? "۱۴ روز" : "14d"}
+                </span>
+                <span className="text-border" aria-hidden>
+                  ·
+                </span>
+                <span>
+                  {health.lastOrderLabel
+                    ? `${isFa ? "سفارش" : "Order"} ${health.lastOrderLabel}`
+                    : isFa
+                      ? "بدون سفارش"
+                      : "No orders"}
+                </span>
                 {health.freshOrders > 0 ? (
                   <>
-                    <span className="mx-2 text-border">·</span>
+                    <span className="text-border" aria-hidden>
+                      ·
+                    </span>
                     <Link
                       href={`/${locale}/dashboard/orders`}
                       className="font-medium text-emerald-700 hover:underline"
@@ -258,7 +269,7 @@ export function WebsiteHubView({
               </p>
 
               {/* Stats — single quiet row */}
-              <div className="flex flex-wrap gap-x-5 gap-y-1 border-y border-border/70 py-3 text-sm">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 border-y border-border/70 py-3 text-sm sm:flex sm:flex-wrap sm:gap-x-5 sm:gap-y-1">
                 <StatInline
                   label={dict.dashboard.products}
                   value={String(productsCount)}
@@ -274,7 +285,7 @@ export function WebsiteHubView({
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap">
                 {!published ? (
                   <PublishButton
                     websiteId={website.id}
@@ -283,6 +294,8 @@ export function WebsiteHubView({
                     unpublishLabel={dict.dashboard.unpublish}
                     locale={locale}
                     blockers={publishBlockers}
+                    brandName={website.config.brand.name}
+                    slug={website.slug}
                   />
                 ) : (
                   <ShareLinkButton url={liveUrl} locale={locale} />
@@ -291,6 +304,7 @@ export function WebsiteHubView({
                   asChild
                   size="sm"
                   variant={published ? "default" : "outline"}
+                  className="w-full min-[420px]:w-auto"
                 >
                   <Link href={`/${locale}/editor/${website.id}`}>
                     <Pencil className="size-3.5 opacity-80" aria-hidden />
@@ -298,14 +312,24 @@ export function WebsiteHubView({
                   </Link>
                 </Button>
                 {published ? (
-                  <Button asChild size="sm" variant="outline">
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="w-full min-[420px]:col-span-2 min-[420px]:w-auto sm:col-auto"
+                  >
                     <Link href={liveUrl} target="_blank" rel="noreferrer">
                       {dict.dashboard.liveSite}
                       <ExternalLink className="size-3 opacity-60" aria-hidden />
                     </Link>
                   </Button>
                 ) : (
-                  <Button asChild size="sm" variant="outline">
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="w-full min-[420px]:w-auto"
+                  >
                     <Link href={previewUrl}>{dict.dashboard.preview}</Link>
                   </Button>
                 )}
@@ -341,7 +365,7 @@ export function WebsiteHubView({
               ) : null}
 
               {/* Destinations as text rail */}
-              <nav className="flex flex-wrap gap-x-1 gap-y-1 text-xs">
+              <nav className="grid grid-cols-3 gap-1 text-xs sm:flex sm:flex-wrap sm:gap-x-1 sm:gap-y-1">
                 <DestLink
                   href={`/${locale}/dashboard/content?id=${website.id}`}
                   label={dict.dashboard.content}
@@ -400,7 +424,7 @@ export function WebsiteHubView({
                   </Button>
                 ) : null}
                 <Button asChild size="sm" variant="ghost">
-                  <Link href={`?id=${website.id}&section=domain`}>
+                  <Link href={`/${locale}/dashboard/domains?id=${website.id}`}>
                     {dict.dashboard.domains}
                   </Link>
                 </Button>
@@ -414,9 +438,9 @@ export function WebsiteHubView({
           </div>
         </div>
 
-        {/* Mobile preview strip — quieter */}
-        <div className="flex items-center gap-4 border-t border-border px-5 py-4 xl:hidden">
-          <div className="w-[88px] shrink-0">
+        {/* Mobile / tablet preview strip */}
+        <div className="flex items-center gap-3 border-t border-border px-4 py-4 sm:gap-4 sm:px-5 xl:hidden">
+          <div className="w-[72px] shrink-0 sm:w-[96px]">
             <LivePhonePreview
               src={phoneSrc}
               locale={locale}
@@ -424,15 +448,20 @@ export function WebsiteHubView({
               hideLink
             />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-ink">
               {isFa ? "پیش‌نمایش موبایل" : "Mobile preview"}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+              {isFa
+                ? "همان چیزی که مشتری روی گوشی می‌بیند."
+                : "What shoppers see on their phone."}
             </p>
             <Link
               href={phoneSrc}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-ink"
+              className="mt-2 inline-flex min-h-10 items-center gap-1 rounded-lg bg-[#f6f6f4] px-3 text-xs font-medium text-ink ring-1 ring-border/70 hover:bg-white"
             >
               {isFa ? "باز کردن تمام‌صفحه" : "Open full screen"}
               <ArrowUpRight className="size-3" aria-hidden />
@@ -455,11 +484,19 @@ export function WebsiteHubView({
         </div>
 
         {/* URL row always visible */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-4">
-          <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <p className="min-w-0 flex-1 truncate font-mono text-xs text-ink" dir="ltr">
-            {liveUrl}
-          </p>
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:px-5">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <Link2
+              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+            <p
+              className="min-w-0 flex-1 break-all font-mono text-xs text-ink"
+              dir="ltr"
+            >
+              {liveUrl}
+            </p>
+          </div>
           {published ? (
             <ShareLinkButton
               url={liveUrl}
@@ -475,7 +512,7 @@ export function WebsiteHubView({
 
         <Accordion
           id="domain"
-          title={isFa ? "اسلاگ، QR و دامنه" : "Slug, QR & domain"}
+          title={isFa ? "اسلاگ و QR" : "Slug & QR"}
           defaultOpen={false}
         >
           <div className="space-y-4">
@@ -491,28 +528,25 @@ export function WebsiteHubView({
                 locale={locale}
               />
             ) : null}
-            {isPro ? (
-              <DomainConnectForm
-                websiteId={website.id}
-                locale={locale}
-                enabled
-                initialHost={domains[0]?.host}
-                compact
-              />
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f6f6f4] px-4 py-3">
-                <p className="text-xs text-muted-foreground">
-                  {isFa
-                    ? "دامنه اختصاصی با پلن حرفه‌ای"
-                    : "Custom domain on Pro"}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f6f6f4] px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-ink">
+                  {isFa ? "دامنه اختصاصی" : "Custom domain"}
                 </p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/${locale}/dashboard/billing`}>
-                    {isFa ? "پلن‌ها" : "Plans"}
-                  </Link>
-                </Button>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {domains[0]
+                    ? domains[0].host
+                    : isFa
+                      ? "مدیریت از بخش دامنه‌ها"
+                      : "Manage from Domains"}
+                </p>
               </div>
-            )}
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/${locale}/dashboard/domains?id=${website.id}`}>
+                  {dict.dashboard.domains}
+                </Link>
+              </Button>
+            </div>
           </div>
         </Accordion>
 
@@ -621,9 +655,9 @@ function DestLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-[#f6f6f4] hover:text-ink"
+      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-center text-muted-foreground transition-colors hover:bg-[#f6f6f4] hover:text-ink sm:min-h-0 sm:justify-start sm:rounded-lg sm:px-2 sm:py-2 sm:text-start"
     >
-      {label}
+      <span className="truncate">{label}</span>
       {meta != null ? (
         <span
           className={cn(
@@ -660,14 +694,14 @@ function Accordion({
         !last && "border-b",
       )}
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-sm font-medium text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink marker:content-none sm:px-5 [&::-webkit-details-marker]:hidden">
         {title}
         <ChevronDown
           className="size-4 text-muted-foreground transition group-open:rotate-180"
           aria-hidden
         />
       </summary>
-      <div className="px-5 pb-5">{children}</div>
+      <div className="px-4 pb-5 sm:px-5">{children}</div>
     </details>
   );
 }

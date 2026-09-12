@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SiteImage } from "@/components/website/SiteImage";
-import { siteCoverUrl } from "@/lib/dashboard/data";
+import { siteCoverUrl } from "@/lib/dashboard/format";
 import { publishedSiteUrl } from "@/lib/config/runtime";
 import type { WebsiteRecord } from "@/types/website";
 import type { Locale } from "@/lib/config/env";

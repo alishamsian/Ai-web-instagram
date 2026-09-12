@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/dashboard/ui";
 import { OrderActions } from "@/components/dashboard/OrderActions";
-import { formatRelativeTime, type StoreOrderRow } from "@/lib/dashboard/data";
+import { formatRelativeTime, type StoreOrderRow } from "@/lib/dashboard/format";
 import { orderStatusTone } from "@/lib/orders/status";
 
 export function OrdersPanel({
@@ -23,8 +23,8 @@ export function OrdersPanel({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-        <div>
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
+        <div className="min-w-0">
           <h2 className="text-sm font-semibold text-ink">
             {isFa ? "سفارش‌ها" : "Orders"}
           </h2>
@@ -36,7 +36,7 @@ export function OrdersPanel({
         </div>
         <Link
           href={`/${locale}/dashboard/orders`}
-          className="rounded-lg px-2 py-1 text-xs font-medium text-ink transition-colors hover:bg-muted"
+          className="inline-flex min-h-9 shrink-0 items-center rounded-lg px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:bg-muted"
         >
           {isFa ? "همه" : "All"}
         </Link>
@@ -102,10 +102,10 @@ export function OrdersPanel({
               .join(isFa ? "، " : ", ");
             const tone = orderStatusTone(order.status);
             return (
-              <li key={order.id} className="space-y-2.5 px-5 py-3.5">
+              <li key={order.id} className="space-y-2.5 px-4 py-3.5 sm:px-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink">
+                    <p className="line-clamp-2 text-sm font-medium text-ink sm:truncate">
                       {summary || order.channel}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">

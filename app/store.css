@@ -310,6 +310,14 @@
   font-size: 1.05rem;
   letter-spacing: -0.03em;
   font-weight: 550;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.store-logo > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .store-logo__mark {
@@ -317,6 +325,7 @@
   height: 1.6rem;
   object-fit: cover;
   border-radius: 999px;
+  flex-shrink: 0;
 }
 
 .store-header__actions {
@@ -578,10 +587,22 @@
 .store-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.75rem 0.85rem;
+  gap: 1.25rem 0.7rem;
 }
 
-@media (min-width: 760px) {
+@media (min-width: 640px) {
+  .store-grid {
+    gap: 1.75rem 0.95rem;
+  }
+
+  .store-grid--3,
+  .store-grid--4 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
   .store-grid--3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2.2rem 1.1rem;
@@ -1186,7 +1207,7 @@
   inset-block: 0;
   inset-inline-end: 0;
   z-index: 71;
-  width: min(26rem, 100vw);
+  width: min(26rem, 100%);
   background: var(--store-bg);
   color: var(--store-fg);
   display: flex;
@@ -1294,4 +1315,213 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ═══════════════════════════════════════════
+   Professional responsive polish (all sections)
+   ═══════════════════════════════════════════ */
+
+.store {
+  overflow-x: clip;
+}
+
+.store-wrap {
+  width: min(var(--store-wrap), calc(100% - 1.5rem));
+}
+
+@media (min-width: 768px) {
+  .store-wrap {
+    width: min(var(--store-wrap), calc(100% - 3rem));
+  }
+}
+
+.store-announce p {
+  text-wrap: balance;
+  line-height: 1.45;
+}
+
+@media (max-width: 480px) {
+  .store-announce {
+    font-size: 0.65rem;
+    letter-spacing: 0.03em;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .store-announce p {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+.store-section {
+  padding-block: clamp(2.75rem, 7vw, 4.5rem);
+}
+
+.store-section__head {
+  margin-bottom: clamp(1.35rem, 3vw, 2.25rem);
+}
+
+.store-hero {
+  min-height: min(72svh, 820px);
+}
+
+.store-hero__content {
+  padding-block: clamp(2.75rem, 8vw, 5rem) clamp(2.25rem, 6vw, 4rem);
+  padding-inline: 0;
+}
+
+.store-hero__brand {
+  font-size: clamp(2.35rem, 11vw, 6.2rem);
+}
+
+.store-hero__actions .store-btn {
+  flex: 1 1 auto;
+  min-width: min(100%, 10rem);
+}
+
+@media (max-width: 480px) {
+  .store-hero {
+    min-height: min(68svh, 640px);
+  }
+
+  .store-hero__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .store-hero__actions .store-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.store-cats {
+  gap: 0.65rem;
+}
+
+@media (min-width: 640px) and (max-width: 899px) {
+  .store-cats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 639px) {
+  .store-cats--3 > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .store-cat {
+    min-height: 10rem;
+  }
+}
+
+.store-card__title {
+  font-size: clamp(0.84rem, 2.6vw, 0.98rem);
+}
+
+.store-card__body {
+  padding-top: 0.7rem;
+}
+
+@media (max-width: 639px) {
+  .store-grid {
+    gap: 1.15rem 0.55rem;
+  }
+}
+
+.store-lookbook {
+  gap: 0.55rem;
+}
+
+@media (max-width: 899px) {
+  .store-lookbook__item--lead {
+    grid-column: 1 / -1;
+  }
+
+  .store-lookbook__item--lead .store-lookbook__img {
+    aspect-ratio: 16 / 10;
+  }
+
+  .store-lookbook__img {
+    aspect-ratio: 1;
+  }
+}
+
+.store-footer__bottom {
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+
+.store-contact__list a,
+.store-contact__list strong,
+.store-contact__list span {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.store-faq__item summary {
+  cursor: pointer;
+  padding-block: 0.85rem;
+  min-height: 2.75rem;
+}
+
+.store-pdp__thumbs {
+  grid-template-columns: repeat(auto-fit, minmax(4.25rem, 1fr));
+}
+
+.store-pdp__actions {
+  gap: 0.65rem;
+}
+
+@media (max-width: 560px) {
+  .store-pdp__actions {
+    flex-direction: column;
+  }
+
+  .store-pdp__actions .store-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.store-cart {
+  width: min(26rem, 100%);
+  max-width: 100%;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.store-drawer__panel {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.store-modal__content {
+  width: min(980px, calc(100% - 1.5rem));
+  max-height: min(920px, calc(100dvh - 2rem));
+}
+
+@media (max-width: 640px) {
+  .store-modal__content {
+    inset: auto 0 0 0;
+    transform: none;
+    width: 100%;
+    max-height: min(92dvh, 100%);
+    border-radius: 1rem 1rem 0 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+.store-promo,
+.store-contact,
+.store-story {
+  padding-block: clamp(2.75rem, 7vw, 4.5rem);
+}
+
+.vitrin-editor-canvas .store-hero {
+  min-height: min(52svh, 420px);
+}
+
+.vitrin-editor-canvas .store-section {
+  padding-block: clamp(2rem, 4vw, 3rem);
 }

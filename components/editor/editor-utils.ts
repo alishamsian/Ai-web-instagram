@@ -14,8 +14,7 @@ export type EditorTab =
   | "seo"
   | "settings"
   | "template"
-  | "versions"
-  | "domain";
+  | "versions";
 
 export const COLOR_PRESETS: {
   id: string;
@@ -125,7 +124,6 @@ export function editorTabs(dict: Dictionary): { id: EditorTab; label: string }[]
     { id: "settings", label: dict.editor.settings },
     { id: "template", label: dict.editor.template },
     { id: "versions", label: dict.editor.versions },
-    { id: "domain", label: dict.editor.domain },
   ];
 }
 
@@ -188,5 +186,108 @@ export function ensureTestimonials(config: WebsiteConfig): WebsiteConfig {
         items: [],
       },
     },
+  };
+}
+
+export function ensureSectionContent(
+  config: WebsiteConfig,
+  type: WebsiteSectionType,
+): WebsiteConfig {
+  const locale = config.settings.language;
+  const next = structuredClone(config);
+  switch (type) {
+    case "about":
+      next.content.about ??= {
+        title: locale === "fa" ? "داستان برند" : "Our story",
+        body:
+          locale === "fa"
+            ? "چند خط درباره برند بنویس."
+            : "Write a short brand story.",
+      };
+      break;
+    case "products":
+      next.content.products ??= {
+        title: locale === "fa" ? "محصولات" : "Products",
+        items: [],
+      };
+      break;
+    case "services":
+      next.content.services ??= {
+        title: locale === "fa" ? "خدمات" : "Services",
+        items: [],
+      };
+      break;
+    case "gallery":
+    case "instagram-feed":
+    case "featured-posts":
+      next.content.gallery ??= {
+        title: locale === "fa" ? "گالری" : "Gallery",
+        imageIds: [],
+      };
+      break;
+    case "testimonials":
+      return ensureTestimonials(next);
+    case "faq":
+      next.content.faq ??= {
+        title: locale === "fa" ? "پرسش‌ها" : "FAQ",
+        items: [],
+      };
+      break;
+    case "contact":
+      next.content.contact ??= {
+        title: locale === "fa" ? "تماس" : "Contact",
+        body: "",
+        info: {
+          phone: null,
+          email: null,
+          website: null,
+          instagram: null,
+          telegram: null,
+          whatsapp: null,
+          address: null,
+          location: null,
+        },
+      };
+      break;
+    case "cta":
+      next.content.promo ??= {
+        kicker: locale === "fa" ? "ویژه" : "Featured",
+        title: locale === "fa" ? "همین حالا خرید کن" : "Shop the collection",
+        cta: locale === "fa" ? "مشاهده" : "Shop now",
+      };
+      break;
+    default:
+      break;
+  }
+  return next;
+}
+
+export function addOrShowSection(
+  config: WebsiteConfig,
+  type: WebsiteSectionType,
+): WebsiteConfig {
+  const withContent = ensureSectionContent(config, type);
+  const existing = withContent.sections.find((s) => s.type === type);
+  if (existing) {
+    return {
+      ...withContent,
+      sections: withContent.sections.map((s) =>
+        s.type === type ? { ...s, visible: true } : s,
+      ),
+    };
+  }
+  const section = {
+    id: `${type}-${Date.now().toString(36)}`,
+    type,
+    visible: true,
+  };
+  const withoutFooter = withContent.sections.filter((s) => s.type !== "footer");
+  const footer = withContent.sections.filter((s) => s.type === "footer");
+  return {
+    ...withContent,
+    sections:
+      type === "footer"
+        ? [...withContent.sections, section]
+        : [...withoutFooter, section, ...footer],
   };
 }

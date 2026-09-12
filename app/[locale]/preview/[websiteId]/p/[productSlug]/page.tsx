@@ -27,6 +27,7 @@ export default async function PreviewProductPage({
   return (
     <WebsiteRenderer
       config={website.config}
+      mode="preview"
       basePath={`/${locale}/preview/${websiteId}`}
       productSlug={productSlug}
     />

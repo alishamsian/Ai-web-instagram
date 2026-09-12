@@ -165,6 +165,22 @@ export async function notifyNewOrder(input: {
     }
 
     await Promise.allSettled(tasks);
+
+    const { createInboxNotification } = await import(
+      "@/lib/notifications/inbox"
+    );
+    await createInboxNotification({
+      workspaceId: input.workspaceId,
+      kind: "order_new",
+      title:
+        input.locale === "fa"
+          ? `سفارش جدید — ${input.brandName}`
+          : `New order — ${input.brandName}`,
+      body: input.summary,
+      href: "dashboard/orders",
+      tone: "accent",
+      meta: { orderId: input.orderId },
+    });
   } catch (error) {
     console.warn("[notify] new order failed", error);
   }

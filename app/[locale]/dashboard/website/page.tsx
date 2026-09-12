@@ -100,7 +100,6 @@ export default async function WebsiteHubPage({
   const visits = website ? (visitCounts.get(website.id) ?? 0) : 0;
   const visits24h = website ? (visitCounts24h.get(website.id) ?? 0) : 0;
   const productsCount = website?.config.content.products?.items.length ?? 0;
-  const hubBase = `/${locale}/dashboard/website`;
   const published = website?.status === "published";
 
   const lastCompletedSync = website
@@ -160,42 +159,6 @@ export default async function WebsiteHubPage({
         <>
           {activeJob ? (
             <JobProgressBanner job={activeJob} locale={locale} />
-          ) : null}
-
-          {websites.length > 1 ? (
-            <nav
-              aria-label={dict.dashboard.pickSite}
-              className="flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              {websites.map((site) => {
-                const active = site.id === website.id;
-                const primary =
-                  site.id === primaryId ||
-                  (!primaryId && site.id === websites[0]?.id);
-                return (
-                  <Link
-                    key={site.id}
-                    href={`${hubBase}?id=${site.id}`}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                      active
-                        ? "bg-ink text-white"
-                        : "bg-white text-muted-foreground ring-1 ring-border hover:text-ink"
-                    }`}
-                  >
-                    {site.config.brand.name}
-                    {primary ? (
-                      <span
-                        className={
-                          active ? "ms-1 opacity-60" : "ms-1 text-amber-600"
-                        }
-                      >
-                        ★
-                      </span>
-                    ) : null}
-                  </Link>
-                );
-              })}
-            </nav>
           ) : null}
 
           <WebsiteHubView

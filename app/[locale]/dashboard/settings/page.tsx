@@ -16,6 +16,7 @@ import {
   PageHeader,
   PageStack,
   Panel,
+  SoftBanner,
   StatusBadge,
 } from "@/components/dashboard/ui";
 
@@ -48,27 +49,27 @@ export default async function SettingsPage({
       <PageHeader
         eyebrow={dict.dashboard.navAccount}
         title={dict.dashboard.settingsTitle}
-        description={dict.dashboard.settingsBody}
+        description={
+          isFa
+            ? "فضای کاری، اعلان‌ها و امنیت — یکجا و مرتب."
+            : "Workspace, notifications, and security — one clean place."
+        }
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title={dict.dashboard.profile}>
-          <dl className="divide-y divide-border">
-            <KeyValue label={dict.dashboard.name} value={session.user.name || "—"} />
-            <KeyValue label={dict.dashboard.email} value={session.user.email} />
-            <KeyValue
-              label={dict.dashboard.language}
-              value={isFa ? "فارسی" : "English"}
-            />
-          </dl>
-          <div className="border-t border-border p-4 md:hidden">
-            <SignOutButton label={dict.dashboard.signOut} locale={locale} />
-          </div>
-        </Panel>
+      <SoftBanner tone="info">
+        {isFa
+          ? "زبان رابط از مسیر /fa یا /en در آدرس سایت تعیین می‌شود."
+          : "UI language follows the /fa or /en path in the URL."}
+      </SoftBanner>
 
+      <div className="grid gap-6 lg:grid-cols-2">
         <Panel
-          title={dict.dashboard.workspace}
-          description={isFa ? "نام و ظرفیت فضای کاری" : "Name and capacity"}
+          title={isFa ? "فضای کاری" : "Workspace"}
+          description={
+            isFa
+              ? "نام برند، پلن و ظرفیت"
+              : "Brand name, plan, and capacity"
+          }
         >
           <WorkspaceNameForm
             initialName={session.workspace.name}
@@ -81,7 +82,11 @@ export default async function SettingsPage({
             />
             <KeyValue
               label={isFa ? "ظرفیت سایت" : "Site capacity"}
-              value={planUsageLabel(session.workspace.plan, siteCount, locale)}
+              value={planUsageLabel(
+                session.workspace.plan,
+                siteCount,
+                locale,
+              )}
             />
           </dl>
           <div className="border-t border-border p-4">
@@ -94,11 +99,33 @@ export default async function SettingsPage({
         </Panel>
 
         <Panel
-          title={isFa ? "اعلان سفارش" : "Order notifications"}
+          title={dict.dashboard.profile}
+          description={
+            isFa ? "حساب ورود شما" : "Your sign-in account"
+          }
+        >
+          <dl className="divide-y divide-border">
+            <KeyValue
+              label={dict.dashboard.name}
+              value={session.user.name || "—"}
+            />
+            <KeyValue label={dict.dashboard.email} value={session.user.email} />
+            <KeyValue
+              label={dict.dashboard.language}
+              value={isFa ? "فارسی" : "English"}
+            />
+          </dl>
+          <div className="border-t border-border p-4 md:hidden">
+            <SignOutButton label={dict.dashboard.signOut} locale={locale} />
+          </div>
+        </Panel>
+
+        <Panel
+          title={isFa ? "اعلان‌ها" : "Notifications"}
           description={
             isFa
-              ? "ایمیل، تلگرام و واتساپ برای سفارش جدید"
-              : "Email, Telegram, and WhatsApp for new orders"
+              ? "وقتی سفارش جدید می‌آید چطور خبرت کنیم"
+              : "How we reach you when a new order arrives"
           }
         >
           <NotificationSettingsForm
@@ -107,44 +134,53 @@ export default async function SettingsPage({
           />
         </Panel>
 
-        <Panel title={isFa ? "امنیت" : "Security"}>
+        <Panel
+          title={isFa ? "امنیت" : "Security"}
+          description={
+            isFa ? "رمز عبور حساب" : "Account password"
+          }
+        >
           <PasswordChangeForm locale={locale} />
         </Panel>
-
-        <Panel
-          title={isFa ? "دسترسی سریع" : "Shortcuts"}
-          description={isFa ? "میانبر به بخش‌های پرتکرار" : "Jump to frequent areas"}
-        >
-          <div className="flex flex-wrap gap-2 p-5">
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/${locale}/dashboard/orders`}>
-                {isFa ? "سفارش‌ها" : "Orders"}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link
-                href={
-                  siteCount > 0
-                    ? `/${locale}/dashboard/website?section=domain`
-                    : `/${locale}/dashboard/website`
-                }
-              >
-                {dict.dashboard.domains}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/${locale}/dashboard/content`}>
-                {dict.dashboard.content}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/${locale}/dashboard/analytics`}>
-                {dict.dashboard.analytics}
-              </Link>
-            </Button>
-          </div>
-        </Panel>
       </div>
+
+      <Panel
+        title={isFa ? "میانبرها" : "Shortcuts"}
+        description={isFa ? "⌘K همه‌جا در دسترس است" : "⌘K works anywhere in the dashboard"}
+      >
+        <div className="flex flex-wrap gap-2 p-5">
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/${locale}/dashboard/orders`}>
+              {isFa ? "سفارش‌ها" : "Orders"}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/${locale}/dashboard/domains`}>
+              {dict.dashboard.domains}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/${locale}/dashboard/content/posts`}>
+              {isFa ? "پست‌ها" : "Posts"}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/${locale}/dashboard/channels`}>
+              {isFa ? "کانال‌ها" : "Channels"}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/${locale}/dashboard/content/queue`}>
+              {isFa ? "صف انتشار" : "Queue"}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/${locale}/dashboard/analytics`}>
+              {dict.dashboard.analytics}
+            </Link>
+          </Button>
+        </div>
+      </Panel>
     </PageStack>
   );
 }

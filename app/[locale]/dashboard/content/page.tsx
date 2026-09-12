@@ -106,42 +106,22 @@ export default async function ContentPage({
   return (
     <PageStack>
       {primary ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {websites.length > 1 ? (
-              <nav className="flex gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {websites.map((site) => (
-                  <Link
-                    key={site.id}
-                    href={`/${locale}/dashboard/content?id=${site.id}`}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                      site.id === primary.id
-                        ? "bg-ink text-white"
-                        : "bg-white/80 text-muted-foreground ring-1 ring-border/70 hover:text-ink"
-                    }`}
-                  >
-                    {site.config.brand.name}
-                  </Link>
-                ))}
-              </nav>
-            ) : (
-              <p className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
-                {dict.dashboard.navMain}
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="ghost">
-              <Link href={`/${locale}/dashboard/website?id=${primary.id}`}>
-                {dict.dashboard.openSite}
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/${locale}/editor/${primary.id}`}>
-                {dict.dashboard.edit}
-              </Link>
-            </Button>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button asChild size="sm" variant="ghost">
+            <Link href={`/${locale}/dashboard/content/posts`}>
+              {isFa ? "پست‌ها" : "Posts"}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="ghost">
+            <Link href={`/${locale}/dashboard/website?id=${primary.id}`}>
+              {dict.dashboard.openSite}
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/${locale}/editor/${primary.id}`}>
+              {dict.dashboard.edit}
+            </Link>
+          </Button>
         </div>
       ) : (
         <PageHeader

@@ -56,7 +56,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-border bg-white p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.06)]",
+        "group relative overflow-hidden rounded-2xl border border-border bg-white p-3.5 shadow-[0_1px_0_rgba(0,0,0,0.02)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.06)] sm:p-5",
         className,
       )}
     >
@@ -64,18 +64,22 @@ export function StatCard({
         className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-ink/15 to-transparent"
         aria-hidden
       />
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <p className="text-[12px] font-medium text-muted-foreground">{label}</p>
-          <p className="mt-2 font-display text-[1.85rem] leading-none tracking-tight text-ink tabular-nums">
+          <p className="text-[11px] font-medium text-muted-foreground sm:text-[12px]">
+            {label}
+          </p>
+          <p className="mt-1.5 font-display text-[1.45rem] leading-none tracking-tight text-ink tabular-nums sm:mt-2 sm:text-[1.85rem]">
             {value}
           </p>
           {hint ? (
-            <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{hint}</p>
+            <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-muted-foreground sm:mt-2 sm:text-[12px]">
+              {hint}
+            </p>
           ) : null}
         </div>
         {icon ? (
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-ink ring-1 ring-border/70 transition-colors group-hover:bg-ink group-hover:text-white">
+          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-ink ring-1 ring-border/70 transition-colors group-hover:bg-ink group-hover:text-white sm:size-10">
             {icon}
           </span>
         ) : null}
@@ -98,14 +102,16 @@ export function EmptyState({
   steps?: { label: string; href?: string; done?: boolean }[];
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-[linear-gradient(165deg,#fff_0%,#fafafa_55%,#f5f5f5_100%)] px-6 py-14 text-center md:px-10">
+    <div className="rounded-2xl border border-dashed border-border bg-[linear-gradient(165deg,#fff_0%,#fafafa_55%,#f5f5f5_100%)] px-4 py-10 text-center sm:px-6 sm:py-14 md:px-10">
       <div
-        className="mx-auto mb-5 inline-flex size-14 items-center justify-center rounded-2xl bg-white text-ink shadow-[0_1px_0_rgba(0,0,0,0.04)] ring-1 ring-border"
+        className="mx-auto mb-4 inline-flex size-12 items-center justify-center rounded-2xl bg-white text-ink shadow-[0_1px_0_rgba(0,0,0,0.04)] ring-1 ring-border sm:mb-5 sm:size-14"
         aria-hidden
       >
         {icon ?? <span className="size-5 rounded-md bg-muted" />}
       </div>
-      <h2 className="font-display text-2xl tracking-tight text-ink">{title}</h2>
+      <h2 className="font-display text-xl tracking-tight text-ink sm:text-2xl">
+        {title}
+      </h2>
       {body ? (
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
           {body}
@@ -155,7 +161,9 @@ export function EmptyState({
           })}
         </ol>
       ) : null}
-      {action ? <div className="mt-7 flex justify-center gap-2">{action}</div> : null}
+      {action ? (
+        <div className="mt-7 flex flex-wrap justify-center gap-2">{action}</div>
+      ) : null}
     </div>
   );
 }
@@ -172,24 +180,26 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
       <div className="min-w-0">
         {eyebrow ? (
           <p className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="mt-1 font-display text-[1.85rem] leading-tight tracking-tight text-ink md:text-[2.15rem]">
+        <h1 className="mt-1 font-display text-[1.55rem] leading-tight tracking-tight text-ink sm:text-[1.85rem] md:text-[2.15rem]">
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <p className="mt-1.5 max-w-2xl text-[13px] leading-6 text-muted-foreground sm:mt-2 sm:text-sm">
             {description}
           </p>
         ) : null}
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {actions}
+        </div>
       ) : null}
     </div>
   );
@@ -220,8 +230,8 @@ export function Panel({
       {title ? (
         <div
           className={cn(
-            "flex items-start justify-between gap-3 border-b border-border px-5",
-            description ? "py-4" : "items-center py-4",
+            "flex flex-col gap-3 border-b border-border px-4 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-5",
+            description ? "py-4" : "sm:items-center py-4",
           )}
         >
           <div className="min-w-0">
@@ -232,7 +242,11 @@ export function Panel({
               </p>
             ) : null}
           </div>
-          {action}
+          {action ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {action}
+            </div>
+          ) : null}
         </div>
       ) : null}
       <div className={flush ? undefined : undefined}>{children}</div>
@@ -282,7 +296,7 @@ export function ListRow({
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-3 px-5 py-3.5",
+        "flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-5",
         className,
       )}
     >
@@ -292,10 +306,16 @@ export function ListRow({
           {meta}
         </div>
         {detail ? (
-          <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
+          <p className="mt-1 break-words text-xs text-muted-foreground sm:truncate">
+            {detail}
+          </p>
         ) : null}
       </div>
-      {trailing}
+      {trailing ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+          {trailing}
+        </div>
+      ) : null}
     </div>
   );
 }

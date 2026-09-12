@@ -25,11 +25,18 @@ Health check: `GET /api/health/supabase` → `"ready": true`
 
 ## Schema updates
 
-After the base schema, also run:
+After the base schema, also run these migrations in order:
 
-`supabase/migrations/20260910143000_global_slug_and_rls.sql`
+1. `supabase/migrations/20260910143000_global_slug_and_rls.sql`
+2. `supabase/migrations/20260911220000_analytics_orders_waitlist.sql`
+3. `supabase/migrations/20260912120000_notifications_order_status.sql`
+4. `supabase/migrations/20260912140000_publishing_channels.sql`
+5. `supabase/migrations/20260912160000_notifications_inbox_queue.sql`
 
-This makes website slugs globally unique and tightens RLS (`WITH CHECK` + least privilege for `anon`).
+Or re-apply the latest `supabase/schema.sql` (includes the core tables).
+
+Publishing queue + inbox notifications require migration `20260912160000_*`.
+Cron hits `/api/publishing/process-due` every 5 minutes (see `vercel.json`).
 
 ## Env vars (Connect → Next.js)
 

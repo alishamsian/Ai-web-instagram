@@ -110,31 +110,29 @@ export function SyncInstagramButton({
 
   return (
     <div className={cn("inline-flex flex-col gap-1", className)}>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={pending || !enabled}
-        title={
-          !enabled
-            ? isFa
-              ? "فقط پلن حرفه‌ای"
-              : "Pro only"
-            : undefined
-        }
-        onClick={() => void onClick()}
-        className="relative"
-      >
-        {label}
-        {!enabled ? (
-          <span className="ms-1 text-[10px] opacity-70">Pro</span>
-        ) : null}
-        {badge ? (
-          <span className="ms-1.5 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
-            {badge}
-          </span>
-        ) : null}
-      </Button>
+      {!enabled ? (
+        <Button asChild size="sm" variant="outline" className={className}>
+          <a href={`/${locale}/dashboard/billing`}>
+            {isFa ? "همگام‌سازی · ارتقا Pro" : "Sync · Upgrade Pro"}
+          </a>
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={pending}
+          onClick={() => void onClick()}
+          className="relative"
+        >
+          {label}
+          {badge ? (
+            <span className="ms-1.5 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800">
+              {badge}
+            </span>
+          ) : null}
+        </Button>
+      )}
       {message ? (
         <p className="max-w-[14rem] text-[11px] leading-4 text-muted-foreground">
           {message}

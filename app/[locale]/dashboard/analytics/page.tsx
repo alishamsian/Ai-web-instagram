@@ -1,22 +1,24 @@
+import {
+  EmptyState,
+  PageHeader,
+  PageStack,
+  Panel,
+  SoftBanner,
+  StatCard,
+  StatusBadge,
+} from "@/components/dashboard/ui";
+import { buildAnalyticsInsights } from "@/lib/dashboard/analytics-insights";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BarChart3, Eye, MousePointerClick, Package, Share2 } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import {
   getWorkspaceAnalytics,
-  getWorkspaceDashboardData,
+  getWorkspaceWebsites,
 } from "@/lib/dashboard/data";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { parseLocale } from "@/lib/i18n/paths";
 import { Button } from "@/components/ui/button";
-import {
-  EmptyState,
-  PageHeader,
-  PageStack,
-  Panel,
-  StatCard,
-  StatusBadge,
-} from "@/components/dashboard/ui";
 
 export default async function AnalyticsPage({
   params,
@@ -29,7 +31,7 @@ export default async function AnalyticsPage({
   if (!session) redirect(`/${locale}/login`);
   const isFa = locale === "fa";
 
-  const { websites } = await getWorkspaceDashboardData(session.workspace.id);
+  const websites = await getWorkspaceWebsites(session.workspace.id);
   const published = websites.filter((site) => site.status === "published");
   const analytics = await getWorkspaceAnalytics(
     published.map((s) => s.id),
@@ -43,6 +45,14 @@ export default async function AnalyticsPage({
     .filter((row) => row.path.startsWith("/p/"))
     .slice(0, 6);
   const primary = published[0] ?? websites[0] ?? null;
+  const insights = buildAnalyticsInsights({
+    total: analytics.total,
+    series: analytics.series,
+    byReferrer: analytics.byReferrer,
+    topProductViews: topProducts.reduce((s, r) => s + r.count, 0),
+    publishedCount: published.length,
+    locale,
+  });
 
   return (
     <PageStack>
@@ -165,6 +175,38 @@ export default async function AnalyticsPage({
             />
           </div>
 
+          {insights.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {insights.map((insight) => (
+                <SoftBanner
+                  key={insight.id}
+                  tone={
+                    insight.tone === "positive"
+                      ? "success"
+                      : insight.tone === "action"
+                        ? "warning"
+                        : "info"
+                  }
+                >
+                  <p className="font-medium text-ink">
+                    {isFa ? insight.titleFa : insight.titleEn}
+                  </p>
+                  <p className="mt-1 text-[13px] leading-5">
+                    {isFa ? insight.bodyFa : insight.bodyEn}
+                  </p>
+                  {insight.href && primary ? (
+                    <Link
+                      href={`/${locale}/${insight.href}${insight.href.includes("website") ? `?id=${primary.id}` : ""}`}
+                      className="mt-2 inline-flex text-xs font-medium underline-offset-2 hover:underline"
+                    >
+                      {isFa ? "ادامه" : "Open"} →
+                    </Link>
+                  ) : null}
+                </SoftBanner>
+              ))}
+            </div>
+          ) : null}
+
           <Panel
             title={dict.dashboard.analyticsVisits}
             description={isFa ? "روند بازدید روزانه" : "Daily visit trend"}
@@ -174,20 +216,30 @@ export default async function AnalyticsPage({
               </StatusBadge>
             }
           >
-            <div className="px-5 py-8">
+            <div className="px-3 py-6 sm:px-5 sm:py-8">
               {sortedSeries.length ? (
-                <div className="flex h-44 items-end gap-1.5 sm:gap-2">
+                <div className="flex h-48 items-stretch gap-1 sm:h-52 sm:gap-2">
                   {sortedSeries.map((point) => (
                     <div
                       key={point.date}
-                      className="group relative flex-1 rounded-t-md bg-gradient-to-t from-ink/20 to-ink/55 transition-[height] hover:to-ink/70"
-                      title={`${point.date}: ${point.count}`}
-                      style={{
-                        height: `${Math.max(10, (point.count / maxBar) * 100)}%`,
-                      }}
+                      className="group relative flex min-w-0 flex-1 flex-col"
                     >
-                      <span className="pointer-events-none absolute -top-7 left-1/2 hidden -translate-x-1/2 rounded-md bg-ink px-1.5 py-0.5 text-[10px] text-white group-hover:block">
-                        {point.count}
+                      <div className="relative flex min-h-0 flex-1 items-end">
+                        <div
+                          className="w-full rounded-t-md bg-gradient-to-t from-ink/20 to-ink/55 transition-[height] hover:to-ink/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
+                          title={`${point.date}: ${point.count}`}
+                          style={{
+                            height: `${Math.max(10, (point.count / maxBar) * 100)}%`,
+                          }}
+                          tabIndex={0}
+                          aria-label={`${point.date}: ${point.count}`}
+                        />
+                        <span className="pointer-events-none absolute -top-7 left-1/2 z-[1] hidden -translate-x-1/2 rounded-md bg-ink px-1.5 py-0.5 text-[10px] text-white group-hover:block group-focus-within:block">
+                          {point.count}
+                        </span>
+                      </div>
+                      <span className="mt-1.5 shrink-0 truncate text-center font-mono text-[9px] text-muted-foreground sm:text-[10px]">
+                        {point.date.slice(5)}
                       </span>
                     </div>
                   ))}
@@ -204,9 +256,9 @@ export default async function AnalyticsPage({
                   {analytics.byPath.map((row) => (
                     <li
                       key={row.path}
-                      className="flex items-center justify-between gap-3 rounded-xl bg-[#fafafa] px-3 py-2.5"
+                      className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-[#fafafa] px-3 py-2.5"
                     >
-                      <span className="font-mono text-xs text-muted-foreground">
+                      <span className="truncate font-mono text-[11px] text-muted-foreground sm:text-xs">
                         {row.path}
                       </span>
                       <span className="tabular-nums font-medium text-ink">
@@ -283,9 +335,9 @@ export default async function AnalyticsPage({
               {published.map((site) => (
                 <li
                   key={site.id}
-                  className="flex items-center justify-between gap-3 px-5 py-4"
+                  className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-5"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium text-ink">
                       {site.config.brand.name}
                     </p>
@@ -293,7 +345,7 @@ export default async function AnalyticsPage({
                       /s/{site.slug}
                     </p>
                   </div>
-                  <Button asChild size="sm" variant="outline">
+                  <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
                     <Link href={`/${locale}/dashboard/website?id=${site.id}`}>
                       {dict.dashboard.openSite}
                     </Link>

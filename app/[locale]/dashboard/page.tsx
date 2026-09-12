@@ -9,38 +9,49 @@ import {
 } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import {
-  buildNotifications,
-  buildSetupChecklist,
-  formatRelativeTime,
   getActiveImportJob,
   getCachedOverviewMetrics,
   getWorkspaceDashboardData,
   planUsageLabel,
 } from "@/lib/dashboard/data";
+import {
+  buildActivityFeed,
+  buildNextActions,
+  buildOnboardingThree,
+  buildSiteHealth,
+  buildSmartSuggestion,
+} from "@/lib/dashboard/ops";
 import { resolveWorkspaceWebsite } from "@/lib/dashboard/primary-site";
 import { getPrimarySiteIdCookie } from "@/lib/dashboard/primary-site-server";
+import { getDomainsForWebsite } from "@/lib/database/queries";
+import { getWorkspaceNotificationSettings } from "@/lib/orders/notify";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { parseLocale } from "@/lib/i18n/paths";
 import { getRuntimeMode } from "@/lib/config/env";
 import { isProPlan } from "@/lib/config/plans";
+import { channelsFromWorkspace } from "@/lib/publishing/repository";
 import { Button } from "@/components/ui/button";
 import { BuildingSitePlaceholder } from "@/components/dashboard/BuildingSitePlaceholder";
 import { JobProgressBanner } from "@/components/dashboard/JobProgressBanner";
 import { OrdersPanel } from "@/components/dashboard/OrdersPanel";
 import { PrimarySiteCard } from "@/components/dashboard/PrimarySiteCard";
 import { ProUpgradeCard } from "@/components/dashboard/ProUpgradeCard";
-import { SetupChecklist } from "@/components/dashboard/SetupChecklist";
 import { SiteCard } from "@/components/dashboard/SiteCard";
 import { SitePhonePreview } from "@/components/dashboard/SitePhonePreview";
+import {
+  ActivityFeed,
+  NextActionsPanel,
+  OnboardingRail,
+  SiteHealthCard,
+  SmartSuggestionCard,
+} from "@/components/dashboard/OverviewWidgets";
 import {
   EmptyState,
   PageHeader,
   PageStack,
-  Panel,
   SectionLabel,
   SoftBanner,
   StatCard,
-  StatusBadge,
 } from "@/components/dashboard/ui";
 
 export default async function DashboardPage({
@@ -55,14 +66,27 @@ export default async function DashboardPage({
 
   const workspaceId = session.workspace.id;
   const primaryId = await getPrimarySiteIdCookie();
-  const { websites, imports, jobs } =
-    await getWorkspaceDashboardData(workspaceId);
+  const [{ websites, imports, jobs }, notificationsSettings] =
+    await Promise.all([
+      getWorkspaceDashboardData(workspaceId),
+      getWorkspaceNotificationSettings(workspaceId),
+    ]);
 
   const { website } = resolveWorkspaceWebsite(websites, { primaryId });
   const otherSites = websites.filter((site) => site.id !== website?.id);
   const websiteIds = websites.map((site) => site.id);
   const { analytics, orderCount, visitCounts, orders } =
     await getCachedOverviewMetrics(workspaceId, websiteIds);
+
+  const domains = website ? await getDomainsForWebsite(website.id) : [];
+  const channels = channelsFromWorkspace({
+    websites,
+    imports,
+    locale,
+    telegramChatId: notificationsSettings.telegramEnabled
+      ? notificationsSettings.telegramChatId
+      : null,
+  });
 
   const activeJob = getActiveImportJob(jobs);
   const mode = getRuntimeMode();
@@ -80,14 +104,47 @@ export default async function DashboardPage({
     0,
   );
 
-  const checklist = buildSetupChecklist({
+  const freshNewOrders = orders.filter((o) => o.status === "new").length;
+  const hasConnectedChannel = channels.some(
+    (c) =>
+      (c.type === "telegram" || c.type === "website" || c.type === "instagram") &&
+      c.status === "connected",
+  );
+
+  const productsMissingPrice = websites.reduce((sum, site) => {
+    const items = site.config.content.products?.items ?? [];
+    return sum + items.filter((p) => !p.hidden && p.price == null).length;
+  }, 0);
+
+  const nextActions = buildNextActions({
     locale,
     website,
+    freshNewOrders,
+    productsCount,
+    productsMissingPrice,
     hasImport: imports.length > 0,
-    hasProducts: productsCount > 0,
-    visits: primaryVisits || analytics.total,
+    channels,
+    unpublishedContentHint: postsCount > 0,
   });
-  const notifications = buildNotifications({
+
+  const onboarding = buildOnboardingThree({
+    hasImport: imports.length > 0,
+    website,
+    hasConnectedChannel,
+  });
+
+  const health = website
+    ? buildSiteHealth({
+        website,
+        hasProducts: productsCount > 0,
+        hasDomain: domains.length > 0,
+        lastSyncAt: imports[0]?.updatedAt,
+        locale,
+      })
+    : [];
+
+  const suggestion = buildSmartSuggestion({ imports, website, channels });
+  const activity = buildActivityFeed({
     locale,
     jobs,
     websites,
@@ -143,10 +200,12 @@ export default async function DashboardPage({
         }
       />
 
-      {!isEmpty && checklist.some((s) => !s.done) ? (
-        <div className="xl:hidden">
-          <SetupChecklist steps={checklist} locale={locale} />
-        </div>
+      {!isEmpty ? (
+        <OnboardingRail
+          locale={locale}
+          workspaceId={workspaceId}
+          steps={onboarding}
+        />
       ) : null}
 
       {showStats ? (
@@ -170,7 +229,15 @@ export default async function DashboardPage({
           <StatCard
             label={isFa ? "سفارش‌ها" : "Orders"}
             value={String(orderCount)}
-            hint={isFa ? "کل ثبت‌شده‌ها" : "All time"}
+            hint={
+              freshNewOrders > 0
+                ? isFa
+                  ? `${freshNewOrders} جدید`
+                  : `${freshNewOrders} new`
+                : isFa
+                  ? "کل ثبت‌شده‌ها"
+                  : "All time"
+            }
             icon={<ShoppingBag className="size-4" aria-hidden />}
           />
           <StatCard
@@ -191,6 +258,18 @@ export default async function DashboardPage({
           title={dict.dashboard.empty}
           body={dict.dashboard.emptyBody}
           icon={<Sparkles className="size-5" aria-hidden />}
+          steps={[
+            {
+              label: isFa ? "لینک اینستاگرام را بده" : "Paste your Instagram",
+              href: `/${locale}/create`,
+            },
+            {
+              label: isFa ? "سایت را بررسی و منتشر کن" : "Review and publish",
+            },
+            {
+              label: isFa ? "یک کانال برای بازنشر وصل کن" : "Connect a channel",
+            },
+          ]}
           action={
             <Button asChild>
               <Link href={`/${locale}/create`}>{dict.dashboard.emptyCta}</Link>
@@ -200,6 +279,8 @@ export default async function DashboardPage({
       ) : (
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
           <div className="space-y-6">
+            <NextActionsPanel locale={locale} actions={nextActions} />
+
             {website ? (
               <PrimarySiteCard
                 site={website}
@@ -215,6 +296,14 @@ export default async function DashboardPage({
             ) : activeJob ? (
               <BuildingSitePlaceholder job={activeJob} locale={locale} />
             ) : null}
+
+            {website ? (
+              <div className="xl:hidden">
+                <SitePhonePreview site={website} locale={locale} />
+              </div>
+            ) : null}
+
+            <SmartSuggestionCard locale={locale} suggestion={suggestion} />
 
             {otherSites.length > 0 ? (
               <div className="space-y-3">
@@ -238,18 +327,23 @@ export default async function DashboardPage({
                 </div>
               </div>
             ) : null}
+
+            <ActivityFeed locale={locale} items={activity} />
           </div>
 
           <div className="space-y-4">
-            {website ? <SitePhonePreview site={website} locale={locale} /> : null}
-
-            <div className="hidden xl:block">
-              <SetupChecklist steps={checklist} locale={locale} />
-            </div>
-            {checklist.every((s) => s.done) ? (
-              <div className="xl:hidden">
-                <SetupChecklist steps={checklist} locale={locale} />
+            {website ? (
+              <div className="hidden xl:block">
+                <SitePhonePreview site={website} locale={locale} />
               </div>
+            ) : null}
+
+            {website && health.length > 0 ? (
+              <SiteHealthCard
+                locale={locale}
+                items={health}
+                brandName={website.config.brand.name}
+              />
             ) : null}
 
             {!isPro ? <ProUpgradeCard locale={locale} feature="generic" /> : null}
@@ -274,44 +368,6 @@ export default async function DashboardPage({
                   : undefined
               }
             />
-
-            <Panel
-              title={isFa ? "اعلان‌ها" : "Notifications"}
-              description={
-                isFa ? "رویدادهای مهم اخیر" : "Recent important events"
-              }
-            >
-              {notifications.length === 0 ? (
-                <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-                  {dict.dashboard.noActivity}
-                </p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {notifications.map((item) => (
-                    <li key={item.id}>
-                      <Link
-                        href={`/${locale}/${item.href}`}
-                        className="flex items-start justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate text-sm font-medium text-ink">
-                              {item.title}
-                            </p>
-                            <StatusBadge tone={item.tone}>
-                              {formatRelativeTime(item.at, locale)}
-                            </StatusBadge>
-                          </div>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {item.detail}
-                          </p>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Panel>
           </div>
         </div>
       )}

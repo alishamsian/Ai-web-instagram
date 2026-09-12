@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { WebsiteConfig } from "@/types/website";
+import { useMemo, useState, type ReactNode } from "react";
+import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
+import type { WebsiteRenderMode } from "@/components/editor/EditContext";
 import type { StoreCatalogProduct } from "@/lib/store/theme";
 import {
   getStoreCatalog,
@@ -25,24 +26,95 @@ import {
 import { StoreFooter } from "@/components/store/StoreFooter";
 import { StoreQuickView } from "@/components/store/StoreQuickView";
 import { StoreCartDrawer } from "@/components/store/StoreCartDrawer";
+import { EditorSectionFrame } from "@/components/editor/EditorSectionFrame";
+import { sectionLabel } from "@/components/editor/editor-utils";
+
+function SectionWrap({
+  config,
+  type,
+  mode,
+  children,
+  fallbackLabel,
+}: {
+  config: WebsiteConfig;
+  type: WebsiteSectionType;
+  mode: WebsiteRenderMode;
+  children: ReactNode;
+  fallbackLabel?: string;
+}) {
+  const section = config.sections.find((item) => item.type === type);
+  if (mode !== "editor" || !section) return <>{children}</>;
+  return (
+    <EditorSectionFrame
+      sectionId={section.id}
+      label={
+        fallbackLabel ??
+        sectionLabel(type, config.settings.language)
+      }
+      settings={section.settings}
+    >
+      {children}
+    </EditorSectionFrame>
+  );
+}
+
+function resolveProductList(
+  config: WebsiteConfig,
+  catalog: StoreCatalogProduct[],
+) {
+  const section = config.sections.find((item) => item.type === "products");
+  const source = (section?.settings?.productSource as string) ?? "all";
+  if (source === "category") {
+    const category = String(section?.settings?.category ?? "").trim();
+    if (!category) return catalog;
+    return catalog.filter((item) => item.category === category);
+  }
+  if (source === "manual") {
+    const ids = Array.isArray(section?.settings?.manualIds)
+      ? (section!.settings!.manualIds as string[])
+      : [];
+    if (!ids.length) return catalog;
+    const byKey = new Map(
+      catalog.map((item) => [item.id ?? item.slug ?? item.name, item]),
+    );
+    return ids
+      .map((id) => byKey.get(id))
+      .filter((item): item is StoreCatalogProduct => Boolean(item));
+  }
+  return catalog;
+}
 
 function StoreHome({
   config,
   catalog,
   categories,
+  mode,
   onQuickView,
 }: {
   config: WebsiteConfig;
   catalog: StoreCatalogProduct[];
   categories: ReturnType<typeof getStoreCategories>;
+  mode: WebsiteRenderMode;
   onQuickView: (product: StoreCatalogProduct) => void;
 }) {
   const isFa = config.settings.language === "fa";
-  const featured = useMemo(() => getFeaturedProducts(catalog, 4), [catalog]);
+  const shopProducts = useMemo(
+    () => resolveProductList(config, catalog),
+    [config, catalog],
+  );
+  const featured = useMemo(
+    () => getFeaturedProducts(shopProducts, 4),
+    [shopProducts],
+  );
   const show = (type: string, fallback = true) => {
     const section = config.sections.find((item) => item.type === type);
     if (!section) return fallback;
+    if (mode === "editor") return true;
     return section.visible;
+  };
+  const dim = (type: string) => {
+    const section = config.sections.find((item) => item.type === type);
+    return mode === "editor" && section && !section.visible;
   };
 
   return (
@@ -50,7 +122,13 @@ function StoreHome({
       <StoreAnnouncement config={config} />
       <StoreHeader config={config} hasCategories={categories.length > 0} />
       <main>
-        {show("hero") ? <StoreHero config={config} /> : null}
+        {show("hero") ? (
+          <SectionWrap config={config} type="hero" mode={mode}>
+            <div className={dim("hero") ? "opacity-45" : undefined}>
+              <StoreHero config={config} />
+            </div>
+          </SectionWrap>
+        ) : null}
         <StoreCategories config={config} categories={categories} />
         {featured.length ? (
           <StoreProductGrid
@@ -63,29 +141,71 @@ function StoreHome({
             onQuickView={onQuickView}
           />
         ) : null}
-        {show("about") ? <StoreStory config={config} /> : null}
+        {show("about") ? (
+          <SectionWrap config={config} type="about" mode={mode}>
+            <div className={dim("about") ? "opacity-45" : undefined}>
+              <StoreStory config={config} />
+            </div>
+          </SectionWrap>
+        ) : null}
         {show("products") ? (
-          <StoreProductGrid
-            config={config}
-            products={catalog}
-            id="shop"
-            columns={4}
-            kicker={isFa ? "فروشگاه" : "Shop"}
-            title={
-              config.content.products?.title ||
-              (isFa ? "همه محصولات" : "All products")
-            }
-            onQuickView={onQuickView}
-          />
+          <SectionWrap config={config} type="products" mode={mode}>
+            <div className={dim("products") ? "opacity-45" : undefined}>
+              <StoreProductGrid
+                config={config}
+                products={shopProducts}
+                id="shop"
+                columns={4}
+                kicker={isFa ? "فروشگاه" : "Shop"}
+                title={
+                  config.content.products?.title ||
+                  (isFa ? "همه محصولات" : "All products")
+                }
+                onQuickView={onQuickView}
+              />
+            </div>
+          </SectionWrap>
         ) : null}
         <StorePromo config={config} />
         {show("gallery") || show("instagram-feed", false) ? (
-          <StoreLookbook config={config} catalog={catalog} />
+          <SectionWrap
+            config={config}
+            type={show("gallery") ? "gallery" : "instagram-feed"}
+            mode={mode}
+          >
+            <div
+              className={
+                dim("gallery") || dim("instagram-feed") ? "opacity-45" : undefined
+              }
+            >
+              <StoreLookbook config={config} catalog={catalog} />
+            </div>
+          </SectionWrap>
         ) : null}
-        {show("faq") ? <StoreFAQ config={config} /> : null}
-        {show("contact") ? <StoreContact config={config} /> : null}
+        {show("faq") ? (
+          <SectionWrap config={config} type="faq" mode={mode}>
+            <div className={dim("faq") ? "opacity-45" : undefined}>
+              <StoreFAQ config={config} />
+            </div>
+          </SectionWrap>
+        ) : null}
+        {show("contact") ? (
+          <SectionWrap config={config} type="contact" mode={mode}>
+            <div className={dim("contact") ? "opacity-45" : undefined}>
+              <StoreContact config={config} />
+            </div>
+          </SectionWrap>
+        ) : null}
       </main>
-      <StoreFooter config={config} hasCategories={categories.length > 0} />
+      {show("footer") ? (
+        <SectionWrap config={config} type="footer" mode={mode}>
+          <div className={dim("footer") ? "opacity-45" : undefined}>
+            <StoreFooter config={config} hasCategories={categories.length > 0} />
+          </div>
+        </SectionWrap>
+      ) : (
+        <StoreFooter config={config} hasCategories={categories.length > 0} />
+      )}
     </>
   );
 }
@@ -94,12 +214,17 @@ export function StoreTemplate({
   config,
   productSlug,
   websiteId,
+  mode = "published",
 }: {
   config: WebsiteConfig;
   productSlug?: string;
   websiteId?: string;
+  mode?: WebsiteRenderMode;
 }) {
-  const catalog = useMemo(() => getStoreCatalog(config), [config]);
+  const catalog = useMemo(
+    () => getStoreCatalog(config, { includeHidden: mode === "editor" }),
+    [config, mode],
+  );
   const categories = useMemo(
     () => getStoreCategories(config, catalog),
     [config, catalog],
@@ -135,6 +260,7 @@ export function StoreTemplate({
             config={config}
             catalog={catalog}
             categories={categories}
+            mode={mode}
             onQuickView={setQuick}
           />
         )}

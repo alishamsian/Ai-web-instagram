@@ -19,6 +19,7 @@ export default async function PublishedSitePage({
       <SiteViewBeacon websiteId={website.id} slug={slug} path="/" />
       <WebsiteRenderer
         config={website.config}
+        mode="published"
         basePath={`/s/${slug}`}
         websiteId={website.id}
       />

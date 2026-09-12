@@ -751,7 +751,7 @@ export function ContentStudio({
           <p className="text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
             {isFa ? "استودیوی کاتالوگ" : "Catalog studio"}
           </p>
-          <h1 className="mt-1.5 font-display text-[2rem] leading-none tracking-tight text-ink md:text-[2.35rem]">
+          <h1 className="mt-1.5 font-display text-[1.65rem] leading-none tracking-tight text-ink sm:text-[2rem] md:text-[2.35rem]">
             {brandName}
           </h1>
           <div className="mt-4 max-w-md">
@@ -914,9 +914,10 @@ export function ContentStudio({
       ) : null}
 
       {/* Toolbar */}
-      <div className="sticky top-14 z-20 -mx-1 space-y-3 bg-[#f4f4f2]/90 px-1 py-2 backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-0.5 rounded-full bg-white p-1 ring-1 ring-border/80">
+      <div className="sticky top-14 z-20 -mx-1 space-y-3 bg-[#f4f4f2]/95 px-1 py-2 backdrop-blur-md">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex w-max gap-0.5 rounded-full bg-white p-1 ring-1 ring-border/80">
             {(
               [
                 ["products", isFa ? "محصولات" : "Products", health.visible],
@@ -929,7 +930,7 @@ export function ContentStudio({
                 type="button"
                 onClick={() => setTab(id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
+                  "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
                   tab === id
                     ? "bg-ink text-white"
                     : "text-muted-foreground hover:text-ink",
@@ -946,13 +947,14 @@ export function ContentStudio({
                 </span>
               </button>
             ))}
+            </div>
           </div>
 
           {tab === "products" ? (
-            <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
+            <div className="relative w-full min-w-0 flex-1 sm:max-w-xs">
               <Search className="pointer-events-none absolute start-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
-                className="h-9 border-border/80 bg-white ps-9 shadow-none"
+                className="h-10 border-border/80 bg-white ps-9 shadow-none sm:h-9"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={isFa ? "جستجو…" : "Search…"}
@@ -962,7 +964,9 @@ export function ContentStudio({
         </div>
 
         {tab === "products" ? (
-          <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 end-0 z-[1] w-8 bg-gradient-to-l from-[#f4f4f2] to-transparent sm:hidden" />
+            <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex gap-1.5">
               {(
                 [
@@ -978,7 +982,7 @@ export function ContentStudio({
                   type="button"
                   onClick={() => setFilter(id)}
                   className={cn(
-                    "shrink-0 rounded-full px-3 py-1 text-[11px] font-medium transition-colors",
+                    "shrink-0 rounded-full px-3 py-2 text-[11px] font-medium transition-colors sm:py-1",
                     filter === id
                       ? "bg-ink/90 text-white"
                       : "bg-white/80 text-muted-foreground ring-1 ring-border/70 hover:text-ink",
@@ -991,7 +995,7 @@ export function ContentStudio({
             <span className="mx-1 h-4 w-px shrink-0 bg-border" />
             <button
               type="button"
-              className="shrink-0 text-[11px] font-medium text-muted-foreground hover:text-ink"
+              className="shrink-0 py-2 text-[11px] font-medium text-muted-foreground hover:text-ink sm:py-0"
               onClick={selectFiltered}
             >
               {isFa ? "انتخاب فیلتر" : "Select filtered"}
@@ -999,12 +1003,13 @@ export function ContentStudio({
             {health.noPrice > 0 ? (
               <button
                 type="button"
-                className="shrink-0 text-[11px] font-medium text-muted-foreground hover:text-ink"
+                className="shrink-0 py-2 text-[11px] font-medium text-muted-foreground hover:text-ink sm:py-0"
                 onClick={selectNeedingPrice}
               >
                 {isFa ? "بدون‌قیمت‌ها" : "No-price"}
               </button>
             ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -1234,7 +1239,7 @@ export function ContentStudio({
             </div>
 
             {/* Mobile fixed bar above tab bar */}
-            <div className="fixed inset-x-0 bottom-[4.75rem] z-30 border-t border-border bg-white/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur-md md:hidden">
+            <div className="fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-white/95 px-3 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur-md md:hidden">
               <div className="flex items-center gap-2">
                 <span className="shrink-0 text-[11px] font-medium tabular-nums text-ink">
                   {selected.size}
@@ -1242,25 +1247,29 @@ export function ContentStudio({
                 <Button
                   type="button"
                   size="sm"
-                  className="flex-1"
+                  className="min-h-10 flex-1"
                   onClick={() => startReview([...selected], "price")}
                 >
                   <Wand2 className="size-3.5" aria-hidden />
-                  {isFa ? "ویرایش سریع" : "Quick edit"}
+                  <span className="truncate">
+                    {isFa ? "ویرایش سریع" : "Quick edit"}
+                  </span>
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="flex-1"
+                  className="min-h-10 flex-1"
                   disabled={pending}
                   onClick={() => void suggestPricesForSelection([...selected])}
                 >
                   <Sparkles className="size-3.5" aria-hidden />
-                  {isFa ? "پیشنهاد قیمت" : "Suggest prices"}
+                  <span className="truncate">
+                    {isFa ? "پیشنهاد" : "Suggest"}
+                  </span>
                 </Button>
                 <details className="relative shrink-0">
-                  <summary className="flex size-9 list-none cursor-pointer items-center justify-center rounded-[10px] border border-border bg-white text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+                  <summary className="flex size-10 list-none cursor-pointer items-center justify-center rounded-[10px] border border-border bg-white text-ink marker:content-none [&::-webkit-details-marker]:hidden">
                     <MoreHorizontal className="size-4" aria-hidden />
                   </summary>
                   <div className="absolute end-0 bottom-[calc(100%+0.5rem)] z-40 w-48 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
@@ -1594,7 +1603,7 @@ export function ContentStudio({
       ) : null}
 
       {toast ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 md:bottom-8">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-[60] flex justify-center px-4 md:bottom-8">
           <p className="rounded-full bg-ink px-4 py-2 text-xs font-medium text-white shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
             {toast}
           </p>
@@ -2006,7 +2015,7 @@ function ProductDrawer({
         aria-label={isFa ? "بستن" : "Close"}
         onClick={onClose}
       />
-      <aside className="relative flex h-full w-full max-w-[26rem] animate-in flex-col border-s border-border bg-white shadow-[0_0_80px_rgba(0,0,0,0.2)] slide-in-from-right duration-300">
+      <aside className="relative flex h-full w-full max-w-full flex-col border-s border-border bg-white shadow-[0_0_80px_rgba(0,0,0,0.2)] sm:max-w-[26rem] animate-in slide-in-from-right duration-300">
         <div className="relative h-52 shrink-0 overflow-hidden bg-[#ecece9] sm:h-60">
           {img ? (
             <SiteImage

@@ -9,6 +9,8 @@ import {
 import type { WebsiteConfig } from "@/types/website";
 import { cn } from "@/lib/utils";
 
+export type WebsiteRenderMode = "editor" | "preview" | "published";
+
 export type EditorFieldPath =
   | "hero.headline"
   | "hero.subheadline"
@@ -25,28 +27,49 @@ export type EditorFieldPath =
   | "promo.title"
   | "promo.cta";
 
+export type SectionAction = "duplicate" | "toggle" | "delete" | "move-up" | "move-down";
+
 type EditorEditApi = {
   enabled: boolean;
+  mode: WebsiteRenderMode;
   selected?: EditorFieldPath;
+  selectedSectionId?: string;
+  hoveredSectionId?: string;
   onSelect: (path: EditorFieldPath) => void;
+  onSelectSection: (sectionId: string | undefined) => void;
+  onHoverSection: (sectionId: string | undefined) => void;
   onChangeText: (path: EditorFieldPath, value: string) => void;
+  onSectionAction?: (sectionId: string, action: SectionAction) => void;
+  isSectionVisible?: (sectionId: string) => boolean;
 };
 
 const EditorEditContext = createContext<EditorEditApi | null>(null);
 
 export function EditorEditProvider({
   enabled,
+  mode = "editor",
   selected,
+  selectedSectionId,
+  hoveredSectionId,
   config,
   onChange,
   onSelect,
+  onSelectSection,
+  onHoverSection,
+  onSectionAction,
   children,
 }: {
   enabled: boolean;
+  mode?: WebsiteRenderMode;
   selected?: EditorFieldPath;
+  selectedSectionId?: string;
+  hoveredSectionId?: string;
   config: WebsiteConfig;
   onChange: (next: WebsiteConfig) => void;
   onSelect: (path: EditorFieldPath) => void;
+  onSelectSection: (sectionId: string | undefined) => void;
+  onHoverSection: (sectionId: string | undefined) => void;
+  onSectionAction?: (sectionId: string, action: SectionAction) => void;
   children: ReactNode;
 }) {
   const onChangeText = useCallback(
@@ -113,9 +136,27 @@ export function EditorEditProvider({
     [config, onChange],
   );
 
+  const isSectionVisible = useCallback(
+    (sectionId: string) =>
+      config.sections.find((section) => section.id === sectionId)?.visible ?? true,
+    [config.sections],
+  );
+
   return (
     <EditorEditContext.Provider
-      value={{ enabled, selected, onSelect, onChangeText }}
+      value={{
+        enabled,
+        mode,
+        selected,
+        selectedSectionId,
+        hoveredSectionId,
+        onSelect,
+        onSelectSection,
+        onHoverSection,
+        onChangeText,
+        onSectionAction,
+        isSectionVisible,
+      }}
     >
       {children}
     </EditorEditContext.Provider>
@@ -140,7 +181,7 @@ export function EditableText({
   multiline?: boolean;
 }) {
   const edit = useEditorEdit();
-  if (!edit?.enabled) {
+  if (!edit?.enabled || edit.mode !== "editor") {
     return <Tag className={className}>{value}</Tag>;
   }
 
@@ -154,7 +195,9 @@ export function EditableText({
       )}
       contentEditable
       suppressContentEditableWarning
-      onFocus={() => edit.onSelect(path)}
+      onFocus={() => {
+        edit.onSelect(path);
+      }}
       onDoubleClick={(event) => {
         event.preventDefault();
         edit.onSelect(path);

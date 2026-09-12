@@ -32,6 +32,7 @@ export default async function PublishedProductPage({
       />
       <WebsiteRenderer
         config={website.config}
+        mode="published"
         basePath={`/s/${slug}`}
         productSlug={productSlug}
         websiteId={website.id}
