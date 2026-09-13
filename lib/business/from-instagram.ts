@@ -3,26 +3,14 @@ import type { InstagramImport } from "@/types/instagram";
 import type { WebsiteAIAnalysis } from "@/types/ai";
 import { sanitizeHttpUrl } from "@/lib/business/schema";
 
-function captionProductName(caption: string | null): string | null {
-  if (!caption?.trim()) return null;
-  const first = caption
-    .split(/[\n.!?]/)
-    .map((part) =>
-      part
-        .replace(/#[\w\u0600-\u06FF]+/g, " ")
-        .replace(/@[\w.]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim(),
-    )
-    .find((part) => part.length > 2);
-  if (!first) return null;
-  if (first.length > 48) return `${first.slice(0, 48).trim()}…`;
-  return first;
-}
-
 /**
  * Map Instagram import (+ optional AI analysis) → canonical BusinessProfile.
  * Never invents product names, prices, or commercial claims.
+ *
+ * Important: raw posts/reels are media evidence, not products. A caption
+ * sentence is not treated as a product name because doing so can turn generic
+ * marketing copy into false catalog inventory. Products enter the canonical
+ * profile only when the upstream analysis explicitly identifies a named item.
  */
 export function businessProfileFromInstagram(input: {
   imported: InstagramImport;
@@ -54,7 +42,7 @@ export function businessProfileFromInstagram(input: {
       }));
   });
 
-  // Dedupe by URL while preserving order
+  // Dedupe by URL while preserving order.
   const seen = new Set<string>();
   const uniqueImages = images.filter((img) => {
     if (seen.has(img.url)) return false;
@@ -66,15 +54,17 @@ export function businessProfileFromInstagram(input: {
     imported.media.map((m) => [m.id, m] as const),
   );
 
+  const sourcePosts = [...imported.posts, ...imported.reels];
   const analysisProducts =
     analysis?.products
       ?.map((product) => {
         const name = product.name?.trim();
         if (!name) return null;
+
         const firstImageId = product.imageIds?.[0];
         const media = firstImageId ? mediaById.get(firstImageId) : undefined;
         const imageFromPost = firstImageId
-          ? [...imported.posts, ...imported.reels].find((p) => p.id === firstImageId)
+          ? sourcePosts.find((p) => p.id === firstImageId)
           : undefined;
         const imageUrl = sanitizeHttpUrl(
           media?.originalUrl ??
@@ -82,6 +72,7 @@ export function businessProfileFromInstagram(input: {
             imageFromPost?.images?.[0] ??
             null,
         );
+
         return {
           id: product.id,
           name,
@@ -99,31 +90,6 @@ export function businessProfileFromInstagram(input: {
         };
       })
       .filter((p): p is NonNullable<typeof p> => Boolean(p)) ?? [];
-
-  // Only use posts as products when AI did not supply named products —
-  // and only when caption yields a real name (never Piece N).
-  const postProducts =
-    analysisProducts.length > 0
-      ? []
-      : [...imported.posts, ...imported.reels]
-          .map((post) => {
-            const name = captionProductName(post.caption);
-            if (!name) return null;
-            const imageUrl = sanitizeHttpUrl(
-              post.displayUrl ?? post.images[0] ?? null,
-            );
-            return {
-              id: post.id,
-              name,
-              description: null as string | null,
-              price: null as number | null,
-              currency: null as string | null,
-              confidence: 0.55,
-              imageUrl,
-            };
-          })
-          .filter((p): p is NonNullable<typeof p> => Boolean(p))
-          .slice(0, 12);
 
   return {
     source: "instagram",
@@ -153,7 +119,7 @@ export function businessProfileFromInstagram(input: {
     media: {
       images: uniqueImages.slice(0, 24),
     },
-    products: analysisProducts.length > 0 ? analysisProducts : postProducts,
+    products: analysisProducts,
     signals: {
       contentSignals: analysis?.brandTone ?? [],
       brandSignals: analysis?.visualStyle ?? [],
