@@ -38,6 +38,7 @@ export function MobileNav({
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
+    const trigger = triggerRef.current;
     document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onOpenChange(false);
@@ -46,7 +47,7 @@ export function MobileNav({
     return () => {
       document.body.style.overflow = previous;
       window.removeEventListener("keydown", onKey);
-      triggerRef.current?.focus();
+      trigger?.focus();
     };
   }, [open, onOpenChange]);
 

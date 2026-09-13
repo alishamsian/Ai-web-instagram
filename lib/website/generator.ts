@@ -137,7 +137,7 @@ export function generateWebsiteConfig(input: {
   const heroImageId =
     galleryIds.find((id) => media[id]?.type === "image") ?? galleryIds[0];
 
-  let sectionTypes = [...template.sections];
+  const sectionTypes = [...template.sections];
   if (products?.items.length && !sectionTypes.includes("products")) {
     const heroIdx = sectionTypes.indexOf("hero");
     sectionTypes.splice(heroIdx + 1, 0, "products");

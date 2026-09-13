@@ -109,8 +109,8 @@ export function DashboardShowcase({
   const [published, setPublished] = useState(true);
   const [visitors, setVisitors] = useState(1284);
   const [paused, setPaused] = useState(false);
-  const [storyBeat, setStoryBeat] = useState<StoryBeat>("idle");
-  const [storyIndex, setStoryIndex] = useState(0);
+  const [, setStoryBeat] = useState<StoryBeat>("idle");
+  const [, setStoryIndex] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [syncedExtra, setSyncedExtra] = useState(false);
   const [chartBoost, setChartBoost] = useState(false);

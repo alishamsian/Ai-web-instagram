@@ -288,4 +288,19 @@ describe("end-to-end pipeline", () => {
     expect(result.config.settings.vertical).toBe("generic");
     expect(result.config.sections.length).toBeGreaterThan(0);
   });
+
+  it("does not mutate recipe catalog or section registry", () => {
+    const recipeBefore = structuredClone(CORE_TEMPLATE_RECIPES);
+    const sectionsBefore = ALL_SECTION_DEFINITIONS.map((d) => d.type).sort();
+    generateWebsiteFromBusinessProfileSync({
+      profile: {
+        displayName: "Immutable",
+        bio: "fashion dress apparel clothing lookbook",
+      },
+    });
+    expect(CORE_TEMPLATE_RECIPES).toEqual(recipeBefore);
+    expect(ALL_SECTION_DEFINITIONS.map((d) => d.type).sort()).toEqual(
+      sectionsBefore,
+    );
+  });
 });

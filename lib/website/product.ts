@@ -14,28 +14,22 @@ export function ensureCatalogProduct(
   index: number,
   locale: "fa" | "en",
 ): CatalogProduct {
+  void locale;
   const id = item.id?.trim() || `product-${index + 1}`;
-  const slug = item.slug?.trim() || productSlug(item.name, index, id);
-  const fallbackName =
-    locale === "fa"
-      ? `محصول ${String(index + 1).padStart(2, "0")}`
-      : `Product ${String(index + 1).padStart(2, "0")}`;
   const rawName = item.name?.trim() || "";
+  // Never invent "Product N" — keep source name (may be empty).
   const name =
     rawName && !/^قطعه\s*\d+/i.test(rawName) && !/^piece\s*\d+/i.test(rawName)
       ? rawName
-      : fallbackName;
+      : "";
+  const slug = item.slug?.trim() || productSlug(name || id, index, id);
 
   return {
     ...item,
     id,
     slug,
     name,
-    description:
-      item.description?.trim() ||
-      (locale === "fa"
-        ? "برای جزئیات، سایز و موجودی پیام بدهید."
-        : "Message us for details, size, and stock."),
+    description: item.description?.trim() || "",
   };
 }
 
@@ -46,7 +40,6 @@ export function ensureCatalogProduct(
 export function expandStoreCatalog(
   items: Product[],
   locale: "fa" | "en",
-  _target?: number,
 ): CatalogProduct[] {
   if (!items.length) return [];
   return items.map((item, index) => ensureCatalogProduct(item, index, locale));

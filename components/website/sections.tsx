@@ -334,6 +334,7 @@ export function AboutSection({ config }: { config: WebsiteConfig }) {
 }
 
 export function ProductsSection({ config }: { config: WebsiteConfig }) {
+  const { basePath, onProductNavigate } = useSiteNav();
   const products = config.content.products;
   if (!products?.items.length) return null;
   const isStore = config.template === "store";
@@ -342,7 +343,6 @@ export function ProductsSection({ config }: { config: WebsiteConfig }) {
     config.template === "restaurant" ||
     config.brand.typography.scale === "editorial";
   const isFa = config.settings.language === "fa";
-  const { basePath, onProductNavigate } = useSiteNav();
 
   const items = products.items.map((item, index) =>
     ensureCatalogProduct(item, index, config.settings.language),

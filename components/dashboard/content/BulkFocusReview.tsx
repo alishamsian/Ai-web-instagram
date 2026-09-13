@@ -58,12 +58,13 @@ export function BulkFocusReview({
 
   const index = queue[cursor] ?? null;
   const product = index != null ? items[index] : null;
+  const queueKey = queue.join(",");
 
   useEffect(() => {
     setCursor(0);
     setDrafts({});
     setHint("");
-  }, [queue.join(",")]);
+  }, [queueKey]);
 
   useEffect(() => {
     setDrafts({});

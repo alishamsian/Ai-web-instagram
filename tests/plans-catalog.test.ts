@@ -17,7 +17,6 @@ describe("honest catalog", () => {
         },
       ],
       "fa",
-      9,
     );
     expect(catalog).toHaveLength(1);
   });
