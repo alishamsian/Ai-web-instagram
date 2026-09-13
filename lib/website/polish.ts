@@ -29,24 +29,23 @@ export function shortBrandName(name: string) {
 }
 
 export function cleanProductName(name: string, index: number, locale: "fa" | "en") {
+  void index;
+  void locale;
   const line =
     stripNoise(name)
       .split(/[\n.!?]/)
       .map((part) => part.trim())
       .find((part) => part.length > 2) ?? "";
 
-  const fallback =
-    locale === "fa"
-      ? `قطعه ${String(index + 1).padStart(2, "0")}`
-      : `Piece ${String(index + 1).padStart(2, "0")}`;
-
-  if (!line) return fallback;
+  // Never invent "Piece N" / "محصول N" — keep cleaned source or empty.
+  if (!line) return name.trim();
 
   const fluff =
     /(روز پسر|کادو|پارتنر|در جریانید|بهترین و مناسب|یونیسکس|هدیه خاص|خوشحالش)/i.test(
       line,
     );
-  if (fluff || line.length > 42) return fallback;
+  if (fluff) return name.trim();
+  if (line.length > 42) return `${line.slice(0, 42).trim()}…`;
 
   return line.length > 36 ? `${line.slice(0, 36).trim()}…` : line;
 }
@@ -84,20 +83,23 @@ export function preferHeroImageId(config: WebsiteConfig) {
 /**
  * Soft-upgrade generated storefront configs so the editor preview
  * looks like a real boutique, not a raw Instagram dump.
+ * Recipe-driven (P4/P5) configs keep composition and skip fabricated trust/shipping claims.
  */
 export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
   const locale = config.settings.language;
   const isStore = config.template === "store";
+  const recipeDriven = Boolean(config.settings.recipeId);
   const brandName = shortBrandName(config.brand.name);
   const heroImageId = preferHeroImageId(config);
 
   let headline = config.content.hero.headline.trim();
   if (
-    headline.includes(config.brand.name) ||
-    headline.length > 64 ||
-    /حالا با یک سایت/i.test(headline) ||
-    /ویترین آنلاین برای هر روز/i.test(headline) ||
-    /online boutique for every day/i.test(headline)
+    !recipeDriven &&
+    (headline.includes(config.brand.name) ||
+      headline.length > 64 ||
+      /حالا با یک سایت/i.test(headline) ||
+      /ویترین آنلاین برای هر روز/i.test(headline) ||
+      /online boutique for every day/i.test(headline))
   ) {
     headline =
       locale === "fa"
@@ -112,7 +114,7 @@ export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
   }
 
   let subheadline = stripNoise(config.content.hero.subheadline);
-  if (!subheadline || subheadline.length < 8) {
+  if (!recipeDriven && (!subheadline || subheadline.length < 8)) {
     subheadline =
       locale === "fa"
         ? "انتخاب کنید، صفحه محصول را ببینید، مستقیم سفارش دهید."
@@ -131,8 +133,9 @@ export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
   const products = config.content.products
     ? {
         ...config.content.products,
-        title:
-          isStore
+        title: recipeDriven
+          ? config.content.products.title
+          : isStore
             ? locale === "fa"
               ? "فروشگاه"
               : "Shop"
@@ -168,12 +171,13 @@ export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
       ...config.content,
       hero: {
         ...config.content.hero,
-        style: isStore ? "overlay" : config.content.hero.style,
-        imageId: heroImageId,
+        style: isStore && !recipeDriven ? "overlay" : config.content.hero.style,
+        imageId: heroImageId ?? config.content.hero.imageId,
         headline,
         subheadline,
-        cta:
-          isStore
+        cta: recipeDriven
+          ? config.content.hero.cta
+          : isStore
             ? locale === "fa"
               ? "ورود به فروشگاه"
               : "Enter the shop"
@@ -186,36 +190,31 @@ export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
             body: stripNoise(config.content.about.body).slice(0, 420),
           }
         : config.content.about,
-      promo:
-        config.content.promo ??
-        (isStore
-          ? {
-              kicker: locale === "fa" ? "سفارش" : "Order",
-              title:
-                locale === "fa"
-                  ? "برای سفارش، مستقیم پیام بدهید."
-                  : "Message us to place your order.",
-              cta: locale === "fa" ? "ارتباط با فروشگاه" : "Contact the shop",
-            }
-          : undefined),
-      trust:
-        config.content.trust ??
-        (isStore
-          ? {
-              items:
-                locale === "fa"
-                  ? [
-                      "ارسال به سراسر کشور",
-                      "هماهنگی قبل از خرید",
-                      "پاسخ سریع در دایرکت",
-                    ]
-                  : [
-                      "Nationwide shipping",
-                      "Confirm before purchase",
-                      "Fast reply on Instagram",
-                    ],
-            }
-          : undefined),
+      // Do not invent shipping / nationwide claims on recipe-driven configs
+      promo: recipeDriven
+        ? config.content.promo
+        : config.content.promo ??
+          (isStore
+            ? {
+                kicker: locale === "fa" ? "سفارش" : "Order",
+                title:
+                  locale === "fa"
+                    ? "برای سفارش، مستقیم پیام بدهید."
+                    : "Message us to place your order.",
+                cta: locale === "fa" ? "ارتباط با فروشگاه" : "Contact the shop",
+              }
+            : undefined),
+      trust: recipeDriven
+        ? config.content.trust
+        : config.content.trust ??
+          (isStore
+            ? {
+                items:
+                  locale === "fa"
+                    ? ["هماهنگی قبل از خرید", "پاسخ سریع در دایرکت"]
+                    : ["Confirm before purchase", "Fast reply on Instagram"],
+              }
+            : undefined),
     },
   };
 }

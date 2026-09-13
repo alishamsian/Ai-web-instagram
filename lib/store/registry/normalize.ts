@@ -45,7 +45,9 @@ function makeSection(
 /**
  * Returns a canonical section list for Store rendering.
  * Existing IDs/order/visibility/settings are preserved.
- * Missing legacy commerce sections get deterministic `compat-*` IDs.
+ * Recipe-driven configs (settings.recipeId) are NOT expanded —
+ * composition already came from TemplateRecipe + data-aware filtering.
+ * Legacy configs without recipeId still get deterministic commerce extras.
  */
 export function normalizeStoreSections(
   config: WebsiteConfig,
@@ -66,6 +68,11 @@ export function normalizeStoreSections(
           type,
           visible: true,
         }));
+
+  // P4/P5 recipe composition is authoritative — do not inject extras.
+  if (config.settings.recipeId) {
+    return source;
+  }
 
   let next = source;
 

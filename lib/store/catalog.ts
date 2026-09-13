@@ -48,24 +48,18 @@ function enrichProduct(
   index: number,
   locale: "fa" | "en",
 ): StoreCatalogProduct {
-  const badges: string[] = [];
-  if (item.confidence >= 0.85 && index === 0) {
-    badges.push(locale === "fa" ? "ویژه" : "Featured");
-  }
-
+  void locale;
+  // Do not invent ranking / "best seller" claims from position alone.
+  // Do not invent short descriptions when source has none.
   return {
     ...item,
     category: isRealCategory(item.category) ? item.category : "",
-    shortDescription:
-      item.description?.slice(0, 90) ||
-      (locale === "fa"
-        ? "از ویترین برند — برای جزئیات پیام بدهید."
-        : "From the brand showcase — message to order."),
+    shortDescription: item.description?.slice(0, 90) || "",
     compareAtPrice: null,
-    badges,
-    isNew: index < 3,
-    isBestSeller: index >= 2 && index < 6,
-    featured: index < 4,
+    badges: [],
+    isNew: false,
+    isBestSeller: false,
+    featured: index < 4 && item.confidence >= 0.85,
   };
 }
 

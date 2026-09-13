@@ -35,9 +35,15 @@ export {
 export {
   generateWebsiteFromBusinessProfile,
   generateWebsiteFromBusinessProfileSync,
+  resolveRecipeId,
   applyGeneratedContent,
   mapBusinessProductsToCatalog,
   isGeneratedContentPathAllowed,
   GENERATED_CONTENT_ALLOWLIST,
+  applyDataAwareComposition,
+  filterSectionsByAvailableData,
+  inspectBusinessData,
   type GenerateWebsiteResult,
 } from "@/lib/business/generation";
+
+export { businessProfileFromInstagram } from "@/lib/business/from-instagram";

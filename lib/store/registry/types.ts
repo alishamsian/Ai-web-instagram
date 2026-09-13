@@ -50,6 +50,16 @@ export type SectionPreview = {
 
 export type RegistrySectionType = WebsiteSectionType | (string & {});
 
+/** Optional data needs — generation may omit the section when unmet. */
+export type SectionDataRequirements = {
+  products?: boolean;
+  productImages?: boolean;
+  gallery?: boolean;
+  categories?: boolean;
+  attributes?: string[];
+  minProducts?: number;
+};
+
 export type SectionDefinition = {
   type: RegistrySectionType;
   category: SectionCategory;
@@ -58,6 +68,8 @@ export type SectionDefinition = {
   variants?: SectionVariant[];
   verticals?: string[] | ["*"];
   capabilities: SectionCapabilities;
+  /** When set, generation omits the section if business data cannot satisfy it. */
+  dataRequirements?: SectionDataRequirements;
   /** Element Schema — source of truth for customization metadata */
   schema?: SectionSchema;
   preview?: SectionPreview;

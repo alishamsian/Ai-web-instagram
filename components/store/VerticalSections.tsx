@@ -51,12 +51,7 @@ export function VerticalTaxonomySection({
   const attr =
     (section.settings?.filterAttribute as string) || attribute;
   const options = collectAttributeOptions(products, attr);
-  const fallbackOptions =
-    options.length > 0
-      ? options
-      : isFa
-        ? ["گزینه ۱", "گزینه ۲", "گزینه ۳", "گزینه ۴"]
-        : ["Option 1", "Option 2", "Option 3", "Option 4"];
+  if (options.length === 0) return null;
 
   return (
     <section className="store-section" data-section={section.type}>
@@ -74,7 +69,7 @@ export function VerticalTaxonomySection({
           )}
         />
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {fallbackOptions.slice(0, 8).map((option) => (
+          {options.slice(0, 8).map((option) => (
             <a
               key={option}
               href={`#shop`}
@@ -293,6 +288,8 @@ export function VerticalLookbookSection({
     .map((id) => ({ id, media: siteMedia(config, id) }))
     .filter((item) => item.media);
 
+  if (images.length === 0) return null;
+
   return (
     <section className="store-section" data-section={section.type}>
       <div className="store-wrap">
@@ -307,29 +304,25 @@ export function VerticalLookbookSection({
               : "Atmosphere and style — no extra frames.",
           )}
         />
-        {images.length === 0 ? (
-          <p className="store-muted mt-6">
-            {isFa ? "هنوز تصویری اضافه نشده." : "No images yet."}
-          </p>
-        ) : (
-          <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
-            {images.slice(0, 6).map((item, index) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "relative overflow-hidden bg-[color:var(--store-muted)]/20",
-                  index === 0 && "md:col-span-2 md:row-span-2",
-                  index === 0 ? "aspect-[4/5] md:aspect-auto md:min-h-[420px]" : "aspect-[3/4]",
-                )}
-              >
-                <SiteMedia
-                  media={item.media!}
-                  className="size-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+          {images.slice(0, 6).map((item, index) => (
+            <div
+              key={item.id}
+              className={cn(
+                "relative overflow-hidden bg-[color:var(--store-muted)]/20",
+                index === 0 && "md:col-span-2 md:row-span-2",
+                index === 0
+                  ? "aspect-[4/5] md:aspect-auto md:min-h-[420px]"
+                  : "aspect-[3/4]",
+              )}
+            >
+              <SiteMedia
+                media={item.media!}
+                className="size-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
