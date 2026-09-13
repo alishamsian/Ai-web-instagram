@@ -49,7 +49,6 @@ function enrichProduct(
   locale: "fa" | "en",
 ): StoreCatalogProduct {
   const badges: string[] = [];
-  // Only surface a badge when confidence is high (AI-ish signal) and item is first.
   if (item.confidence >= 0.85 && index === 0) {
     badges.push(locale === "fa" ? "ویژه" : "Featured");
   }
@@ -58,14 +57,14 @@ function enrichProduct(
     ...item,
     category: isRealCategory(item.category) ? item.category : "",
     shortDescription:
-      item.description?.slice(0, 110) ||
+      item.description?.slice(0, 90) ||
       (locale === "fa"
-        ? "از ویترین برند — برای جزئیات و سفارش پیام بدهید."
+        ? "از ویترین برند — برای جزئیات پیام بدهید."
         : "From the brand showcase — message to order."),
     compareAtPrice: null,
     badges,
-    isNew: false,
-    isBestSeller: false,
+    isNew: index < 3,
+    isBestSeller: index >= 2 && index < 6,
     featured: index < 4,
   };
 }
@@ -100,10 +99,32 @@ export function getStoreCategories(
   });
 }
 
-/** First up-to-4 products when catalog is large enough to warrant a featured strip. */
+/** Featured strip when catalog has enough items. */
 export function getFeaturedProducts(catalog: StoreCatalogProduct[], count = 4) {
-  if (catalog.length < 5) return [];
-  return catalog.filter((p) => p.featured).slice(0, count);
+  if (catalog.length < 4) return [];
+  const featured = catalog.filter((p) => p.featured);
+  return (featured.length ? featured : catalog).slice(0, count);
+}
+
+export function getBestSellerProducts(
+  catalog: StoreCatalogProduct[],
+  count = 4,
+) {
+  const best = catalog.filter((p) => p.isBestSeller);
+  if (best.length >= 2) return best.slice(0, count);
+  return catalog.slice(
+    Math.min(2, catalog.length),
+    Math.min(2 + count, catalog.length),
+  );
+}
+
+export function getNewArrivalProducts(
+  catalog: StoreCatalogProduct[],
+  count = 4,
+) {
+  const newest = catalog.filter((p) => p.isNew);
+  if (newest.length >= 2) return newest.slice(0, count);
+  return catalog.slice(0, count);
 }
 
 export function findStoreProduct(catalog: StoreCatalogProduct[], slug: string) {

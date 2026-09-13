@@ -1,6 +1,9 @@
 export const INSTAGRAM_HOSTS = new Set([
   "instagram.com",
   "www.instagram.com",
+  "m.instagram.com",
+  "instagr.am",
+  "www.instagr.am",
 ]);
 
 const RESERVED_PATHS = new Set([
@@ -17,6 +20,7 @@ const RESERVED_PATHS = new Set([
   "developer",
   "directory",
   "lite",
+  "share",
 ]);
 
 export class InstagramUrlError extends Error {
@@ -32,15 +36,47 @@ export class InstagramUrlError extends Error {
   }
 }
 
+function cleanInput(input: string) {
+  return input
+    .trim()
+    // Invisible / bidi marks from RTL paste
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
+    // Arabic/Persian question mark sometimes pasted instead of ?
+    .replace(/؟/g, "?")
+    // Fullwidth slash variants
+    .replace(/［/g, "[")
+    .replace(/］/g, "]");
+}
+
+function isValidUsername(username: string) {
+  return /^[A-Za-z0-9._]{1,30}$/.test(username);
+}
+
+function asProfile(username: string) {
+  return {
+    username,
+    profileUrl: `https://www.instagram.com/${username}/`,
+    canonical: `instagram.com/${username}`,
+  };
+}
+
 export function normalizeInstagramUrl(input: string) {
-  const trimmed = input.trim();
+  const trimmed = cleanInput(input);
   if (!trimmed) {
     throw new InstagramUrlError("Enter a valid Instagram profile URL.", "INVALID_URL");
   }
 
-  const withProtocol = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
+  // Bare username or @username
+  const bare = trimmed.replace(/^@+/, "");
+  if (isValidUsername(bare) && !bare.includes("/")) {
+    return asProfile(bare);
+  }
+
+  // Drop query/hash before URL parse so ?hl=fa / share params never break paths
+  const withoutQuery = trimmed.split(/[?#]/)[0]!.trim();
+  const withProtocol = /^https?:\/\//i.test(withoutQuery)
+    ? withoutQuery
+    : `https://${withoutQuery.replace(/^\/+/, "")}`;
 
   let url: URL;
   try {
@@ -49,8 +85,13 @@ export function normalizeInstagramUrl(input: string) {
     throw new InstagramUrlError("Enter a valid Instagram profile URL.", "INVALID_URL");
   }
 
-  const host = url.hostname.toLowerCase();
-  if (!INSTAGRAM_HOSTS.has(host)) {
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  const hostOk =
+    INSTAGRAM_HOSTS.has(url.hostname.toLowerCase()) ||
+    INSTAGRAM_HOSTS.has(host) ||
+    host === "instagram.com" ||
+    host === "instagr.am";
+  if (!hostOk) {
     throw new InstagramUrlError(
       "Only Instagram profile URLs are supported.",
       "UNSUPPORTED_URL",
@@ -65,7 +106,7 @@ export function normalizeInstagramUrl(input: string) {
     );
   }
 
-  const first = segments[0].toLowerCase();
+  const first = segments[0]!.toLowerCase().replace(/^@/, "");
   if (RESERVED_PATHS.has(first) || first.startsWith("accounts")) {
     throw new InstagramUrlError(
       "This Instagram URL is not a public profile.",
@@ -73,23 +114,13 @@ export function normalizeInstagramUrl(input: string) {
     );
   }
 
-  if (segments.length > 2) {
-    throw new InstagramUrlError(
-      "This Instagram URL is not a public profile.",
-      "UNSUPPORTED_URL",
-    );
-  }
-
-  const username = segments[0].replace(/^@/, "");
-  if (!/^[A-Za-z0-9._]{1,30}$/.test(username)) {
+  // /username, /username/, /username/reels, /username/tagged — first segment is profile
+  const username = first;
+  if (!isValidUsername(username)) {
     throw new InstagramUrlError("Enter a valid Instagram username.", "INVALID_USERNAME");
   }
 
-  return {
-    username,
-    profileUrl: `https://www.instagram.com/${username}/`,
-    canonical: `instagram.com/${username}`,
-  };
+  return asProfile(username);
 }
 
 export function isDemoUsername(username: string) {

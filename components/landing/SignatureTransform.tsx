@@ -203,9 +203,9 @@ export function SignatureTransform({
                             <p className="text-sm font-medium">{item.value}</p>
                             {item.swatches ? (
                               <span className="ms-auto flex gap-1">
-                                {item.swatches.map((c) => (
+                                {item.swatches.map((c, swatchIndex) => (
                                   <span
-                                    key={c}
+                                    key={`swatch-${swatchIndex}`}
                                     className="size-3 rounded-full border border-border"
                                     style={{ background: c }}
                                     aria-hidden

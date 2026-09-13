@@ -25,7 +25,7 @@ export const DESIGN_PRESETS: DesignPreset[] = [
     colors: {
       primary: "#111111",
       secondary: "#FFFFFF",
-      accent: "#111111",
+      accent: "#2A2A2A",
       background: "#FAFAFA",
       foreground: "#111111",
       muted: "#EEEEEE",

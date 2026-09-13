@@ -225,18 +225,18 @@ export function StoreStory({ config }: { config: WebsiteConfig }) {
             <SiteMedia
               media={image}
               mode="cover"
-              width={1000}
-              height={1250}
+              width={1100}
+              height={1400}
               className="store-story__img"
-              sizes="(max-width: 900px) 100vw, 46vw"
+              sizes="(max-width: 900px) 100vw, 48vw"
             />
           ) : (
             <div className="store-card__ph" />
           )}
         </div>
         <div className="store-story__copy">
-          <p className="store-kicker">{isFa ? "داستان برند" : "Brand story"}</p>
-          <h2 className="store-heading">
+          <p className="store-kicker">{isFa ? "رویکرد ما" : "Our approach"}</p>
+          <h2 className="store-display store-display--sm">
             <EditableText path="about.title" value={about.title} as="span" />
           </h2>
           <p className="store-lead">
@@ -251,6 +251,9 @@ export function StoreStory({ config }: { config: WebsiteConfig }) {
           {config.brand.tagline ? (
             <p className="store-quote">{config.brand.tagline}</p>
           ) : null}
+          <a href="#shop" className="store-btn store-btn--ghost">
+            {isFa ? "مشاهده مجموعه" : "Explore the shop"}
+          </a>
         </div>
       </div>
     </section>
@@ -265,21 +268,30 @@ export function StoreLookbook({
   catalog: StoreCatalogProduct[];
 }) {
   const gallery = config.content.gallery;
-  if (!gallery?.imageIds.length) return null;
   const isFa = config.settings.language === "fa";
   const { basePath, onProductNavigate } = useSiteNav();
+  if (!gallery?.imageIds.length) return null;
 
   return (
     <section className="store-section store-section--soft" id="lookbook">
       <div className="store-wrap">
-        <div className="store-section__head">
-          <p className="store-kicker">{isFa ? "گالری" : "Gallery"}</p>
-          <h2 className="store-heading">
-            <EditableText path="gallery.title" value={gallery.title} as="span" />
-          </h2>
+        <div className="store-section__head store-section__head--row">
+          <div>
+            <p className="store-kicker">
+              {isFa ? "دنبال کنید" : "Follow the ritual"}
+            </p>
+            <h2 className="store-heading">
+              <EditableText path="gallery.title" value={gallery.title} as="span" />
+            </h2>
+            {config.content.contact?.info?.instagram ? (
+              <p className="store-lead">
+                @{config.content.contact.info.instagram.replace(/^@/, "")}
+              </p>
+            ) : null}
+          </div>
         </div>
         <div className="store-lookbook">
-          {gallery.imageIds.slice(0, 8).map((id, index) => {
+          {gallery.imageIds.slice(0, 6).map((id, index) => {
             const image = siteMedia(config, id);
             if (!image) return null;
             const matched = productForGalleryImage(catalog, id);
@@ -339,15 +351,15 @@ export function StoreLookbook({
 export function StorePromo({ config }: { config: WebsiteConfig }) {
   const isFa = config.settings.language === "fa";
   const promo = config.content.promo ?? {
-    kicker: isFa ? "سفارش" : "Order",
+    kicker: isFa ? "کمپین" : "Campaign",
     title: isFa
-      ? "برای سفارش، مستقیم پیام بدهید."
-      : "Message us to place your order.",
-    cta: isFa ? "ارتباط با فروشگاه" : "Contact the shop",
+      ? "آیین هرروزه، ارتقا یافته."
+      : "Your daily ritual, elevated.",
+    cta: isFa ? "مشاهده مجموعه" : "Shop the collection",
   };
 
   return (
-    <section className="store-promo">
+    <section className="store-promo" id="campaign">
       <div className="store-wrap store-promo__inner">
         <p className="store-kicker store-kicker--on-dark">
           <EditableText path="promo.kicker" value={promo.kicker} as="span" />
@@ -355,7 +367,7 @@ export function StorePromo({ config }: { config: WebsiteConfig }) {
         <h2 className="store-display store-display--sm">
           <EditableText path="promo.title" value={promo.title} as="span" />
         </h2>
-        <a href="#contact" className="store-btn store-btn--on-dark">
+        <a href="#shop" className="store-btn store-btn--on-dark">
           <EditableText path="promo.cta" value={promo.cta} as="span" />
         </a>
       </div>

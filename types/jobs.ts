@@ -32,6 +32,8 @@ export interface ImportJob {
   errorMessage?: string;
   retryCount: number;
   postsImported: number;
+  /** How many posts the user requested for this scrape (plan-capped). */
+  postsLimit?: number;
   startedAt: string;
   completedAt?: string;
   createdAt: string;

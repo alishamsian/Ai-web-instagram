@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     url?: string;
     locale?: string;
     forceRefresh?: boolean;
+    postsLimit?: number | string;
   };
   const locale = parseLocale(body.locale);
 
@@ -42,10 +43,11 @@ export async function POST(request: Request) {
       locale,
       forceRefresh: Boolean(body.forceRefresh),
       plan: session.workspace.plan,
+      postsLimit: body.postsLimit,
     });
 
     if (job.status !== "completed") {
-      scheduleImportProcessing(job.id, locale);
+      scheduleImportProcessing(job.id, locale, job.postsLimit);
     }
 
     return NextResponse.json({
@@ -65,6 +67,14 @@ export async function POST(request: Request) {
         { status: 402 },
       );
     }
-    return NextResponse.json({ error: "SCRAPE_FAILED" }, { status: 500 });
+    console.error("[api/import] failed", error);
+    return NextResponse.json(
+      {
+        error: "SCRAPE_FAILED",
+        message:
+          error instanceof Error ? error.message : "Import failed unexpectedly.",
+      },
+      { status: 500 },
+    );
   }
 }

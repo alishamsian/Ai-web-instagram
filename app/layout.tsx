@@ -7,6 +7,7 @@ import "./globals.css";
 import "./store.css";
 import "./auth.css";
 import { IconProvider } from "@/components/ui/icon-provider";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/config/env";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
@@ -65,7 +66,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="min-h-full font-sans text-foreground antialiased">
-        <IconProvider>{children}</IconProvider>
+        <IconProvider>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </IconProvider>
       </body>
     </html>
   );

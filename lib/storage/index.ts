@@ -86,6 +86,23 @@ async function recordMediaAsset(params: {
   );
 }
 
+async function mapPool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+) {
+  if (items.length === 0) return;
+  let next = 0;
+  const run = async () => {
+    while (next < items.length) {
+      const index = next++;
+      await worker(items[index]!);
+    }
+  };
+  const pool = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: pool }, () => run()));
+}
+
 /**
  * Download Instagram CDN assets, store them, rewrite import URLs.
  * In production, refuses to leave hotlinked fbcdn URLs when persistence fails
@@ -120,7 +137,8 @@ export async function persistImportMedia(
   let persisted = 0;
   let failed = 0;
 
-  for (const media of imported.media) {
+  // Keep uploads modest — parallel large videos often trip Storage "fetch failed".
+  await mapPool(imported.media, 3, async (media) => {
     if (!isInstagramCdnUrl(media.originalUrl)) {
       result[media.id] = {
         id: media.id,
@@ -130,7 +148,7 @@ export async function persistImportMedia(
         type: media.type,
         createdAt: new Date(),
       };
-      continue;
+      return;
     }
 
     const file = downloaded.get(media.originalUrl);
@@ -144,7 +162,7 @@ export async function persistImportMedia(
         type: media.type,
         createdAt: new Date(),
       };
-      continue;
+      return;
     }
 
     const originalUrl = media.originalUrl;
@@ -186,14 +204,18 @@ export async function persistImportMedia(
         createdAt: new Date(),
       };
     }
-  }
+  });
 
   applyUrlMap(imported, urlMap);
 
   const igLeft = imported.media.filter((m) => isInstagramCdnUrl(m.originalUrl))
     .length;
+  // When real storage is configured, never ship hotlinked IG CDN URLs — browsers
+  // routinely get ERR_CONNECTION_CLOSED on cdninstagram.com / fbcdn.net.
+  const mustPersist =
+    isSupabaseConfigured() || isR2Configured() || !allowMockServices();
   if (
-    !allowMockServices() &&
+    mustPersist &&
     candidates.length > 0 &&
     (persisted === 0 || igLeft > candidates.length / 2)
   ) {

@@ -3,6 +3,7 @@ import { SiteImage } from "@/components/website/SiteImage";
 import { StatusBadge } from "@/components/dashboard/ui";
 import { Button } from "@/components/ui/button";
 import { ShareLinkButton } from "@/components/dashboard/ShareLinkButton";
+import { DeleteSiteButton } from "@/components/dashboard/DeleteSiteButton";
 import { siteCoverUrl } from "@/lib/dashboard/format";
 import { publishedSiteUrl } from "@/lib/config/runtime";
 import type { Dictionary } from "@/lib/i18n/dictionary";
@@ -96,6 +97,15 @@ export function SiteCard({
               {dict.dashboard.openSite}
             </Link>
           </Button>
+          <DeleteSiteButton
+            websiteId={site.id}
+            label={dict.dashboard.deleteSite}
+            confirmMessage={dict.dashboard.deleteSiteConfirm}
+            errorMessage={dict.dashboard.deleteSiteFailed}
+            redirectTo={`/${locale}/dashboard`}
+            siteName={site.config.brand.name}
+            locale={locale}
+          />
         </div>
       </div>
     </article>

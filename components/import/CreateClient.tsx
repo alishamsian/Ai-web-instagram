@@ -25,24 +25,33 @@ function importStartCache() {
   return w.__vitrinImportPromises;
 }
 
-export function CreateClient({ locale }: { locale: Locale }) {
+export function CreateClient({
+  locale,
+  maxPosts = 10,
+}: {
+  locale: Locale;
+  maxPosts?: number;
+}) {
   const dict = getDictionary(locale);
   const search = useSearchParams();
   const router = useRouter();
   const url = search.get("url") ?? "";
+  const postsParam = search.get("posts");
   const forceRefresh = search.get("refresh") === "1";
+  const hasPostsChoice = Boolean(postsParam && Number(postsParam) > 0);
   const [jobId, setJobId] = useState<string | null>(null);
   const [cached, setCached] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "starting" | "ready">(
-    url ? "starting" : "idle",
+    url && hasPostsChoice ? "starting" : "idle",
   );
   const reduce = useReducedMotion();
 
   useEffect(() => {
-    if (!url) return;
+    if (!url || !hasPostsChoice) return;
     let cancelled = false;
-    const key = `${locale}|${url}|${forceRefresh ? 1 : 0}`;
+    const posts = Number(postsParam);
+    const key = `${locale}|${url}|${posts}|${forceRefresh ? 1 : 0}`;
     const cache = importStartCache();
 
     if (!cache.has(key)) {
@@ -51,7 +60,12 @@ export function CreateClient({ locale }: { locale: Locale }) {
         fetch("/api/import", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url, locale, forceRefresh }),
+          body: JSON.stringify({
+            url,
+            locale,
+            forceRefresh,
+            postsLimit: posts,
+          }),
         }).then(async (response) => ({
           response,
           data: (await response.json()) as StartResult["data"],
@@ -65,8 +79,9 @@ export function CreateClient({ locale }: { locale: Locale }) {
         if (cancelled) return;
         if (response.status === 401) {
           cache.delete(key);
+          const next = `/${locale}/create?url=${encodeURIComponent(url)}&posts=${posts}`;
           router.replace(
-            `/${locale}/signup?next=${encodeURIComponent(`/${locale}/create?url=${url}`)}`,
+            `/${locale}/signup?next=${encodeURIComponent(next)}`,
           );
           return;
         }
@@ -96,6 +111,8 @@ export function CreateClient({ locale }: { locale: Locale }) {
     };
   }, [
     url,
+    postsParam,
+    hasPostsChoice,
     locale,
     forceRefresh,
     dict.errors.invalidUrl,
@@ -128,9 +145,22 @@ export function CreateClient({ locale }: { locale: Locale }) {
     );
   }
 
-  if (jobId) return <ImportProgress jobId={jobId} locale={locale} />;
+  if (jobId) {
+    const postsFromUrl = Number(postsParam);
+    return (
+      <ImportProgress
+        jobId={jobId}
+        locale={locale}
+        postsLimit={
+          Number.isFinite(postsFromUrl) && postsFromUrl > 0
+            ? postsFromUrl
+            : undefined
+        }
+      />
+    );
+  }
 
-  if (phase === "starting" && url) {
+  if (phase === "starting" && url && hasPostsChoice) {
     return (
       <CreateShell solid>
         <motion.div
@@ -162,7 +192,6 @@ export function CreateClient({ locale }: { locale: Locale }) {
   return (
     <CreateShell>
       <div className="relative mx-auto max-w-[720px] text-center">
-        {/* Soft brand glow behind the composition */}
         <div
           className="pointer-events-none absolute start-1/2 top-[18%] size-[min(28rem,90vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--mkt-glow)] blur-[100px]"
           aria-hidden
@@ -184,10 +213,10 @@ export function CreateClient({ locale }: { locale: Locale }) {
           className="relative mt-4 font-display tracking-[-0.04em]"
         >
           <span className="block text-[clamp(2rem,6vw,3.5rem)] leading-[1.08] text-foreground-secondary">
-            {dict.create.line1}
+            {url && !hasPostsChoice ? dict.create.postsTitle : dict.create.line1}
           </span>
           <span className="mt-1 block text-[clamp(2rem,6vw,3.5rem)] leading-[1.08] text-foreground md:mt-2">
-            {dict.create.line2}
+            {url && !hasPostsChoice ? dict.create.postsSubtitle : dict.create.line2}
           </span>
         </motion.h1>
 
@@ -197,7 +226,7 @@ export function CreateClient({ locale }: { locale: Locale }) {
           transition={{ delay: reduce ? 0 : 0.12, duration: 0.45 }}
           className="relative mx-auto mt-5 max-w-lg text-pretty text-[15px] leading-7 text-foreground-muted md:mt-6 md:text-[16px] md:leading-8"
         >
-          {dict.create.body}
+          {url && !hasPostsChoice ? dict.create.postsBody : dict.create.body}
         </motion.p>
 
         <motion.div
@@ -210,6 +239,7 @@ export function CreateClient({ locale }: { locale: Locale }) {
             dict={dict}
             locale={locale}
             defaultValue={url}
+            maxPosts={maxPosts}
             ctaLabel={dict.hero.cta}
           />
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12px] text-foreground-muted md:text-[13px]">
@@ -234,7 +264,7 @@ export function CreateClient({ locale }: { locale: Locale }) {
             <p className="mt-2 text-[13px] text-foreground-muted">{dict.errors.retry}</p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <Button asChild variant="contrast" size="lg">
-                <a href={`/${locale}/create?url=instagram.com/demo`}>
+                <a href={`/${locale}/create?url=instagram.com/demo&posts=6`}>
                   {dict.errors.useDemo}
                 </a>
               </Button>
@@ -245,7 +275,6 @@ export function CreateClient({ locale }: { locale: Locale }) {
           </motion.div>
         ) : null}
 
-        {/* One job: the three beats — not cards, just a quiet path */}
         <motion.ol
           initial={reduce ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}

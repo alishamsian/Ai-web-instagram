@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { SoftBanner, StatusBadge } from "@/components/dashboard/ui";
 import type { ImportJob } from "@/types/jobs";
-import { IMPORT_STALE_MS } from "@/lib/config/import";
+import { importStaleMs } from "@/lib/config/import";
 
 export function JobProgressBanner({
   job,
@@ -18,11 +18,17 @@ export function JobProgressBanner({
   const isFa = locale === "fa";
   const router = useRouter();
   const [live, setLive] = useState(job);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const finished = useRef(false);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 5000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const stale =
-    Date.now() - new Date(live.updatedAt || live.createdAt).getTime() >
-    IMPORT_STALE_MS;
+    nowMs - new Date(live.updatedAt || live.createdAt).getTime() >
+    importStaleMs(live.postsLimit);
 
   useEffect(() => {
     let active = true;
@@ -95,19 +101,19 @@ export function JobProgressBanner({
         <div className="mt-3 space-y-3">
           <SoftBanner tone="warning" className="border-red-200/60 bg-white/70 text-red-900">
             {isFa
-              ? "بیش از ۲٫۵ دقیقه پیشرفتی نبود. دوباره تلاش کن یا از دمو استفاده کن."
-              : "No progress for 2.5+ minutes. Retry or use the demo profile."}
+              ? "مدت‌ها پیشرفتی ثبت نشد. دوباره تلاش کن یا تعداد پست کمتری انتخاب کن."
+              : "No progress for a long time. Retry, or choose fewer posts."}
           </SoftBanner>
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
               <Link
-                href={`/${locale}/create?url=${encodeURIComponent(live.sourceUrl || "instagram.com/demo")}&refresh=1`}
+                href={`/${locale}/create?url=${encodeURIComponent(live.sourceUrl || "instagram.com/demo")}&posts=${live.postsLimit ?? 6}&refresh=1`}
               >
                 {isFa ? "تلاش دوباره" : "Try again"}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link href={`/${locale}/create?url=instagram.com/demo`}>
+              <Link href={`/${locale}/create?url=instagram.com/demo&posts=6`}>
                 {isFa ? "دمو" : "Demo"}
               </Link>
             </Button>

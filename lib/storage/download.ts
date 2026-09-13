@@ -28,11 +28,13 @@ async function downloadDirect(url: string): Promise<DownloadedMedia | null> {
   try {
     const response = await fetch(url, {
       headers: {
-        accept: "image/*,video/*,*/*;q=0.8",
+        accept: "image/avif,image/webp,image/apng,image/*,video/*,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+        referer: "https://www.instagram.com/",
         "user-agent":
-          "Mozilla/5.0 (compatible; VitrinBot/1.0; +https://vitrin.app)",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       },
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(30_000),
       redirect: "follow",
     });
     if (!response.ok) return null;
@@ -65,6 +67,23 @@ type ApifyHttpItem = {
   contentType?: string;
 };
 
+async function mapPool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+) {
+  if (items.length === 0) return;
+  let next = 0;
+  const run = async () => {
+    while (next < items.length) {
+      const index = next++;
+      await worker(items[index]!);
+    }
+  };
+  const pool = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: pool }, () => run()));
+}
+
 async function downloadViaApify(urls: string[]): Promise<Map<string, DownloadedMedia>> {
   const result = new Map<string, DownloadedMedia>();
   const token = process.env.APIFY_API_TOKEN;
@@ -74,8 +93,13 @@ async function downloadViaApify(urls: string[]): Promise<Map<string, DownloadedM
   const timeoutSec = Math.ceil(BATCH_TIMEOUT_MS / 1000);
   const endpoint = `${APIFY_BASE}/acts/${encodedActor}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${timeoutSec}`;
 
+  const batches: string[][] = [];
   for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-    const batch = urls.slice(i, i + BATCH_SIZE);
+    batches.push(urls.slice(i, i + BATCH_SIZE));
+  }
+
+  // Up to 2 Apify download batches in flight (CDN fallback path).
+  await mapPool(batches, 2, async (batch) => {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
@@ -85,7 +109,7 @@ async function downloadViaApify(urls: string[]): Promise<Map<string, DownloadedM
         }),
         signal: AbortSignal.timeout(BATCH_TIMEOUT_MS + 5_000),
       });
-      if (!response.ok) continue;
+      if (!response.ok) return;
       const items = (await response.json()) as ApifyHttpItem[];
       for (const item of items) {
         const sourceUrl = item.requestedUrl || item.finalUrl;
@@ -96,16 +120,15 @@ async function downloadViaApify(urls: string[]): Promise<Map<string, DownloadedM
             ? Uint8Array.from(Buffer.from(item.body, "base64"))
             : Uint8Array.from(Buffer.from(item.body, "binary"));
         if (body.length < 32) continue;
-        // Reject JPEG magic check only when content claims image and fails
         const contentType =
           item.contentType?.split(";")[0]?.trim() ||
           guessContentType(sourceUrl, body);
         result.set(sourceUrl, { url: sourceUrl, body, contentType });
       }
     } catch {
-      // Keep whatever succeeded in earlier batches.
+      // Keep whatever succeeded in other batches.
     }
-  }
+  });
 
   return result;
 }
@@ -121,13 +144,12 @@ export async function downloadMediaUrls(
   const result = new Map<string, DownloadedMedia>();
   const missing: string[] = [];
 
-  await Promise.all(
-    unique.map(async (url) => {
-      const direct = await downloadDirect(url);
-      if (direct) result.set(url, direct);
-      else missing.push(url);
-    }),
-  );
+  // Modest concurrency — IG CDN often closes burst connections.
+  await mapPool(unique, 4, async (url) => {
+    const direct = await downloadDirect(url);
+    if (direct) result.set(url, direct);
+    else missing.push(url);
+  });
 
   if (missing.length > 0 && isApifyConfigured()) {
     const viaApify = await downloadViaApify(missing);

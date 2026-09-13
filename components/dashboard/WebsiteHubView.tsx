@@ -17,6 +17,7 @@ import { ShareLinkButton } from "@/components/dashboard/ShareLinkButton";
 import { SiteQrCard } from "@/components/dashboard/SiteQrCard";
 import { SiteSlugForm } from "@/components/dashboard/SiteSlugForm";
 import { SyncInstagramButton } from "@/components/dashboard/SyncInstagramButton";
+import { DeleteSiteButton } from "@/components/dashboard/DeleteSiteButton";
 import { SiteImage } from "@/components/website/SiteImage";
 import { SoftBanner, StatusBadge } from "@/components/dashboard/ui";
 import { HashDetailsOpener } from "@/components/dashboard/HashDetailsOpener";
@@ -428,6 +429,15 @@ export function WebsiteHubView({
                     {dict.dashboard.domains}
                   </Link>
                 </Button>
+                <DeleteSiteButton
+                  websiteId={website.id}
+                  label={dict.dashboard.deleteSite}
+                  confirmMessage={dict.dashboard.deleteSiteConfirm}
+                  errorMessage={dict.dashboard.deleteSiteFailed}
+                  redirectTo={`/${locale}/dashboard`}
+                  siteName={website.config.brand.name}
+                  locale={locale}
+                />
               </div>
             </details>
           </div>

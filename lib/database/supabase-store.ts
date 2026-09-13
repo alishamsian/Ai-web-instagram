@@ -23,6 +23,7 @@ export type JobRow = {
   error_message: string | null;
   retry_count: number;
   posts_imported: number;
+  posts_limit?: number | null;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -152,6 +153,7 @@ export function mapJob(row: JobRow): ImportJob {
     errorMessage: row.error_message ?? undefined,
     retryCount: row.retry_count,
     postsImported: row.posts_imported,
+    postsLimit: row.posts_limit ?? undefined,
     startedAt: row.started_at ?? row.created_at,
     completedAt: row.completed_at ?? undefined,
     createdAt: row.created_at,
@@ -283,7 +285,7 @@ async function readTableStore(): Promise<AppStore> {
 }
 
 function jobToRow(job: ImportJob): Record<string, unknown> {
-  return {
+  const row: Record<string, unknown> = {
     id: job.id,
     workspace_id: job.workspaceId,
     user_id: job.userId,
@@ -304,6 +306,11 @@ function jobToRow(job: ImportJob): Record<string, unknown> {
     created_at: job.createdAt,
     updated_at: job.updatedAt,
   };
+  // Only send posts_limit when the live schema has the column (avoids PGRST204 500s).
+  if (importJobsPostsLimitReady) {
+    row.posts_limit = job.postsLimit ?? null;
+  }
+  return row;
 }
 
 function importToRow(item: InstagramImport): Record<string, unknown> {
@@ -339,6 +346,22 @@ function ids(list: { id: string }[]) {
   return new Set(list.map((item) => item.id));
 }
 
+/** Cached probe — live DB may lag behind repo migrations. */
+let importJobsPostsLimitReady: boolean | null = null;
+
+export async function importJobsSupportsPostsLimit() {
+  if (importJobsPostsLimitReady !== null) return importJobsPostsLimitReady;
+  const db = getSupabaseAdmin();
+  const { error } = await db.from("import_jobs").select("posts_limit").limit(1);
+  importJobsPostsLimitReady = !error;
+  if (!importJobsPostsLimitReady) {
+    console.warn(
+      "[supabase] import_jobs.posts_limit is missing. Run supabase/migrations/20260913120000_import_posts_limit.sql in the SQL editor.",
+    );
+  }
+  return importJobsPostsLimitReady;
+}
+
 /**
  * Upsert-only sync. Never deletes "missing" rows from a full-table snapshot —
  * that race used to resurrect/delete concurrent users' data.
@@ -371,6 +394,47 @@ export async function deleteDomainRows(idsToDelete: string[]) {
   if (error) throw error;
 }
 
+export async function deleteWebsiteRows(idsToDelete: string[]) {
+  if (!idsToDelete.length) return;
+  const db = getSupabaseAdmin();
+  // FK cascades cover versions/domains/analytics; jobs.website_id is ON DELETE SET NULL.
+  const { error } = await db.from("websites").delete().in("id", idsToDelete);
+  if (error) throw error;
+}
+
+/**
+ * Direct ownership-scoped delete — avoids full store sync (which can fail on
+ * unrelated upserts like jobs/posts_limit) and is the reliable delete path.
+ */
+export async function deleteWebsiteForWorkspace(
+  websiteId: string,
+  workspaceId: string,
+) {
+  const db = getSupabaseAdmin();
+  const { data, error: findError } = await db
+    .from("websites")
+    .select("id")
+    .eq("id", websiteId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (!data) return false;
+
+  // Clear job pointers first so older DBs without ON DELETE SET NULL still work.
+  await db
+    .from("import_jobs")
+    .update({ website_id: null })
+    .eq("website_id", websiteId);
+
+  const { error } = await db
+    .from("websites")
+    .delete()
+    .eq("id", websiteId)
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+  return true;
+}
+
 export async function trimWebsiteVersions(websiteId: string, keep: number) {
   const db = getSupabaseAdmin();
   const { data, error } = await db
@@ -385,6 +449,7 @@ export async function trimWebsiteVersions(websiteId: string, keep: number) {
 }
 
 async function writeTableStore(before: AppStore, after: AppStore) {
+  await importJobsSupportsPostsLimit();
   const db = getSupabaseAdmin();
   const beforeUsers = new Map(before.users.map((u) => [u.id, u]));
   const usersChanged = after.users.filter((user) => {
@@ -425,6 +490,15 @@ async function writeTableStore(before: AppStore, after: AppStore) {
     importToRow,
   );
   await upsertChanged("websites", before.websites, after.websites, websiteToRow);
+
+  const afterWebsiteIds = ids(after.websites);
+  const removedWebsites = before.websites
+    .filter((site) => !afterWebsiteIds.has(site.id))
+    .map((site) => site.id);
+  if (removedWebsites.length) {
+    await deleteWebsiteRows(removedWebsites);
+  }
+
   await upsertChanged("import_jobs", before.jobs, after.jobs, jobToRow);
   await upsertChanged(
     "website_versions",

@@ -16,6 +16,30 @@ describe("Instagram URL normalization", () => {
     );
   });
 
+  it("accepts query params, mobile host, and bare usernames", () => {
+    expect(
+      normalizeInstagramUrl("https://www.instagram.com/vina_accessory/?hl=fa")
+        .username,
+    ).toBe("vina_accessory");
+    expect(
+      normalizeInstagramUrl(
+        "https://www.instagram.com/vina_accessory/?hl=fa&igsh=abc",
+      ).username,
+    ).toBe("vina_accessory");
+    expect(
+      normalizeInstagramUrl("https://m.instagram.com/vina_accessory/").username,
+    ).toBe("vina_accessory");
+    expect(normalizeInstagramUrl("@vina_accessory").username).toBe(
+      "vina_accessory",
+    );
+    expect(normalizeInstagramUrl("vina_accessory").username).toBe(
+      "vina_accessory",
+    );
+    expect(
+      normalizeInstagramUrl("instagram.com/vina_accessory/reels").username,
+    ).toBe("vina_accessory");
+  });
+
   it("rejects other domains and reserved paths", () => {
     expect(() => normalizeInstagramUrl("https://example.com/demo")).toThrow(InstagramUrlError);
     expect(() => normalizeInstagramUrl("instagram.com/p/shortcode")).toThrow(InstagramUrlError);

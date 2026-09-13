@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PostPublishDialog } from "@/components/dashboard/PostPublishDialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function PublishButton({
   websiteId,
@@ -28,6 +29,7 @@ export function PublishButton({
   slug?: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const isFa = locale === "fa";
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -35,19 +37,27 @@ export function PublishButton({
 
   async function toggle() {
     if (published) {
-      const ok = window.confirm(
-        isFa
+      const ok = await confirm({
+        title: isFa ? "لغو انتشار" : "Unpublish site",
+        description: isFa
           ? "لغو انتشار، لینک عمومی را قطع می‌کند. مطمئنی؟"
           : "Unpublishing takes the public link offline. Continue?",
-      );
+        tone: "warning",
+        confirmLabel: unpublishLabel,
+        cancelLabel: isFa ? "انصراف" : "Cancel",
+      });
       if (!ok) return;
     } else if (blockers && blockers.length > 0) {
-      const list = blockers.map((b) => `• ${b.label}`).join("\n");
-      const ok = window.confirm(
-        isFa
-          ? `قبل از انتشار چند مورد ناقص است:\n${list}\n\nبا این حال منتشر شود؟`
-          : `Some setup is incomplete:\n${list}\n\nPublish anyway?`,
-      );
+      const ok = await confirm({
+        title: isFa ? "انتشار با نقص" : "Publish with gaps",
+        description: isFa
+          ? "قبل از انتشار چند مورد ناقص است. با این حال منتشر شود؟"
+          : "Some setup is incomplete. Publish anyway?",
+        detail: blockers.map((b) => `• ${b.label}`).join("\n"),
+        tone: "warning",
+        confirmLabel: publishLabel,
+        cancelLabel: isFa ? "انصراف" : "Cancel",
+      });
       if (!ok) return;
     }
 

@@ -102,6 +102,7 @@ export async function POST(
       locale,
       forceRefresh: true,
       plan: session.workspace.plan,
+      postsLimit: limits.maxImportPosts,
     });
     if (job.status !== "completed") {
       scheduleImportProcessing(job.id, locale);

@@ -16,6 +16,7 @@ export function StoreFooter({
   const year = new Date().getFullYear();
   const { basePath, onHomeNavigate } = useSiteNav();
   const root = basePath.replace(/\/$/, "");
+  const ig = config.content.contact?.info?.instagram?.replace(/^@/, "");
 
   const sectionHref = (hash: string) =>
     mode === "pdp" ? `${root || ""}${hash}` : hash;
@@ -40,29 +41,48 @@ export function StoreFooter({
                 ? "ویترین آنلاین ساخته‌شده از اینستاگرام."
                 : "An online storefront built from Instagram.")}
           </p>
+          {ig ? (
+            <a
+              href={`https://instagram.com/${ig}`}
+              target="_blank"
+              rel="noreferrer"
+              className="store-footer__social"
+            >
+              @{ig}
+            </a>
+          ) : null}
         </div>
         <div>
           <p className="store-footer__label">{isFa ? "فروشگاه" : "Shop"}</p>
           <a href={sectionHref("#shop")} onClick={(e) => goSection(e, "#shop")}>
             {isFa ? "محصولات" : "Products"}
           </a>
+          <a
+            href={sectionHref("#featured")}
+            onClick={(e) => goSection(e, "#featured")}
+          >
+            {isFa ? "تازه‌ها" : "New arrivals"}
+          </a>
           {hasCategories ? (
             <a
               href={sectionHref("#categories")}
               onClick={(e) => goSection(e, "#categories")}
             >
-              {isFa ? "دسته‌ها" : "Categories"}
+              {isFa ? "مجموعه‌ها" : "Collections"}
             </a>
           ) : null}
           <a
             href={sectionHref("#lookbook")}
             onClick={(e) => goSection(e, "#lookbook")}
           >
-            {isFa ? "لوک‌بوک" : "Lookbook"}
+            {isFa ? "گالری" : "Gallery"}
           </a>
         </div>
         <div>
-          <p className="store-footer__label">{isFa ? "راهنما" : "Help"}</p>
+          <p className="store-footer__label">{isFa ? "درباره" : "About"}</p>
+          <a href={sectionHref("#story")} onClick={(e) => goSection(e, "#story")}>
+            {isFa ? "داستان برند" : "Brand story"}
+          </a>
           <a href={sectionHref("#faq")} onClick={(e) => goSection(e, "#faq")}>
             FAQ
           </a>
@@ -72,8 +92,20 @@ export function StoreFooter({
           >
             {isFa ? "تماس" : "Contact"}
           </a>
-          <a href={sectionHref("#story")} onClick={(e) => goSection(e, "#story")}>
-            {isFa ? "درباره" : "About"}
+          <a
+            href={sectionHref("#newsletter")}
+            onClick={(e) => goSection(e, "#newsletter")}
+          >
+            {isFa ? "خبرنامه" : "Newsletter"}
+          </a>
+        </div>
+        <div>
+          <p className="store-footer__label">{isFa ? "راهنما" : "Help"}</p>
+          <a href={sectionHref("#contact")} onClick={(e) => goSection(e, "#contact")}>
+            {isFa ? "پشتیبانی" : "Support"}
+          </a>
+          <a href={sectionHref("#shop")} onClick={(e) => goSection(e, "#shop")}>
+            {isFa ? "سفارش" : "Ordering"}
           </a>
         </div>
       </div>

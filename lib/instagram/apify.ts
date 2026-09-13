@@ -6,10 +6,11 @@ import {
 } from "@/types/instagram";
 import { normalizeInstagramUrl } from "@/lib/instagram/url";
 import { normalizePost, normalizeProfile } from "@/lib/instagram/normalizer";
+import { apifyPostsTimeoutMs } from "@/lib/config/import";
 
 const APIFY_BASE = "https://api.apify.com/v2";
-/** Soft limit for sync actor runs (Apify + local abort). */
-const APIFY_TIMEOUT_MS = 75_000;
+/** Soft limit for sync profile actor runs. */
+const APIFY_PROFILE_TIMEOUT_MS = 90_000;
 
 async function fetchWithTimeout(
   url: string,
@@ -25,14 +26,18 @@ async function fetchWithTimeout(
   }
 }
 
-async function runActor<T>(actorId: string, input: Record<string, unknown>) {
+async function runActor<T>(
+  actorId: string,
+  input: Record<string, unknown>,
+  timeoutMs = APIFY_PROFILE_TIMEOUT_MS,
+) {
   const token = process.env.APIFY_API_TOKEN;
   if (!token) {
     throw new CollectorError("Apify is not configured.", "SCRAPE_FAILED", true);
   }
 
   const encodedActor = actorId.replace("/", "~");
-  const timeoutSec = Math.ceil(APIFY_TIMEOUT_MS / 1000);
+  const timeoutSec = Math.ceil(timeoutMs / 1000);
   const url = `${APIFY_BASE}/acts/${encodedActor}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${timeoutSec}`;
 
   let response: Response;
@@ -44,13 +49,13 @@ async function runActor<T>(actorId: string, input: Record<string, unknown>) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(input),
       },
-      APIFY_TIMEOUT_MS,
+      timeoutMs + 5_000,
     );
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
     if (name === "TimeoutError" || name === "AbortError") {
       throw new CollectorError(
-        "Instagram import timed out. Please try again, or use the demo profile.",
+        "Instagram import timed out. Try fewer posts, or use the demo profile.",
         "RATE_LIMITED",
         true,
       );
@@ -117,13 +122,18 @@ export class ApifyCollector implements InstagramCollector {
   async scrapePosts(url: string, limit: number): Promise<InstagramPost[]> {
     const { profileUrl, username } = normalizeInstagramUrl(url);
     const actor = process.env.APIFY_POST_ACTOR ?? "apify/instagram-scraper";
+    const timeoutMs = apifyPostsTimeoutMs(limit);
 
-    const items = await runActor<Record<string, unknown>>(actor, {
-      directUrls: [profileUrl],
-      resultsType: "posts",
-      resultsLimit: limit,
-      resultsLimitPerProfile: limit,
-    });
+    const items = await runActor<Record<string, unknown>>(
+      actor,
+      {
+        directUrls: [profileUrl],
+        resultsType: "posts",
+        resultsLimit: limit,
+        resultsLimitPerProfile: limit,
+      },
+      timeoutMs,
+    );
 
     const posts = items
       .filter((item) => !isErrorItem(item))

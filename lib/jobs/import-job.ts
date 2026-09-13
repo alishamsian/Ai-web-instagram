@@ -15,9 +15,9 @@ import type { ImportJob, ImportJobStage } from "@/types/jobs";
 import { countWebsitesForWorkspace } from "@/lib/database/queries";
 import { planLimits } from "@/lib/config/plans";
 import type { PlanId } from "@/lib/config/plans";
-import { IMPORT_POSTS_LIMIT, IMPORT_STALE_MS } from "@/lib/config/import";
+import { clampImportPosts, IMPORT_POSTS_HARD_MAX, importStaleMs } from "@/lib/config/import";
 
-export { IMPORT_STALE_MS };
+export { IMPORT_STALE_MS } from "@/lib/config/import";
 
 const STAGES: ImportJobStage[] = [
   "connecting",
@@ -106,6 +106,7 @@ function jobToRow(job: ImportJob): Record<string, unknown> {
     error_message: job.errorMessage ?? null,
     retry_count: job.retryCount,
     posts_imported: job.postsImported,
+    posts_limit: job.postsLimit ?? null,
     started_at: job.startedAt,
     completed_at: job.completedAt ?? null,
     created_at: job.createdAt,
@@ -125,6 +126,7 @@ function patchToRow(patch: Partial<ImportJob>): Record<string, unknown> {
   if (patch.errorMessage !== undefined) row.error_message = patch.errorMessage;
   if (patch.retryCount !== undefined) row.retry_count = patch.retryCount;
   if (patch.postsImported !== undefined) row.posts_imported = patch.postsImported;
+  if (patch.postsLimit !== undefined) row.posts_limit = patch.postsLimit;
   if (patch.startedAt !== undefined) row.started_at = patch.startedAt;
   if (patch.completedAt !== undefined) row.completed_at = patch.completedAt;
   if (patch.username !== undefined) row.username = patch.username;
@@ -164,7 +166,8 @@ async function insertJob(job: ImportJob) {
 export async function failStaleImportJob(job: ImportJob): Promise<ImportJob> {
   if (!isActiveStatus(job.status)) return job;
   const updatedAt = Date.parse(job.updatedAt || job.createdAt);
-  if (!Number.isFinite(updatedAt) || Date.now() - updatedAt < IMPORT_STALE_MS) {
+  const staleAfter = importStaleMs(job.postsLimit);
+  if (!Number.isFinite(updatedAt) || Date.now() - updatedAt < staleAfter) {
     return job;
   }
   const mapped = publicError("RATE_LIMITED");
@@ -182,6 +185,25 @@ export async function failStaleImportJob(job: ImportJob): Promise<ImportJob> {
     completedAt: now(),
     updatedAt: now(),
   };
+}
+
+/** Keep `updatedAt` fresh during long Apify / media work so stale checks don't kill the job. */
+async function withJobHeartbeat<T>(
+  jobId: string,
+  work: () => Promise<T>,
+): Promise<T> {
+  const beat = () => {
+    void updateJob(jobId, {}).catch(() => {
+      /* ignore heartbeat failures */
+    });
+  };
+  beat();
+  const timer = setInterval(beat, 25_000);
+  try {
+    return await work();
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 export async function findCachedWebsite(workspaceId: string, username: string) {
@@ -225,6 +247,7 @@ export async function createImportJob(input: {
   locale: Locale;
   forceRefresh?: boolean;
   plan?: PlanId | string;
+  postsLimit?: number | string | null;
 }) {
   let parsed;
   try {
@@ -235,6 +258,8 @@ export async function createImportJob(input: {
     }
     throw new InstagramUrlError("Enter a valid Instagram profile URL.", "INVALID_URL");
   }
+
+  const postsLimit = clampImportPosts(input.postsLimit, input.plan);
 
   if (!input.forceRefresh) {
     const cached = await findCachedWebsite(input.workspaceId, parsed.username);
@@ -251,6 +276,7 @@ export async function createImportJob(input: {
         retryCount: 0,
         postsImported:
           (cached.imported?.posts.length ?? 0) + (cached.imported?.reels.length ?? 0),
+        postsLimit,
         startedAt: now(),
         createdAt: now(),
         updatedAt: now(),
@@ -286,6 +312,7 @@ export async function createImportJob(input: {
     collector: collectorLabel(parsed.username),
     retryCount: 0,
     postsImported: 0,
+    postsLimit,
     startedAt: now(),
     createdAt: now(),
     updatedAt: now(),
@@ -298,7 +325,11 @@ export async function createImportJob(input: {
   return job;
 }
 
-export async function processImportJob(jobId: string, locale: Locale) {
+export async function processImportJob(
+  jobId: string,
+  locale: Locale,
+  postsLimitOverride?: number,
+) {
   const store = await readStore();
   const job = store.jobs.find((item) => item.id === jobId);
   if (!job || !job.username) return;
@@ -317,26 +348,36 @@ export async function processImportJob(jobId: string, locale: Locale) {
     await updateJob(jobId, { status: "scraping", stage: "connecting" });
 
     const collector = resolveCollector(job.username);
-    const profile = await collector.scrapeProfile(job.sourceUrl);
+    const postsLimit =
+      typeof postsLimitOverride === "number" && postsLimitOverride > 0
+        ? Math.min(postsLimitOverride, IMPORT_POSTS_HARD_MAX)
+        : typeof job.postsLimit === "number" && job.postsLimit > 0
+          ? Math.min(job.postsLimit, IMPORT_POSTS_HARD_MAX)
+          : clampImportPosts(undefined);
+
+    // Profile + posts in parallel — Apify runs dominate wall time.
+    await updateJob(jobId, { status: "scraping", stage: "reading_content" });
+    const [profile, posts] = await withJobHeartbeat(jobId, () =>
+      Promise.all([
+        collector.scrapeProfile(job.sourceUrl),
+        collector.scrapePosts(job.sourceUrl, postsLimit),
+      ]),
+    );
 
     if (profile.isPrivate) {
       throw new CollectorError("This profile is private.", "PRIVATE");
     }
 
     await updateJob(jobId, { status: "scraping", stage: "profile_found" });
-    await updateJob(jobId, { status: "scraping", stage: "reading_content" });
-
-    const posts = await collector.scrapePosts(job.sourceUrl, IMPORT_POSTS_LIMIT);
     const imported = mergeInstagramData({
       workspaceId: job.workspaceId,
       sourceUrl: job.sourceUrl,
       profile,
       posts,
-      requestedLimit: IMPORT_POSTS_LIMIT,
+      requestedLimit: postsLimit,
       collector: job.collector,
     });
 
-    await persistImportMedia(imported);
     await updateJob(jobId, {
       status: "processing",
       stage: "posts_imported",
@@ -350,16 +391,29 @@ export async function processImportJob(jobId: string, locale: Locale) {
           item.workspaceId === job.workspaceId &&
           item.username.toLowerCase() === imported.username.toLowerCase(),
       );
-      if (existing >= 0) draft.imports[existing] = imported;
-      else draft.imports.unshift(imported);
+      if (existing >= 0) {
+        // Keep stable id — (workspace_id, username) is unique in Supabase.
+        const prev = draft.imports[existing]!;
+        imported.id = prev.id;
+        imported.createdAt = prev.createdAt;
+        draft.imports[existing] = imported;
+      } else {
+        draft.imports.unshift(imported);
+      }
     });
 
+    // AI only needs captions; overlap it with media download/upload.
     await updateJob(jobId, { status: "analyzing", stage: "understanding_brand" });
-    const analysis = await getAIAnalyzer(job.username).analyzeImport({
-      profile,
-      posts,
-      locale,
-    });
+    const [analysis] = await withJobHeartbeat(jobId, () =>
+      Promise.all([
+        getAIAnalyzer(job.username ?? "demo").analyzeImport({
+          profile,
+          posts,
+          locale,
+        }),
+        persistImportMedia(imported),
+      ]),
+    );
     imported.aiAnalysis = analysis;
 
     await updateJob(jobId, { status: "generating", stage: "creating_website" });
@@ -431,6 +485,7 @@ export async function processImportJob(jobId: string, locale: Locale) {
       completedAt: now(),
     });
   } catch (error) {
+    console.error("[import] processImportJob failed", jobId, error);
     const code =
       error instanceof InstagramUrlError
         ? error.code
@@ -440,6 +495,9 @@ export async function processImportJob(jobId: string, locale: Locale) {
             ? "MEDIA_PERSIST_FAILED"
           : error instanceof Error && error.message.includes("AI")
             ? "AI_FAILED"
+            : error instanceof Error &&
+                /duplicate|unique|23505/i.test(error.message)
+              ? "SCRAPE_FAILED"
             : "SCRAPE_FAILED";
     const mapped = publicError(code);
     await updateJob(jobId, {

@@ -86,9 +86,9 @@ export function AIUnderstanding({ dict }: { dict: Dictionary }) {
                       <p className="text-sm font-medium">{item.value}</p>
                       {"swatches" in item ? (
                         <span className="ms-auto flex gap-1.5">
-                          {item.swatches.map((color) => (
+                          {item.swatches.map((color, swatchIndex) => (
                             <span
-                              key={color}
+                              key={`${item.key}-swatch-${swatchIndex}`}
                               className="size-3.5 rounded-full border border-border"
                               style={{ background: color }}
                               aria-hidden

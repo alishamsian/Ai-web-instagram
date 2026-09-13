@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function SiteSlugForm({
   websiteId,
@@ -16,6 +17,7 @@ export function SiteSlugForm({
 }) {
   const isFa = locale === "fa";
   const router = useRouter();
+  const confirm = useConfirm();
   const [slug, setSlug] = useState(currentSlug);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -24,11 +26,16 @@ export function SiteSlugForm({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!dirty) return;
-    const ok = window.confirm(
-      isFa
+    const ok = await confirm({
+      title: isFa ? "تغییر آدرس سایت" : "Change site address",
+      description: isFa
         ? "تغییر اسلاگ لینک قدیمی را می‌شکند. ادامه می‌دهی؟"
         : "Changing the slug breaks the old public URL. Continue?",
-    );
+      detail: `/${currentSlug} → /${slug.trim()}`,
+      tone: "warning",
+      confirmLabel: isFa ? "تغییر بده" : "Change",
+      cancelLabel: isFa ? "انصراف" : "Cancel",
+    });
     if (!ok) return;
     setPending(true);
     setMessage("");

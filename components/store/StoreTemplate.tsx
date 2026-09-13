@@ -8,13 +8,19 @@ import {
   getStoreCatalog,
   getStoreCategories,
   getFeaturedProducts,
+  getBestSellerProducts,
+  getNewArrivalProducts,
   findStoreProduct,
 } from "@/lib/store/catalog";
 import { StoreCartProvider } from "@/lib/store/cart";
 import { StoreRoot } from "@/components/store/StoreRoot";
 import { StoreAnnouncement, StoreHeader } from "@/components/store/StoreHeader";
 import { StoreHero, StoreCategories } from "@/components/store/StoreHero";
-import { StoreProductGrid } from "@/components/store/StoreProductCard";
+import {
+  StoreProductGrid,
+  StoreProductSpotlight,
+  StoreNewsletter,
+} from "@/components/store/StoreProductCard";
 import {
   StoreStory,
   StoreLookbook,
@@ -48,8 +54,7 @@ function SectionWrap({
     <EditorSectionFrame
       sectionId={section.id}
       label={
-        fallbackLabel ??
-        sectionLabel(type, config.settings.language)
+        fallbackLabel ?? sectionLabel(type, config.settings.language)
       }
       settings={section.settings}
     >
@@ -84,6 +89,14 @@ function resolveProductList(
   return catalog;
 }
 
+function gridColumns(config: WebsiteConfig): 2 | 3 | 4 | 5 {
+  const raw = config.sections.find((s) => s.type === "products")?.settings
+    ?.columns;
+  const n = Number(raw);
+  if (n === 2 || n === 3 || n === 4 || n === 5) return n;
+  return 4;
+}
+
 function StoreHome({
   config,
   catalog,
@@ -106,6 +119,17 @@ function StoreHome({
     () => getFeaturedProducts(shopProducts, 4),
     [shopProducts],
   );
+  const bestsellers = useMemo(
+    () => getBestSellerProducts(shopProducts, 4),
+    [shopProducts],
+  );
+  const newArrivals = useMemo(
+    () => getNewArrivalProducts(shopProducts, 4),
+    [shopProducts],
+  );
+  const spotlight = featured[0] ?? shopProducts[0];
+  const columns = gridColumns(config);
+
   const show = (type: string, fallback = true) => {
     const section = config.sections.find((item) => item.type === type);
     if (!section) return fallback;
@@ -117,86 +141,193 @@ function StoreHome({
     return mode === "editor" && section && !section.visible;
   };
 
+  const orderedTypes = config.sections
+    .filter((s) => s.type !== "footer")
+    .map((s) => s.type) as WebsiteSectionType[];
+
+  const sequence: WebsiteSectionType[] = orderedTypes.length
+    ? orderedTypes
+    : ["hero", "products", "about", "gallery", "faq", "contact"];
+
+  const commerceExtras = (
+    <>
+      <StoreCategories config={config} categories={categories} />
+      {newArrivals.length >= 2 ? (
+        <StoreProductGrid
+          config={config}
+          products={newArrivals}
+          id="featured"
+          columns={4}
+          soft={false}
+          variant="rail"
+          kicker={isFa ? "تازه‌ها" : "New arrivals"}
+          title={isFa ? "تازه‌واردها" : "Just arrived"}
+          lead={
+            isFa
+              ? "انتخاب‌های تازه از ویترین."
+              : "Fresh picks from the storefront."
+          }
+          onQuickView={onQuickView}
+        />
+      ) : featured.length ? (
+        <StoreProductGrid
+          config={config}
+          products={featured}
+          id="featured"
+          columns={4}
+          soft={false}
+          variant="rail"
+          kicker={isFa ? "منتخب" : "Featured"}
+          title={isFa ? "تازه‌های ویترین" : "Fresh from the shop"}
+          onQuickView={onQuickView}
+        />
+      ) : null}
+      {spotlight ? (
+        <StoreProductSpotlight
+          config={config}
+          product={spotlight}
+          onQuickView={onQuickView}
+        />
+      ) : null}
+    </>
+  );
+
+  const hasCta = sequence.includes("cta");
+  const nodes: ReactNode[] = [];
+  let extrasPlaced = false;
+  let galleryPlaced = false;
+
+  for (const type of sequence) {
+    if (type === "hero" && show("hero")) {
+      nodes.push(
+        <SectionWrap key="hero" config={config} type="hero" mode={mode}>
+          <div className={dim("hero") ? "opacity-45" : undefined}>
+            <StoreHero config={config} />
+          </div>
+        </SectionWrap>,
+      );
+      nodes.push(<div key="commerce-extras">{commerceExtras}</div>);
+      extrasPlaced = true;
+      continue;
+    }
+
+    if (type === "about" && show("about")) {
+      nodes.push(
+        <SectionWrap key="about" config={config} type="about" mode={mode}>
+          <div className={dim("about") ? "opacity-45" : undefined}>
+            <StoreStory config={config} />
+          </div>
+        </SectionWrap>,
+      );
+      continue;
+    }
+
+    if (type === "products" && show("products")) {
+      if (!extrasPlaced) {
+        nodes.push(<div key="commerce-extras">{commerceExtras}</div>);
+        extrasPlaced = true;
+      }
+      nodes.push(
+        <SectionWrap key="products" config={config} type="products" mode={mode}>
+          <div className={dim("products") ? "opacity-45" : undefined}>
+            <StoreProductGrid
+              config={config}
+              products={shopProducts}
+              id="shop"
+              columns={columns}
+              variant="classic"
+              editableTitle
+              kicker={isFa ? "فروشگاه" : "Shop"}
+              title={
+                config.content.products?.title ||
+                (isFa ? "همه محصولات" : "All products")
+              }
+              onQuickView={onQuickView}
+            />
+            {bestsellers.length >= 2 ? (
+              <StoreProductGrid
+                config={config}
+                products={bestsellers}
+                id="bestsellers"
+                columns={4}
+                soft={false}
+                variant="compact"
+                kicker={isFa ? "پرفروش" : "Bestsellers"}
+                title={isFa ? "محبوب‌ترین‌ها" : "Most loved"}
+                onQuickView={onQuickView}
+              />
+            ) : null}
+          </div>
+        </SectionWrap>,
+      );
+      if (!hasCta) {
+        nodes.push(<StorePromo key="promo" config={config} />);
+      }
+      continue;
+    }
+
+    if (type === "cta") {
+      nodes.push(<StorePromo key="cta" config={config} />);
+      continue;
+    }
+
+    if (
+      (type === "gallery" || type === "instagram-feed") &&
+      !galleryPlaced &&
+      (show("gallery") || show("instagram-feed", false))
+    ) {
+      galleryPlaced = true;
+      nodes.push(
+        <SectionWrap
+          key="gallery"
+          config={config}
+          type={show("gallery") ? "gallery" : "instagram-feed"}
+          mode={mode}
+        >
+          <div
+            className={
+              dim("gallery") || dim("instagram-feed") ? "opacity-45" : undefined
+            }
+          >
+            <StoreLookbook config={config} catalog={catalog} />
+          </div>
+        </SectionWrap>,
+      );
+      continue;
+    }
+
+    if (type === "faq" && show("faq")) {
+      nodes.push(
+        <SectionWrap key="faq" config={config} type="faq" mode={mode}>
+          <div className={dim("faq") ? "opacity-45" : undefined}>
+            <StoreFAQ config={config} />
+          </div>
+        </SectionWrap>,
+      );
+      continue;
+    }
+
+    if (type === "contact" && show("contact")) {
+      nodes.push(
+        <SectionWrap key="contact" config={config} type="contact" mode={mode}>
+          <div className={dim("contact") ? "opacity-45" : undefined}>
+            <StoreContact config={config} />
+            <StoreNewsletter config={config} />
+          </div>
+        </SectionWrap>,
+      );
+    }
+  }
+
+  if (!extrasPlaced) {
+    nodes.unshift(<div key="commerce-extras">{commerceExtras}</div>);
+  }
+
   return (
     <>
       <StoreAnnouncement config={config} />
       <StoreHeader config={config} hasCategories={categories.length > 0} />
-      <main>
-        {show("hero") ? (
-          <SectionWrap config={config} type="hero" mode={mode}>
-            <div className={dim("hero") ? "opacity-45" : undefined}>
-              <StoreHero config={config} />
-            </div>
-          </SectionWrap>
-        ) : null}
-        <StoreCategories config={config} categories={categories} />
-        {featured.length ? (
-          <StoreProductGrid
-            config={config}
-            products={featured}
-            id="featured"
-            columns={4}
-            kicker={isFa ? "منتخب" : "Featured"}
-            title={isFa ? "تازه‌های ویترین" : "Fresh from the shop"}
-            onQuickView={onQuickView}
-          />
-        ) : null}
-        {show("about") ? (
-          <SectionWrap config={config} type="about" mode={mode}>
-            <div className={dim("about") ? "opacity-45" : undefined}>
-              <StoreStory config={config} />
-            </div>
-          </SectionWrap>
-        ) : null}
-        {show("products") ? (
-          <SectionWrap config={config} type="products" mode={mode}>
-            <div className={dim("products") ? "opacity-45" : undefined}>
-              <StoreProductGrid
-                config={config}
-                products={shopProducts}
-                id="shop"
-                columns={4}
-                kicker={isFa ? "فروشگاه" : "Shop"}
-                title={
-                  config.content.products?.title ||
-                  (isFa ? "همه محصولات" : "All products")
-                }
-                onQuickView={onQuickView}
-              />
-            </div>
-          </SectionWrap>
-        ) : null}
-        <StorePromo config={config} />
-        {show("gallery") || show("instagram-feed", false) ? (
-          <SectionWrap
-            config={config}
-            type={show("gallery") ? "gallery" : "instagram-feed"}
-            mode={mode}
-          >
-            <div
-              className={
-                dim("gallery") || dim("instagram-feed") ? "opacity-45" : undefined
-              }
-            >
-              <StoreLookbook config={config} catalog={catalog} />
-            </div>
-          </SectionWrap>
-        ) : null}
-        {show("faq") ? (
-          <SectionWrap config={config} type="faq" mode={mode}>
-            <div className={dim("faq") ? "opacity-45" : undefined}>
-              <StoreFAQ config={config} />
-            </div>
-          </SectionWrap>
-        ) : null}
-        {show("contact") ? (
-          <SectionWrap config={config} type="contact" mode={mode}>
-            <div className={dim("contact") ? "opacity-45" : undefined}>
-              <StoreContact config={config} />
-            </div>
-          </SectionWrap>
-        ) : null}
-      </main>
+      <main>{nodes}</main>
       {show("footer") ? (
         <SectionWrap config={config} type="footer" mode={mode}>
           <div className={dim("footer") ? "opacity-45" : undefined}>

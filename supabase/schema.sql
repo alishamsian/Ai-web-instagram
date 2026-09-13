@@ -79,6 +79,7 @@ create table if not exists import_jobs (
   error_message text,
   retry_count int not null default 0,
   posts_imported int not null default 0,
+  posts_limit int,
   started_at timestamptz,
   completed_at timestamptz,
   created_at timestamptz not null default now(),

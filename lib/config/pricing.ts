@@ -30,8 +30,8 @@ export const pricing = {
         ],
       },
       limits: {
-        fa: ["برند ویترین روی سایت", "یک سایت فعال"],
-        en: ["Vitrin branding on site", "One active site"],
+        fa: ["برند ویترین روی سایت", "تا ۴ سایت فعال", "تا ۱۰ پست در هر ورود"],
+        en: ["Vitrin branding on site", "Up to 4 active sites", "Up to 10 posts per import"],
       },
     },
     {

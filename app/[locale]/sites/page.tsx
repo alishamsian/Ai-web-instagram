@@ -8,6 +8,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
 import { SiteImage } from "@/components/website/SiteImage";
+import { DeleteSiteButton } from "@/components/dashboard/DeleteSiteButton";
 
 export default async function SitesPage({
   params,
@@ -105,6 +106,15 @@ export default async function SitesPage({
                           {dict.dashboard.refreshImport}
                         </Link>
                       </Button>
+                      <DeleteSiteButton
+                        websiteId={site.id}
+                        label={dict.dashboard.deleteSite}
+                        confirmMessage={dict.dashboard.deleteSiteConfirm}
+                        errorMessage={dict.dashboard.deleteSiteFailed}
+                        redirectTo={`/${locale}/sites`}
+                        siteName={site.config.brand.name}
+                        locale={locale}
+                      />
                     </div>
                   </div>
                 </article>

@@ -376,13 +376,15 @@ function WebsiteQuickSettings({
               className="rounded-xl border border-black/8 bg-white p-2.5 text-start transition hover:border-black/16"
             >
               <div className="mb-2 flex gap-1">
-                {[
-                  preset.colors.background,
-                  preset.colors.foreground,
-                  preset.colors.accent,
-                ].map((swatch, swatchIndex) => (
+                {(
+                  [
+                    ["bg", preset.colors.background],
+                    ["fg", preset.colors.foreground],
+                    ["accent", preset.colors.accent],
+                  ] as const
+                ).map(([role, swatch]) => (
                   <span
-                    key={`${preset.id}-swatch-${swatchIndex}`}
+                    key={`${preset.id}-${role}`}
                     className="size-4 rounded-full border border-black/10"
                     style={{ background: swatch }}
                   />
@@ -847,46 +849,69 @@ function ProductsSectionInspector({
   }
 
   if (mode === "layout") {
+    const columns = Number(section?.settings?.columns ?? 4);
     return (
-      <InspectorGroup title={dict.editor.productSource} defaultOpen>
-        <Segmented
-          value={source}
-          options={[
-            { id: "all", label: dict.editor.sourceAll },
-            { id: "manual", label: dict.editor.sourceManual },
-            { id: "category", label: dict.editor.sourceCategory },
-          ]}
-          onChange={(value) =>
-            onChange(
-              patchSectionSettings(config, sectionId, {
-                productSource: value,
-              }),
-            )
-          }
-        />
-        {source === "category" ? (
-          <Field label={dict.editor.productCategory}>
-            <select
-              className="w-full rounded-xl border border-border bg-white px-3 py-2 text-[13px]"
-              value={String(section?.settings?.category ?? "")}
-              onChange={(event) =>
+      <div className="space-y-4">
+        <InspectorGroup title={dict.editor.productSource} defaultOpen>
+          <Segmented
+            value={source}
+            options={[
+              { id: "all", label: dict.editor.sourceAll },
+              { id: "manual", label: dict.editor.sourceManual },
+              { id: "category", label: dict.editor.sourceCategory },
+            ]}
+            onChange={(value) =>
+              onChange(
+                patchSectionSettings(config, sectionId, {
+                  productSource: value,
+                }),
+              )
+            }
+          />
+          {source === "category" ? (
+            <Field label={dict.editor.productCategory}>
+              <select
+                className="w-full rounded-xl border border-border bg-white px-3 py-2 text-[13px]"
+                value={String(section?.settings?.category ?? "")}
+                onChange={(event) =>
+                  onChange(
+                    patchSectionSettings(config, sectionId, {
+                      category: event.target.value,
+                    }),
+                  )
+                }
+              >
+                <option value="">{dict.editor.pickCategory}</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+        </InspectorGroup>
+        <InspectorGroup title={dict.editor.layout} defaultOpen>
+          <Field label="Columns">
+            <Segmented
+              value={String([2, 3, 4, 5].includes(columns) ? columns : 4)}
+              options={[
+                { id: "2", label: "2" },
+                { id: "3", label: "3" },
+                { id: "4", label: "4" },
+                { id: "5", label: "5" },
+              ]}
+              onChange={(value) =>
                 onChange(
                   patchSectionSettings(config, sectionId, {
-                    category: event.target.value,
+                    columns: Number(value),
                   }),
                 )
               }
-            >
-              <option value="">{dict.editor.pickCategory}</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
-        ) : null}
-      </InspectorGroup>
+        </InspectorGroup>
+      </div>
     );
   }
 

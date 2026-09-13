@@ -3,6 +3,7 @@ import type { InstagramImport } from "@/types/instagram";
 import type { PublishingChannel } from "@/types/publishing";
 import type { WebsiteRecord } from "@/types/website";
 import type { StoreOrderRow } from "@/lib/dashboard/format";
+import { sanitizeDisplaySnippet } from "@/lib/dashboard/format";
 
 export type NextAction = {
   id: string;
@@ -301,7 +302,10 @@ export function buildSmartSuggestion(input: {
   if (!post) return null;
 
   const caption = (post.caption ?? "").trim();
-  const title = caption.split("\n")[0]?.slice(0, 60) || "New post";
+  const title = sanitizeDisplaySnippet(
+    caption.split("\n")[0] ?? caption,
+    60,
+  );
   const telegramOk = input.channels.some(
     (c) => c.type === "telegram" && c.status === "connected",
   );

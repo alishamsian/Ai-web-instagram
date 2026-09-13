@@ -24,7 +24,8 @@ describe("dashboard smoke — core happy path helpers", () => {
   });
 
   it("keeps free/pro plan gates honest", () => {
-    expect(planLimits("free").maxWebsites).toBe(1);
+    expect(planLimits("free").maxWebsites).toBe(4);
+    expect(planLimits("free").maxImportPosts).toBe(10);
     expect(planLimits("free").customDomain).toBe(false);
     expect(isProPlan("pro")).toBe(true);
     expect(isProPlan("free")).toBe(false);
@@ -48,6 +49,13 @@ describe("dashboard smoke — core happy path helpers", () => {
   it("import stale window is finite and > 1 minute", () => {
     expect(IMPORT_STALE_MS).toBeGreaterThan(60_000);
     expect(Number.isFinite(IMPORT_STALE_MS)).toBe(true);
+  });
+
+  it("typical import minutes scale with posts", async () => {
+    const { importTypicalMinutes } = await import("@/lib/config/import");
+    expect(importTypicalMinutes(4)).toBeLessThan(importTypicalMinutes(20));
+    expect(importTypicalMinutes(6)).toBeGreaterThanOrEqual(2);
+    expect(importTypicalMinutes(50)).toBeLessThanOrEqual(10);
   });
 
   it("resolves primary site cookie over list order", () => {

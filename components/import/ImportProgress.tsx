@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
   motion,
@@ -21,6 +21,10 @@ import {
   type AppIcon,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import {
+  importClientTimeoutMs,
+  importTypicalMinutes,
+} from "@/lib/config/import";
 
 const STAGE_ORDER: ImportJobStage[] = [
   "connecting",
@@ -31,8 +35,6 @@ const STAGE_ORDER: ImportJobStage[] = [
   "creating_website",
   "ready",
 ];
-
-const CLIENT_TIMEOUT_MS = 3 * 60 * 1000;
 
 const STAGE_ICON: Record<ImportJobStage, AppIcon> = {
   connecting: IconInstagram,
@@ -54,9 +56,12 @@ function formatElapsed(ms: number) {
 export function ImportProgress({
   jobId,
   locale,
+  postsLimit: postsLimitProp,
 }: {
   jobId: string;
   locale: Locale;
+  /** Known from create URL before the job payload loads. */
+  postsLimit?: number;
 }) {
   const dict = getDictionary(locale);
   const reduce = useReducedMotion();
@@ -67,7 +72,22 @@ export function ImportProgress({
   const [tipIndex, setTipIndex] = useState(0);
   const [doneWebsiteId, setDoneWebsiteId] = useState<string | null>(null);
   const [finalElapsedMs, setFinalElapsedMs] = useState(0);
-  const startedAt = useMemo(() => Date.now(), [jobId]);
+  const startedAtRef = useRef(0);
+  const effectivePosts =
+    job?.postsLimit && job.postsLimit > 0
+      ? job.postsLimit
+      : postsLimitProp && postsLimitProp > 0
+        ? postsLimitProp
+        : undefined;
+  const timeoutMsRef = useRef(importClientTimeoutMs(effectivePosts));
+
+  useEffect(() => {
+    startedAtRef.current = Date.now();
+  }, [jobId]);
+
+  useEffect(() => {
+    timeoutMsRef.current = importClientTimeoutMs(effectivePosts);
+  }, [effectivePosts]);
 
   useEffect(() => {
     let active = true;
@@ -75,7 +95,7 @@ export function ImportProgress({
 
     async function tick() {
       if (!active) return;
-      if (Date.now() - wallStart > CLIENT_TIMEOUT_MS) {
+      if (Date.now() - wallStart > timeoutMsRef.current) {
         setTimedOut(true);
         return;
       }
@@ -95,7 +115,7 @@ export function ImportProgress({
         setJob(data);
         setPollError(null);
         if (data.status === "completed" && data.websiteId) {
-          setFinalElapsedMs(Date.now() - startedAt);
+          setFinalElapsedMs(Date.now() - startedAtRef.current);
           setDoneWebsiteId(data.websiteId);
           return "stop";
         }
@@ -119,7 +139,7 @@ export function ImportProgress({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [jobId, locale, dict.errors.scrapeFailed, timedOut, startedAt]);
+  }, [jobId, locale, dict.errors.scrapeFailed, timedOut]);
 
   useEffect(() => {
     if (
@@ -130,10 +150,10 @@ export function ImportProgress({
     )
       return;
     const id = window.setInterval(() => {
-      setElapsedMs(Date.now() - startedAt);
+      setElapsedMs(Date.now() - startedAtRef.current);
     }, 250);
     return () => window.clearInterval(id);
-  }, [startedAt, timedOut, job?.status, doneWebsiteId]);
+  }, [timedOut, job?.status, doneWebsiteId]);
 
   useEffect(() => {
     if (reduce || timedOut || job?.status === "failed" || doneWebsiteId) return;
@@ -176,7 +196,11 @@ export function ImportProgress({
   );
 
   const ActiveIcon = STAGE_ICON[currentStage];
-  const Arrow = forwardArrow(locale);
+  const typicalMinutes = importTypicalMinutes(effectivePosts);
+  const typicalLabel = dict.create.buildingTypical.replace(
+    "{minutes}",
+    String(typicalMinutes),
+  );
 
   if (doneWebsiteId) {
     return (
@@ -216,7 +240,10 @@ export function ImportProgress({
               <Button asChild variant="accent" size="xl" className="min-h-12 rounded-xl px-7">
                 <a href={`/${locale}/editor/${doneWebsiteId}`}>
                   {dict.create.successCta}
-                  <Arrow size={16} data-arrow aria-hidden />
+                  {createElement(forwardArrow(locale), {
+                    size: 16,
+                    "aria-hidden": true,
+                  })}
                 </a>
               </Button>
               <Button asChild variant="soft" size="lg" className="rounded-xl">
@@ -274,7 +301,7 @@ export function ImportProgress({
                 progress={progress}
                 elapsedLabel={formatElapsed(elapsedMs)}
                 caption={dict.create.buildingElapsed}
-                typical={dict.create.buildingTypical}
+                typical={typicalLabel}
                 reduce={!!reduce}
               />
 

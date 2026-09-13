@@ -33,7 +33,7 @@ async function runWorker(request: Request) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  let body: { jobId?: string; locale?: string } = {};
+  let body: { jobId?: string; locale?: string; postsLimit?: number } = {};
   if (request.method === "POST") {
     body = (await request.json().catch(() => ({}))) as typeof body;
   } else {
@@ -53,7 +53,7 @@ async function runWorker(request: Request) {
     return NextResponse.json({ ok: true, processed: false });
   }
 
-  await processImportJob(jobId, locale);
+  await processImportJob(jobId, locale, body.postsLimit);
   return NextResponse.json({ ok: true, processed: true, jobId });
 }
 

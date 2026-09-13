@@ -41,7 +41,19 @@ export class LocalMediaStorage implements MediaStorage {
 }
 
 export class SupabaseMediaStorage implements MediaStorage {
-  private async ensureBucket() {
+  private bucketReady: Promise<void> | null = null;
+
+  private ensureBucket() {
+    if (!this.bucketReady) {
+      this.bucketReady = this.createBucketIfNeeded().catch((error) => {
+        this.bucketReady = null;
+        throw error;
+      });
+    }
+    return this.bucketReady;
+  }
+
+  private async createBucketIfNeeded() {
     const db = getSupabaseAdmin();
     const { data: buckets, error: listError } = await db.storage.listBuckets();
     if (listError) throw listError;
@@ -68,21 +80,35 @@ export class SupabaseMediaStorage implements MediaStorage {
   }): Promise<StoredMedia> {
     await this.ensureBucket();
     const db = getSupabaseAdmin();
-    const { error } = await db.storage.from(MEDIA_BUCKET).upload(params.key, params.body, {
-      contentType: params.contentType,
-      upsert: true,
-      cacheControl: "public, max-age=31536000, immutable",
-    });
-    if (error) throw error;
+    const body =
+      params.body instanceof Buffer ? params.body : Buffer.from(params.body);
 
-    return {
-      id: createId("media"),
-      originalUrl: params.key,
-      storageKey: params.key,
-      publicUrl: this.getPublicUrl(params.key),
-      type: mediaTypeFromContentType(params.contentType),
-      createdAt: new Date(),
-    };
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const { error } = await db.storage
+        .from(MEDIA_BUCKET)
+        .upload(params.key, body, {
+          contentType: params.contentType,
+          upsert: true,
+          cacheControl: "public, max-age=31536000, immutable",
+        });
+      if (!error) {
+        return {
+          id: createId("media"),
+          originalUrl: params.key,
+          storageKey: params.key,
+          publicUrl: this.getPublicUrl(params.key),
+          type: mediaTypeFromContentType(params.contentType),
+          createdAt: new Date(),
+        };
+      }
+      lastError = error;
+      // Transient network blips ("fetch failed") — brief backoff then retry.
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+    throw lastError;
   }
 
   async delete(key: string) {

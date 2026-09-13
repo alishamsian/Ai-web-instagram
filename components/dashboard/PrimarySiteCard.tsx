@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/dashboard/ui";
 import { PublishButton } from "@/components/dashboard/PublishButton";
 import { ShareLinkButton } from "@/components/dashboard/ShareLinkButton";
 import { SyncInstagramButton } from "@/components/dashboard/SyncInstagramButton";
+import { DeleteSiteButton } from "@/components/dashboard/DeleteSiteButton";
 import { siteCoverUrl } from "@/lib/dashboard/format";
 import { publishedSiteUrl } from "@/lib/config/runtime";
 import type { Dictionary } from "@/lib/i18n/dictionary";
@@ -182,6 +183,15 @@ export function PrimarySiteCard({
                     username ? `https://instagram.com/${username}` : undefined
                   }
                   compact
+                />
+                <DeleteSiteButton
+                  websiteId={site.id}
+                  label={dict.dashboard.deleteSite}
+                  confirmMessage={dict.dashboard.deleteSiteConfirm}
+                  errorMessage={dict.dashboard.deleteSiteFailed}
+                  redirectTo={`/${locale}/dashboard`}
+                  siteName={site.config.brand.name}
+                  locale={locale}
                 />
               </div>
             </details>

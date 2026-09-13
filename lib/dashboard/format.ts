@@ -37,6 +37,32 @@ export function formatRelativeTime(iso: string, locale: "fa" | "en") {
   return locale === "fa" ? `${days} روز پیش` : `${days}d ago`;
 }
 
+/**
+ * Instagram captions often include bidi isolates and can be sliced mid-emoji,
+ * which produces lone UTF-16 surrogates. Those render differently in SSR HTML
+ * vs the client RSC payload and cause hydration mismatches.
+ */
+export function sanitizeDisplaySnippet(raw: string, maxLen = 60): string {
+  let s = String(raw ?? "").normalize("NFC");
+  s = s.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "");
+  s = s.replace(/\s+/g, " ").trim();
+  if (typeof s.toWellFormed === "function") {
+    s = s.toWellFormed();
+  } else {
+    s = s.replace(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+      "",
+    );
+  }
+  // Drop replacement chars left by toWellFormed / broken emoji.
+  s = s.replace(/\uFFFD+/g, "").trim();
+  const chars = Array.from(s);
+  if (chars.length > maxLen) {
+    return `${chars.slice(0, maxLen).join("").trimEnd()}…`;
+  }
+  return s || "New post";
+}
+
 export function siteCoverUrl(site: WebsiteRecord): string | null {
   if (site.config.brand.logo) return site.config.brand.logo;
   const heroId = site.config.content.hero.imageId;
