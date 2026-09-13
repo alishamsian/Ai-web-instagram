@@ -1,6 +1,7 @@
 export type {
   VerticalId,
   VerticalPack,
+  BusinessStrategyInput,
   BusinessProfile,
   BusinessStrategy,
   ProductAttributeDefinition,

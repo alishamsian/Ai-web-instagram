@@ -1,7 +1,6 @@
 import type { WebsiteAIAnalysis, WebsiteBusinessProfile } from "@/types/ai";
-import type { StoreMood } from "@/lib/design-system/themes";
 import type {
-  BusinessProfile,
+  BusinessStrategyInput,
   BusinessStrategy,
 } from "@/lib/store/verticals/types";
 import {
@@ -12,10 +11,11 @@ import {
 } from "@/lib/store/verticals/resolve";
 import { getRecipe, getRecipesForVertical } from "@/lib/store/recipes/registry";
 import type { RegistrySectionType } from "@/lib/store/registry/types";
+import type { StoreMood } from "@/lib/design-system/themes";
 
 function fromWebsiteProfile(
   profile: WebsiteBusinessProfile | undefined,
-): BusinessProfile {
+): BusinessStrategyInput {
   if (!profile) return {};
   return {
     vertical: profile.vertical,
@@ -31,12 +31,12 @@ function fromWebsiteProfile(
 }
 
 /**
- * Consumer seam for AI / business understanding → store strategy.
+ * Consumer seam for strategy hints → Vertical Engine.
  * Does NOT classify Instagram. Does NOT invent confidence.
  */
 export function toBusinessProfile(
-  input: BusinessProfile | WebsiteAIAnalysis | null | undefined,
-): BusinessProfile {
+  input: BusinessStrategyInput | WebsiteAIAnalysis | null | undefined,
+): BusinessStrategyInput {
   if (!input) return {};
   if ("businessName" in input && "businessType" in input) {
     const analysis = input as WebsiteAIAnalysis;
@@ -50,11 +50,11 @@ export function toBusinessProfile(
       fallbackVertical: fromNested.fallbackVertical ?? "generic",
     };
   }
-  return input as BusinessProfile;
+  return input as BusinessStrategyInput;
 }
 
 export function resolveBusinessStrategy(
-  input: BusinessProfile | WebsiteAIAnalysis | null | undefined,
+  input: BusinessStrategyInput | WebsiteAIAnalysis | null | undefined,
 ): BusinessStrategy {
   const profile = toBusinessProfile(input);
   const picked = pickVerticalWithConfidence({

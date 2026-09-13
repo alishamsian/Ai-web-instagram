@@ -21,3 +21,5 @@ export function getAIAnalyzer(username?: string) {
 
 export { validateAnalysis, buildAnalysisPrompt } from "./prompts";
 export { MockAIAnalyzer } from "./mock";
+export type { BusinessIntelligenceProvider } from "@/lib/ai/business-intelligence";
+export { UnavailableBusinessIntelligence } from "@/lib/ai/business-intelligence";

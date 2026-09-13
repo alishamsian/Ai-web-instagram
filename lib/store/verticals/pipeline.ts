@@ -1,12 +1,12 @@
 /**
- * AI / Business Understanding consumer seam.
- * No Instagram classification — only structured profile → strategy → config.
+ * Strategy hints → Vertical / Recipe → WebsiteConfig seam (P3).
+ * Full BusinessProfile intake lives in lib/business (P4).
  */
 
 import type { WebsiteAIAnalysis } from "@/types/ai";
 import type { WebsiteConfig } from "@/types/website";
 import type {
-  BusinessProfile,
+  BusinessStrategyInput,
   BusinessStrategy,
 } from "@/lib/store/verticals/types";
 import {
@@ -19,8 +19,8 @@ import {
 } from "@/lib/store/recipes/builder";
 import { resolveVerticalId } from "@/lib/store/verticals/resolve";
 
-/** Alias matching Phase 3 brief naming. */
-export type BusinessUnderstanding = BusinessProfile;
+/** Alias for strategy hints (not lib/business BusinessProfile). */
+export type BusinessUnderstanding = BusinessStrategyInput;
 
 export function resolveVertical(
   input: BusinessUnderstanding | WebsiteAIAnalysis | null | undefined,

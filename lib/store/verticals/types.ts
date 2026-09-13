@@ -90,10 +90,10 @@ export type VerticalPack = {
 };
 
 /**
- * Business understanding consumer shape.
- * Extends AI analysis without inventing Instagram extraction.
+ * Strategy hints consumed by Vertical Engine (not the full business input model).
+ * Full intake lives in `lib/business` as BusinessProfile.
  */
-export type BusinessProfile = {
+export type BusinessStrategyInput = {
   vertical?: VerticalId | string | null;
   subVertical?: string | null;
   style?: string | null;
@@ -105,6 +105,9 @@ export type BusinessProfile = {
   fallbackVertical?: VerticalId | string | null;
   mood?: StoreMood | string | null;
 };
+
+/** @deprecated Use BusinessStrategyInput — P4 BusinessProfile is lib/business */
+export type BusinessProfile = BusinessStrategyInput;
 
 export type BusinessStrategy = {
   vertical: VerticalId | string;
