@@ -27,7 +27,39 @@ export type WebsiteSectionType =
   | "social"
   | "cta"
   | "promo"
-  | "footer";
+  | "footer"
+  // Beauty
+  | "shop-by-concern"
+  | "shop-by-skin-type"
+  | "routine"
+  | "ingredient-story"
+  | "product-finder"
+  // Fashion
+  | "lookbook"
+  | "shop-the-look"
+  | "collection-story"
+  | "style-guide"
+  | "designer-spotlight"
+  | "fit-guide"
+  // Jewelry
+  | "shop-by-material"
+  | "shop-by-occasion"
+  | "stack-builder"
+  | "jewelry-care"
+  // Coffee
+  | "origin-explorer"
+  | "flavor-profile"
+  | "brew-guide"
+  | "roaster-story"
+  | "subscription"
+  | "coffee-finder"
+  // Furniture
+  | "shop-by-room"
+  | "shop-by-designer"
+  | "materials"
+  | "dimensions"
+  | "projects"
+  | "room-inspiration";
 
 export interface ColorConfig {
   primary: string;

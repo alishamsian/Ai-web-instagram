@@ -8,6 +8,7 @@ import {
   hasSectionRenderer,
   registerSectionRenderer,
   resetRegistryForTests,
+  ALL_SECTION_DEFINITIONS,
 } from "@/lib/store/registry";
 import { CORE_SECTION_DEFINITIONS } from "@/lib/store/registry/definitions";
 import { normalizeStoreSections } from "@/lib/store/registry/normalize";
@@ -79,6 +80,17 @@ describe("section registry", () => {
     );
     expect(hasSection("hero")).toBe(true);
     expect(hasSection("shopByConcern")).toBe(false);
+    expect(hasSection("shop-by-concern")).toBe(false);
+  });
+
+  it("registers vertical-specific sections when seeded", () => {
+    resetRegistryForTests(ALL_SECTION_DEFINITIONS);
+    expect(hasSection("shop-by-concern")).toBe(true);
+    expect(hasSection("lookbook")).toBe(true);
+    expect(hasSection("origin-explorer")).toBe(true);
+    expect(getSectionDefinition("shop-by-concern")?.verticals).toContain(
+      "beauty",
+    );
   });
 
   it("owns renderer bindings via registerSectionRenderer", () => {

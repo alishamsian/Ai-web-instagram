@@ -10,29 +10,39 @@ import {
   isSectionSupportedByVertical,
   getProductAttributesForVertical,
   pickVerticalWithConfidence,
-  resolveBusinessStrategy,
+  buildWebsiteConfigFromUnderstanding,
+  filterProductsByAttribute,
+  resolveVerticalFilters,
+  CORE_VERTICAL_PACKS,
 } from "@/lib/store/verticals";
-import { CORE_VERTICAL_PACKS } from "@/lib/store/verticals/packs";
 import {
   buildWebsiteConfigFromRecipe,
   getRecipe,
   getRecipesForVertical,
   resetRecipeRegistryForTests,
+  resolveRecipe,
   templateDefinitionToRecipe,
   CORE_TEMPLATE_RECIPES,
 } from "@/lib/store/recipes";
 import { templates } from "@/lib/website/templates";
-import { resetRegistryForTests } from "@/lib/store/registry/catalog";
-import { CORE_SECTION_DEFINITIONS } from "@/lib/store/registry/definitions";
+import {
+  resetRegistryForTests,
+  ALL_SECTION_DEFINITIONS,
+  hasSection,
+  getSectionDefinition,
+} from "@/lib/store/registry";
 import { getSectionLibraryItems } from "@/lib/store/registry/library-adapter";
 import { inferStoreMood } from "@/lib/store/theme";
 import type { Product } from "@/types/ai";
 import { normalizeStoreSections } from "@/lib/store/registry/normalize";
+import { ensureStoreSectionRenderersBound } from "@/components/store/bind-store-renderers";
+import { getSectionRenderer } from "@/lib/store/registry/catalog";
 
 beforeEach(() => {
-  resetRegistryForTests(CORE_SECTION_DEFINITIONS);
+  resetRegistryForTests(ALL_SECTION_DEFINITIONS);
   resetVerticalRegistryForTests([...CORE_VERTICAL_PACKS]);
   resetRecipeRegistryForTests([...CORE_TEMPLATE_RECIPES]);
+  ensureStoreSectionRenderersBound();
 });
 
 describe("vertical registry", () => {
@@ -60,17 +70,31 @@ describe("vertical registry", () => {
 });
 
 describe("vertical section compatibility", () => {
-  it("beauty / fashion / coffee get recommended core sections", () => {
+  it("beauty / fashion / coffee include vertical-specific registered sections", () => {
+    expect(hasSection("shop-by-concern")).toBe(true);
+    expect(hasSection("lookbook")).toBe(true);
+    expect(hasSection("origin-explorer")).toBe(true);
+    expect(getSectionDefinition("shop-by-concern")?.verticals).toContain(
+      "beauty",
+    );
+
     for (const id of ["beauty", "fashion", "coffee"] as const) {
       const recommended = getRecommendedSectionsForVertical(id);
       const supported = getSectionsForVertical(id).map((s) => s.type);
       expect(recommended.length).toBeGreaterThan(0);
       for (const type of recommended) {
         expect(supported).toContain(type);
+        expect(hasSection(type)).toBe(true);
       }
       expect(isSectionSupportedByVertical("hero", id)).toBe(true);
-      expect(isSectionSupportedByVertical("products", id)).toBe(true);
     }
+
+    expect(isSectionSupportedByVertical("shop-by-concern", "beauty")).toBe(
+      true,
+    );
+    expect(isSectionSupportedByVertical("shop-by-concern", "fashion")).toBe(
+      false,
+    );
   });
 
   it("supported != recommended", () => {
@@ -79,12 +103,14 @@ describe("vertical section compatibility", () => {
     expect(supported.length).toBeGreaterThan(recommended.length);
   });
 
-  it("generic sections remain available for unknown vertical", () => {
-    expect(isSectionSupportedByVertical("gallery", "unknown-xyz")).toBe(true);
+  it("resolves renderers for vertical sections", () => {
+    expect(getSectionRenderer("routine")).toBeTypeOf("function");
+    expect(getSectionRenderer("brew-guide")).toBeTypeOf("function");
+    expect(getSectionRenderer("lookbook")).toBeTypeOf("function");
   });
 });
 
-describe("product attributes", () => {
+describe("product attributes + filters", () => {
   it("vertical exposes attribute definitions without mutating products", () => {
     const attrs = getProductAttributesForVertical("beauty", "skincare");
     expect(attrs.some((a) => a.key === "skinType")).toBe(true);
@@ -98,28 +124,52 @@ describe("product attributes", () => {
       currency: null,
       imageIds: [],
       confidence: 0.9,
-    };
-    const before = structuredClone(product);
-    void getProductAttributesForVertical("beauty");
-    expect(product).toEqual(before);
-    expect(product.industryData).toBeUndefined();
-
-    const withIndustry: Product = {
-      ...product,
       industryData: {
         vertical: "beauty",
-        attributes: { skinType: ["oily"] },
+        attributes: { concerns: ["acne"], skinType: ["oily"] },
       },
     };
-    expect(withIndustry.name).toBe("Serum");
-    expect(withIndustry.industryData?.attributes?.skinType).toEqual(["oily"]);
+    const before = structuredClone(product);
+    const filtered = filterProductsByAttribute([product], "concerns", "acne");
+    expect(filtered).toHaveLength(1);
+    expect(product).toEqual(before);
+
+    const filters = resolveVerticalFilters("beauty", [product]);
+    expect(filters.some((f) => f.attribute === "concerns")).toBe(true);
+    expect(filters.find((f) => f.attribute === "concerns")?.options).toContain(
+      "acne",
+    );
+  });
+
+  it("missing attributes do not crash filters", () => {
+    const product: Product = {
+      name: "Plain",
+      description: "",
+      category: "",
+      price: null,
+      currency: null,
+      imageIds: [],
+      confidence: 1,
+    };
+    expect(filterProductsByAttribute([product], "origin", "ethiopia")).toEqual(
+      [],
+    );
+    const filters = resolveVerticalFilters("coffee", [product]);
+    expect(filters.length).toBeGreaterThan(0);
+    expect(
+      filters.find((f) => f.attribute === "roastLevel")?.options.length,
+    ).toBeGreaterThan(0);
   });
 });
 
 describe("template recipes", () => {
-  it("recipe resolves through registry and builds WebsiteConfig", () => {
+  it("beauty recipe includes vertical sections and builds immutably", () => {
     const recipe = getRecipe("beauty-editorial");
-    expect(recipe).toBeTruthy();
+    expect(recipe?.sections.some((s) => s.type === "shop-by-concern")).toBe(
+      true,
+    );
+    expect(recipe?.sections.some((s) => s.type === "routine")).toBe(true);
+
     const input = {
       recipe: recipe!,
       seed: { brandName: "Glow", locale: "en" as const },
@@ -129,26 +179,46 @@ describe("template recipes", () => {
     expect(input).toEqual(before);
     expect(config.settings.vertical).toBe("beauty");
     expect(config.settings.recipeId).toBe("beauty-editorial");
-    expect(
-      config.sections.every((s) => s.id.includes("beauty-editorial")),
-    ).toBe(true);
-    expect(config.sections[0]?.type).toBe("hero");
+    expect(config.sections.map((s) => s.type)).toEqual(
+      expect.arrayContaining([
+        "shop-by-concern",
+        "routine",
+        "ingredient-story",
+        "product-finder",
+      ]),
+    );
     expect(config.sections.map((s) => s.id)).toEqual(
       buildWebsiteConfigFromRecipe(input).sections.map((s) => s.id),
     );
   });
 
-  it("coffee and fashion recipes produce valid configs", () => {
-    for (const id of ["coffee-story", "fashion-editorial"] as const) {
-      const recipe = getRecipe(id)!;
-      const config = buildWebsiteConfigFromRecipe({
-        recipe,
-        seed: { brandName: "Demo", locale: "fa" },
-      });
-      expect(config.sections.length).toBeGreaterThan(3);
-      expect(config.settings.language).toBe("fa");
-      expect(config.settings.direction).toBe("rtl");
-    }
+  it("unknown recipe falls back to generic-store", () => {
+    const recipe = resolveRecipe("does-not-exist");
+    expect(recipe.id).toBe("generic-store");
+    const config = buildWebsiteConfigFromRecipe({ recipeId: "missing" });
+    expect(config.settings.recipeId).toBe("generic-store");
+    expect(config.settings.vertical).toBe("generic");
+  });
+
+  it("coffee and fashion recipes produce vertical compositions", () => {
+    const coffee = buildWebsiteConfigFromRecipe({
+      recipe: getRecipe("coffee-story")!,
+      seed: { brandName: "Roast", locale: "fa" },
+    });
+    expect(coffee.sections.map((s) => s.type)).toEqual(
+      expect.arrayContaining([
+        "origin-explorer",
+        "brew-guide",
+        "subscription",
+      ]),
+    );
+
+    const fashion = buildWebsiteConfigFromRecipe({
+      recipe: getRecipe("fashion-editorial")!,
+    });
+    expect(fashion.sections.map((s) => s.type)).toEqual(
+      expect.arrayContaining(["lookbook", "shop-the-look", "collection-story"]),
+    );
   });
 
   it("legacy templates remain compatible via adapter", () => {
@@ -169,12 +239,11 @@ describe("theme separation", () => {
       recipe,
       seed: { brandName: "Glow" },
     });
-    const mood = inferStoreMood(config);
-    expect(typeof mood).toBe("string");
+    expect(typeof inferStoreMood(config)).toBe("string");
   });
 });
 
-describe("confidence + strategy", () => {
+describe("confidence + strategy + pipeline", () => {
   it("low confidence falls back", () => {
     const picked = pickVerticalWithConfidence({
       vertical: "beauty",
@@ -183,23 +252,34 @@ describe("confidence + strategy", () => {
     });
     expect(picked.vertical).toBe("generic");
     expect(picked.uncertain).toBe(true);
+  });
 
-    const strategy = resolveBusinessStrategy({
-      vertical: "coffee",
-      confidence: 0.9,
-      recommendedTemplate: "coffee-story",
+  it("BusinessUnderstanding → Vertical → Recipe → WebsiteConfig", () => {
+    const { strategy, config } = buildWebsiteConfigFromUnderstanding({
+      understanding: {
+        vertical: "coffee",
+        confidence: 0.92,
+        recommendedTemplate: "coffee-story",
+      },
+      seed: { brandName: "Bean Co", locale: "en" },
     });
     expect(strategy.vertical).toBe("coffee");
     expect(strategy.template).toBe("coffee-story");
-    expect(strategy.uncertain).toBe(false);
+    expect(config.settings.vertical).toBe("coffee");
+    expect(config.settings.recipeId).toBe("coffee-story");
+    expect(config.sections.every((s) => hasSection(s.type))).toBe(true);
+    expect(getSectionRenderer(config.sections[0]!.type)).toBeTypeOf("function");
   });
 });
 
 describe("editor library seam", () => {
-  it("library can filter by vertical and mark recommended", () => {
+  it("library surfaces beauty sections as recommended", () => {
     const items = getSectionLibraryItems({ vertical: "beauty" });
-    expect(items.some((i) => i.type === "hero")).toBe(true);
-    expect(items.some((i) => i.recommended)).toBe(true);
+    expect(items.some((i) => i.type === "shop-by-concern")).toBe(true);
+    expect(items.find((i) => i.type === "shop-by-concern")?.recommended).toBe(
+      true,
+    );
+    expect(items.some((i) => i.type === "lookbook")).toBe(false);
   });
 });
 

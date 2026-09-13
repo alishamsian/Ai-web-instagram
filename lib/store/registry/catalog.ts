@@ -6,6 +6,7 @@ import type {
 } from "@/lib/store/registry/types";
 import type { StoreSectionRenderer } from "@/lib/store/registry/render-contract";
 import { CORE_SECTION_DEFINITIONS } from "@/lib/store/registry/definitions";
+import { VERTICAL_SECTION_DEFINITIONS } from "@/lib/store/registry/vertical-definitions";
 import { validateSectionDefinition } from "@/lib/store/registry/element-schema";
 
 const registry = new Map<string, SectionDefinition>();
@@ -26,6 +27,7 @@ function seed(defs: SectionDefinition[]) {
 }
 
 seed(CORE_SECTION_DEFINITIONS);
+seed(VERTICAL_SECTION_DEFINITIONS);
 
 /** Register or override section definitions (vertical packs later). */
 export function registerSections(defs: SectionDefinition[]) {
@@ -105,8 +107,13 @@ export function getSectionSchema(type: RegistrySectionType) {
   return getSectionDefinition(type)?.schema;
 }
 
+export const ALL_SECTION_DEFINITIONS = [
+  ...CORE_SECTION_DEFINITIONS,
+  ...VERTICAL_SECTION_DEFINITIONS,
+];
+
 export function resetRegistryForTests(
-  defs: SectionDefinition[] = CORE_SECTION_DEFINITIONS,
+  defs: SectionDefinition[] = ALL_SECTION_DEFINITIONS,
 ) {
   registry.clear();
   renderers.clear();

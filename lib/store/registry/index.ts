@@ -13,7 +13,9 @@ export {
   getSectionRenderer,
   hasSectionRenderer,
   resetRegistryForTests,
+  ALL_SECTION_DEFINITIONS,
 } from "@/lib/store/registry/catalog";
+export { VERTICAL_SECTION_DEFINITIONS } from "@/lib/store/registry/vertical-definitions";
 export { SECTION_CATEGORIES } from "@/lib/store/registry/categories";
 export { getSectionLibraryItems } from "@/lib/store/registry/library-adapter";
 export { normalizeStoreSections } from "@/lib/store/registry/normalize";

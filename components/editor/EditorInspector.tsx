@@ -510,10 +510,12 @@ function SectionInspector({
 
   const schema = getSectionSchema(sectionType);
   const schemaDriven = Boolean(
-    schema &&
-      (sectionType === "hero" ||
-        sectionType === "products" ||
-        sectionType === "gallery"),
+    schema && Object.keys(schema).some((key) => {
+      const block = schema[key as keyof typeof schema];
+      if (!block) return false;
+      if (Array.isArray(block)) return block.length > 0;
+      return Object.keys(block).length > 0;
+    }),
   );
 
   const schemaGroups: ElementSchemaGroup[] =

@@ -16,7 +16,6 @@ export const beautyPack: VerticalPack = {
   ],
   sectionTypes: [
     ...CORE_ECOMMERCE_SECTIONS,
-    // Planned (not registered until renderers exist)
     "shop-by-concern",
     "shop-by-skin-type",
     "routine",
@@ -25,13 +24,13 @@ export const beautyPack: VerticalPack = {
   ],
   recommendedSections: [
     "hero",
-    "categories",
+    "shop-by-concern",
+    "routine",
+    "ingredient-story",
     "bestsellers",
     "featured-products",
-    "product-spotlight",
+    "product-finder",
     "gallery",
-    "about",
-    "faq",
   ],
   templates: ["beauty-editorial", "beauty-commerce"],
   productAttributes: [

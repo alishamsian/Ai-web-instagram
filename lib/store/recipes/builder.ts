@@ -2,15 +2,45 @@ import type { TemplateRecipe } from "@/lib/store/recipes/types";
 import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
 import { hasSection } from "@/lib/store/registry/catalog";
 import { templates } from "@/lib/website/templates";
+import { getRecipe } from "@/lib/store/recipes/registry";
+import { resolveVerticalId } from "@/lib/store/verticals/resolve";
 
 export type BuildRecipeInput = {
-  recipe: TemplateRecipe;
+  recipe?: TemplateRecipe;
+  /** Lookup by id when recipe object not provided */
+  recipeId?: string | null;
   /** Optional seed — never mutated */
   seed?: Partial<WebsiteConfig> & {
     brandName?: string;
     locale?: "fa" | "en";
   };
 };
+
+const FALLBACK_RECIPE_ID = "generic-store";
+
+export function resolveRecipe(
+  recipeOrId?: TemplateRecipe | string | null,
+): TemplateRecipe {
+  if (recipeOrId && typeof recipeOrId === "object") {
+    return recipeOrId;
+  }
+  const id = typeof recipeOrId === "string" ? recipeOrId : null;
+  return (
+    getRecipe(id) ??
+    getRecipe(FALLBACK_RECIPE_ID) ?? {
+      id: FALLBACK_RECIPE_ID,
+      vertical: "generic",
+      label: { fa: "عمومی", en: "Generic" },
+      baseTemplate: "store",
+      sections: [
+        { type: "hero" },
+        { type: "products" },
+        { type: "about" },
+        { type: "footer" },
+      ],
+    }
+  );
+}
 
 function defaultConfig(locale: "fa" | "en", brandName: string): WebsiteConfig {
   const base = templates.store;
@@ -61,12 +91,14 @@ function defaultConfig(locale: "fa" | "en", brandName: string): WebsiteConfig {
  * - Deterministic section ids
  * - Does not mutate inputs
  * - Does not save to DB
- * - Skips unknown Registry types (planned vertical sections)
+ * - Skips section types missing from Registry
+ * - Unknown recipe → generic-store
+ * - Unknown vertical → generic
  */
 export function buildWebsiteConfigFromRecipe(
   input: BuildRecipeInput,
 ): WebsiteConfig {
-  const { recipe } = input;
+  const recipe = resolveRecipe(input.recipe ?? input.recipeId);
   const seed = input.seed ? structuredClone(input.seed) : undefined;
   const locale = seed?.locale ?? seed?.settings?.language ?? "en";
   const brandName =
@@ -75,9 +107,15 @@ export function buildWebsiteConfigFromRecipe(
   const base = defaultConfig(locale, brandName);
   const baseTemplate = recipe.baseTemplate ?? "store";
   const legacy = templates[baseTemplate] ?? templates.store;
+  const vertical = resolveVerticalId(recipe.vertical);
 
+  const skipped: string[] = [];
   const sections = recipe.sections
-    .filter((item) => hasSection(item.type))
+    .filter((item) => {
+      const ok = hasSection(item.type);
+      if (!ok) skipped.push(String(item.type));
+      return ok;
+    })
     .map((item, index) => {
       const type = item.type as WebsiteSectionType;
       const id =
@@ -91,6 +129,30 @@ export function buildWebsiteConfigFromRecipe(
         ...(item.settings ? { settings: { ...item.settings } } : {}),
       };
     });
+
+  // Safe composition fallback if recipe had only unknown types
+  const safeSections =
+    sections.length > 0
+      ? sections
+      : [
+          {
+            id: `${recipe.id}__00__hero`,
+            type: "hero" as WebsiteSectionType,
+            visible: true,
+          },
+          {
+            id: `${recipe.id}__01__products`,
+            type: "products" as WebsiteSectionType,
+            visible: true,
+          },
+          {
+            id: `${recipe.id}__02__footer`,
+            type: "footer" as WebsiteSectionType,
+            visible: true,
+          },
+        ];
+
+  void skipped;
 
   const config: WebsiteConfig = {
     ...base,
@@ -133,14 +195,14 @@ export function buildWebsiteConfigFromRecipe(
           },
         }),
     template: baseTemplate,
-    sections,
+    sections: safeSections,
     settings: {
       ...base.settings,
       ...seed?.settings,
       language: locale,
       direction:
         seed?.settings?.direction ?? (locale === "fa" ? "rtl" : "ltr"),
-      vertical: recipe.vertical,
+      vertical,
       recipeId: recipe.id,
       published: false,
     },

@@ -13,6 +13,7 @@ export {
 } from "@/lib/store/recipes/registry";
 export {
   buildWebsiteConfigFromRecipe,
+  resolveRecipe,
   type BuildRecipeInput,
 } from "@/lib/store/recipes/builder";
 export { templateDefinitionToRecipe } from "@/lib/store/recipes/compat";

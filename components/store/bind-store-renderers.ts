@@ -4,7 +4,7 @@
  * Binds Store section adapters to the Registry.
  * This is the source of truth for type → renderer (not a central RENDERERS map).
  */
-import { registerSectionRenderers } from "@/lib/store/registry/catalog";
+import { registerSectionRenderers, hasSectionRenderer } from "@/lib/store/registry/catalog";
 import {
   renderAboutSection,
   renderBestsellersSection,
@@ -20,11 +20,41 @@ import {
   renderPromoSection,
   renderUnsupportedStoreSection,
 } from "@/components/store/section-adapters";
+import {
+  renderBrewGuideSection,
+  renderCoffeeFinderSection,
+  renderCollectionStorySection,
+  renderDesignerSpotlightSection,
+  renderDimensionsSection,
+  renderFitGuideSection,
+  renderFlavorProfileSection,
+  renderIngredientStorySection,
+  renderJewelryCareSection,
+  renderLookbookSection,
+  renderMaterialsSection,
+  renderOriginExplorerSection,
+  renderProductFinderSection,
+  renderProjectsSection,
+  renderRoasterStorySection,
+  renderRoomInspirationSection,
+  renderRoutineSection,
+  renderShopByConcernSection,
+  renderShopByDesignerSection,
+  renderShopByMaterialSection,
+  renderShopByOccasionSection,
+  renderShopByRoomSection,
+  renderShopBySkinTypeSection,
+  renderShopTheLookSection,
+  renderStackBuilderSection,
+  renderStyleGuideSection,
+  renderSubscriptionSection,
+} from "@/components/store/vertical-section-adapters";
 
 let bound = false;
 
 export function ensureStoreSectionRenderersBound() {
-  if (bound) return;
+  // Re-bind when registry renderers were cleared (tests) or first load.
+  if (bound && hasSectionRenderer("hero")) return;
   bound = true;
   registerSectionRenderers({
     hero: renderHeroSection,
@@ -46,6 +76,43 @@ export function ensureStoreSectionRenderersBound() {
     services: renderUnsupportedStoreSection,
     location: renderUnsupportedStoreSection,
     social: renderUnsupportedStoreSection,
+
+    // Beauty
+    "shop-by-concern": renderShopByConcernSection,
+    "shop-by-skin-type": renderShopBySkinTypeSection,
+    routine: renderRoutineSection,
+    "ingredient-story": renderIngredientStorySection,
+    "product-finder": renderProductFinderSection,
+
+    // Fashion
+    lookbook: renderLookbookSection,
+    "shop-the-look": renderShopTheLookSection,
+    "collection-story": renderCollectionStorySection,
+    "style-guide": renderStyleGuideSection,
+    "designer-spotlight": renderDesignerSpotlightSection,
+    "fit-guide": renderFitGuideSection,
+
+    // Jewelry
+    "shop-by-material": renderShopByMaterialSection,
+    "shop-by-occasion": renderShopByOccasionSection,
+    "stack-builder": renderStackBuilderSection,
+    "jewelry-care": renderJewelryCareSection,
+
+    // Coffee
+    "origin-explorer": renderOriginExplorerSection,
+    "flavor-profile": renderFlavorProfileSection,
+    "brew-guide": renderBrewGuideSection,
+    "roaster-story": renderRoasterStorySection,
+    subscription: renderSubscriptionSection,
+    "coffee-finder": renderCoffeeFinderSection,
+
+    // Furniture
+    "shop-by-room": renderShopByRoomSection,
+    "shop-by-designer": renderShopByDesignerSection,
+    materials: renderMaterialsSection,
+    dimensions: renderDimensionsSection,
+    projects: renderProjectsSection,
+    "room-inspiration": renderRoomInspirationSection,
   });
 }
 

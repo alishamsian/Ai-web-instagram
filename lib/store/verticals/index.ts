@@ -42,3 +42,19 @@ export {
 export { CORE_ECOMMERCE_SECTIONS } from "@/lib/store/verticals/core-sections";
 
 export { CORE_VERTICAL_PACKS } from "@/lib/store/verticals/packs";
+
+export {
+  getProductAttributeMap,
+  getProductAttributeValue,
+  filterProductsByAttribute,
+  filterProductsByFilters,
+  collectAttributeOptions,
+  resolveVerticalFilters,
+} from "@/lib/store/verticals/filters";
+
+export {
+  buildWebsiteConfigFromUnderstanding,
+  resolveVertical,
+  resolveRecipeForUnderstanding,
+  type BusinessUnderstanding,
+} from "@/lib/store/verticals/pipeline";
