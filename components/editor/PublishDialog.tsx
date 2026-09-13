@@ -1,29 +1,37 @@
 "use client";
 
 import type { Dictionary } from "@/lib/i18n/dictionary";
+import type { Locale } from "@/lib/config/env";
+import type { PublishPreflightResult } from "@/lib/editor/validation";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
 export function PublishDialog({
   open,
   dict,
+  locale,
   isPublished,
   changes,
   publishing,
   error,
+  preflight,
   onClose,
   onConfirm,
 }: {
   open: boolean;
   dict: Dictionary;
+  locale: Locale;
   isPublished: boolean;
   changes: string[];
   publishing: boolean;
   error?: string | null;
+  preflight?: PublishPreflightResult | null;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   if (!open) return null;
+  const isFa = locale === "fa";
+  const blocked = Boolean(preflight && !preflight.ok && !isPublished);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-6">
@@ -55,6 +63,29 @@ export function PublishDialog({
             <X size={16} />
           </button>
         </div>
+
+        {!isPublished && preflight ? (
+          <div className="space-y-2 border-b border-white/[0.06] px-5 py-4">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#77777F]">
+              {isFa ? "پیش‌پرواز انتشار" : "Publish preflight"}
+            </p>
+            {preflight.errors.map((issue) => (
+              <p key={issue.id} className="text-[12px] text-red-300">
+                {issue.message[locale]}
+              </p>
+            ))}
+            {preflight.warnings.map((issue) => (
+              <p key={issue.id} className="text-[12px] text-amber-300">
+                {issue.message[locale]}
+              </p>
+            ))}
+            {preflight.errors.length === 0 && preflight.warnings.length === 0 ? (
+              <p className="text-[12px] text-emerald-300">
+                {isFa ? "آماده انتشار" : "Ready to publish"}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {!isPublished && changes.length > 0 ? (
           <ul className="space-y-1.5 border-b border-white/[0.06] px-5 py-4">
@@ -89,7 +120,7 @@ export function PublishDialog({
           <Button
             type="button"
             size="sm"
-            disabled={publishing}
+            disabled={publishing || blocked}
             onClick={onConfirm}
             className="bg-[#FF6B57] text-white hover:bg-[#ff7d6c]"
           >

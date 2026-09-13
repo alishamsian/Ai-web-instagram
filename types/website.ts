@@ -155,6 +155,8 @@ export interface WebsiteSettings {
   vertical?: string | null;
   /** Template recipe id when composed from Vertical Engine. */
   recipeId?: string | null;
+  /** Visual mood id from Design System themes (optional). */
+  mood?: string | null;
 }
 
 export interface WebsiteConfig {

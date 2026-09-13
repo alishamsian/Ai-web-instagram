@@ -7,22 +7,21 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
-
-type Device = "desktop" | "tablet" | "mobile";
-
-const DEVICE_WIDTH: Record<Device, number> = {
-  mobile: 390,
-  tablet: 768,
-  desktop: 1180,
-};
+import {
+  EDITOR_VIEWPORT_PRESETS,
+  viewportWidth,
+  type EditorViewportId,
+} from "@/lib/editor";
 
 export function EditorCanvasFrame({
-  device,
+  viewport,
+  customWidth = 1280,
   brandName,
   children,
   className,
 }: {
-  device: Device;
+  viewport: EditorViewportId;
+  customWidth?: number;
   brandName: string;
   children: ReactNode;
   className?: string;
@@ -40,13 +39,16 @@ export function EditorCanvasFrame({
     return () => observer.disconnect();
   }, []);
 
-  const targetWidth = DEVICE_WIDTH[device];
+  const targetWidth = viewportWidth(viewport, customWidth);
   const pad = 24;
   const available = Math.max(0, hostWidth - pad * 2);
-  const scale =
-    available > 0 ? Math.min(1, available / targetWidth) : 1;
-  const frameHeight =
-    device === "mobile" ? 720 : device === "tablet" ? 900 : 780;
+  const scale = available > 0 ? Math.min(1, available / targetWidth) : 1;
+  const isMobile = targetWidth <= 480;
+  const isTablet = targetWidth > 480 && targetWidth < 1100;
+  const frameHeight = isMobile ? 720 : isTablet ? 900 : 780;
+  const presetLabel =
+    EDITOR_VIEWPORT_PRESETS.find((p) => p.id === viewport)?.label.en ??
+    `${targetWidth}px`;
 
   return (
     <div
@@ -67,7 +69,7 @@ export function EditorCanvasFrame({
         <div
           className={cn(
             "absolute start-0 top-0 origin-top-left overflow-hidden bg-white",
-            device === "mobile"
+            isMobile
               ? "rounded-[1.75rem] border border-white/12 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-black/20"
               : "rounded-xl border border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.4)]",
           )}
@@ -77,7 +79,7 @@ export function EditorCanvasFrame({
             transform: `scale(${scale})`,
           }}
         >
-          {device === "mobile" ? (
+          {isMobile ? (
             <div className="flex h-7 items-center justify-center border-b border-black/5 bg-[#F7F7F5]">
               <span className="h-1.5 w-16 rounded-full bg-black/15" />
             </div>
@@ -89,7 +91,7 @@ export function EditorCanvasFrame({
               <span className="ms-3 truncate text-[10px] text-black/40">
                 {brandName}
                 <span className="ms-2 tabular-nums text-black/25">
-                  {targetWidth}px
+                  {presetLabel} · {targetWidth}px
                 </span>
               </span>
             </div>
@@ -98,8 +100,7 @@ export function EditorCanvasFrame({
           <div
             className="vitrin-editor-canvas overflow-y-auto overflow-x-hidden text-ink"
             style={{
-              height:
-                device === "mobile" ? frameHeight - 28 : frameHeight - 36,
+              height: isMobile ? frameHeight - 28 : frameHeight - 36,
               WebkitOverflowScrolling: "touch",
             }}
           >

@@ -10,7 +10,6 @@ import { getDictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import { cn } from "@/lib/utils";
 import {
-  addOrShowSection,
   cloneConfig,
   configsEqual,
   sectionLabel,
@@ -35,9 +34,36 @@ import {
   EditorViewportBar,
 } from "@/components/editor/EditorMobileChrome";
 import { EditorCanvasFrame } from "@/components/editor/EditorCanvasFrame";
+import { EditorCommandPalette, type EditorCommandItem } from "@/components/editor/EditorCommandPalette";
+import { HistoryPanel } from "@/components/editor/HistoryPanel";
+import { QualityPanel } from "@/components/editor/QualityPanel";
+import {
+  createHistoryEntry,
+  pushHistory,
+  undoHistory,
+  redoHistory,
+  restoreHistoryIndex,
+  resolveEditorKeyCommand,
+  deviceFromViewport,
+  viewportFromDevice,
+  runPublishPreflight,
+  scoreWebsiteQuality,
+  commandAddSection,
+  commandToggleSection,
+  commandDeleteSection,
+  commandDuplicateSection,
+  commandMoveSection,
+  applyEditorAction,
+  proposeEditorActions,
+  type HistoryEntry,
+  type EditorViewportId,
+  EDITOR_HISTORY_LIMIT,
+} from "@/lib/editor";
 import {
   ArrowLeft,
   ExternalLink,
+  Gauge,
+  History,
   Monitor,
   Redo2,
   Smartphone,
@@ -45,10 +71,8 @@ import {
   Undo2,
 } from "lucide-react";
 
-const HISTORY_LIMIT = 40;
 const AUTOSAVE_MS = 900;
 
-type Device = "desktop" | "tablet" | "mobile";
 type PhonePane = "canvas" | "sections" | "inspector";
 
 export function EditorShell({
@@ -70,17 +94,24 @@ export function EditorShell({
   const [savedConfig, setSavedConfig] = useState<WebsiteConfig>(() =>
     polishWebsiteConfig(cloneConfig(website.config)),
   );
-  const [history, setHistory] = useState<WebsiteConfig[]>(() => [
-    polishWebsiteConfig(cloneConfig(website.config)),
+  const [history, setHistory] = useState<HistoryEntry[]>(() => [
+    createHistoryEntry(
+      polishWebsiteConfig(cloneConfig(website.config)),
+      "Initial",
+    ),
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [device, setDevice] = useState<Device>("desktop");
+  const [viewport, setViewport] = useState<EditorViewportId>("1280");
+  const device = deviceFromViewport(viewport);
   const [leftNav, setLeftNav] = useState<LeftNavTab>("sections");
   const [activePage, setActivePage] = useState("home");
   const [phonePane, setPhonePane] = useState<PhonePane>("canvas");
   const [tabletInspectorOpen, setTabletInspectorOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [qualityOpen, setQualityOpen] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [savePhase, setSavePhase] = useState<"idle" | "saving" | "error">("idle");
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -92,6 +123,7 @@ export function EditorShell({
   const [flash, setFlash] = useState<string | null>(null);
   const [canvasProduct, setCanvasProduct] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [pendingLabel, setPendingLabel] = useState("Edit");
 
   const skipHistory = useRef(false);
   const debounceRef = useRef<number | null>(null);
@@ -117,7 +149,7 @@ export function EditorShell({
   useEffect(() => {
     const phone = window.matchMedia("(max-width: 767px)");
     const apply = () => {
-      if (phone.matches) setDevice("mobile");
+      if (phone.matches) setViewport("390");
     };
     apply();
     phone.addEventListener("change", apply);
@@ -134,41 +166,48 @@ export function EditorShell({
     window.setTimeout(() => setFlash(null), 1800);
   }
 
-  function commitHistory(snapshot: WebsiteConfig) {
+  function commitHistory(snapshot: WebsiteConfig, label = pendingLabel) {
     if (debounceRef.current) {
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    const base = historyRef.current.slice(0, historyIndexRef.current + 1);
-    const last = base[base.length - 1];
-    if (last && configsEqual(last, snapshot)) return;
-    const merged = [...base, cloneConfig(snapshot)].slice(-HISTORY_LIMIT);
-    historyRef.current = merged;
-    historyIndexRef.current = merged.length - 1;
-    setHistory(merged);
-    setHistoryIndex(merged.length - 1);
+    const pushed = pushHistory({
+      entries: historyRef.current,
+      index: historyIndexRef.current,
+      next: snapshot,
+      label,
+      limit: EDITOR_HISTORY_LIMIT,
+    });
+    historyRef.current = pushed.entries;
+    historyIndexRef.current = pushed.index;
+    setHistory(pushed.entries);
+    setHistoryIndex(pushed.index);
   }
 
-  function applyConfig(next: WebsiteConfig) {
+  function applyConfig(next: WebsiteConfig, label = "Edit") {
     setConfig(next);
+    setPendingLabel(label);
     if (skipHistory.current) {
       skipHistory.current = false;
       return;
     }
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => {
-      commitHistory(next);
+      commitHistory(next, label);
     }, 320);
   }
 
   function undo() {
-    if (debounceRef.current) commitHistory(config);
-    if (historyIndexRef.current <= 0) return;
-    const nextIndex = historyIndexRef.current - 1;
+    if (debounceRef.current) commitHistory(config, pendingLabel);
+    const result = undoHistory({
+      entries: historyRef.current,
+      index: historyIndexRef.current,
+    });
+    if (!result.config) return;
     skipHistory.current = true;
-    historyIndexRef.current = nextIndex;
-    setHistoryIndex(nextIndex);
-    setConfig(cloneConfig(historyRef.current[nextIndex]!));
+    historyIndexRef.current = result.index;
+    setHistoryIndex(result.index);
+    setConfig(result.config);
   }
 
   function redo() {
@@ -176,12 +215,25 @@ export function EditorShell({
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    if (historyIndexRef.current >= historyRef.current.length - 1) return;
-    const nextIndex = historyIndexRef.current + 1;
+    const result = redoHistory({
+      entries: historyRef.current,
+      index: historyIndexRef.current,
+    });
+    if (!result.config) return;
     skipHistory.current = true;
-    historyIndexRef.current = nextIndex;
-    setHistoryIndex(nextIndex);
-    setConfig(cloneConfig(historyRef.current[nextIndex]!));
+    historyIndexRef.current = result.index;
+    setHistoryIndex(result.index);
+    setConfig(result.config);
+  }
+
+  function restoreHistory(index: number) {
+    const result = restoreHistoryIndex({ entries: history, index });
+    if (!result.config) return;
+    skipHistory.current = true;
+    historyIndexRef.current = result.index;
+    setHistoryIndex(result.index);
+    setConfig(result.config);
+    setHistoryOpen(false);
   }
 
   const save = useCallback(async (snapshot?: WebsiteConfig) => {
@@ -245,97 +297,73 @@ export function EditorShell({
   }, [dirty]);
 
   function handleSectionAction(sectionId: string, action: SectionAction) {
-    const index = config.sections.findIndex((s) => s.id === sectionId);
-    const section = config.sections[index];
-    if (!section) return;
-
+    let result = null;
     if (action === "toggle") {
-      applyConfig({
-        ...config,
-        sections: config.sections.map((s) =>
-          s.id === sectionId ? { ...s, visible: !s.visible } : s,
-        ),
-      });
-      return;
+      result = commandToggleSection(config, sectionId);
+    } else if (action === "delete") {
+      result = commandDeleteSection(config, sectionId);
+    } else if (action === "duplicate") {
+      result = commandDuplicateSection(config, sectionId);
+    } else if (action === "move-up") {
+      result = commandMoveSection(config, sectionId, "up");
+    } else if (action === "move-down") {
+      result = commandMoveSection(config, sectionId, "down");
     }
-
-    if (action === "delete") {
-      applyConfig({
-        ...config,
-        sections: config.sections.filter((s) => s.id !== sectionId),
-      });
-      setSelectedSectionId(undefined);
-      return;
-    }
-
-    if (action === "duplicate") {
-      const copy = {
-        ...section,
-        id: `${section.type}-${Date.now().toString(36)}`,
-      };
-      const sections = [...config.sections];
-      sections.splice(index + 1, 0, copy);
-      applyConfig({ ...config, sections });
-      setSelectedSectionId(copy.id);
-      return;
-    }
-
-    if (action === "move-up" && index > 0) {
-      const sections = [...config.sections];
-      const [item] = sections.splice(index, 1);
-      sections.splice(index - 1, 0, item!);
-      applyConfig({ ...config, sections });
-      return;
-    }
-
-    if (action === "move-down" && index < config.sections.length - 1) {
-      const sections = [...config.sections];
-      const [item] = sections.splice(index, 1);
-      sections.splice(index + 1, 0, item!);
-      applyConfig({ ...config, sections });
+    if (!result) return;
+    applyConfig(result.config, result.label);
+    if (result.selectedSectionId !== undefined) {
+      setSelectedSectionId(result.selectedSectionId ?? undefined);
     }
   }
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      const meta = event.metaKey || event.ctrlKey;
       const target = event.target as HTMLElement | null;
       const typing =
         target?.isContentEditable ||
         target?.tagName === "INPUT" ||
         target?.tagName === "TEXTAREA";
 
-      if (event.key === "Escape") {
+      const command = resolveEditorKeyCommand(event, {
+        typing: Boolean(typing),
+        hasSelection: Boolean(selectedSectionId),
+      });
+      if (!command) return;
+
+      if (command === "escape") {
         setSelectedSectionId(undefined);
         setSelectedField(undefined);
         setLibraryOpen(false);
         setPublishOpen(false);
+        setCommandOpen(false);
+        setHistoryOpen(false);
+        setQualityOpen(false);
         setPhonePane("canvas");
         setTabletInspectorOpen(false);
         return;
       }
 
-      if (
-        !typing &&
-        (event.key === "Delete" || event.key === "Backspace") &&
-        selectedSectionId
-      ) {
+      if (command === "deleteSection" && selectedSectionId) {
         event.preventDefault();
         handleSectionAction(selectedSectionId, "delete");
         return;
       }
 
-      if (!meta) return;
-      if (event.key === "z" && !event.shiftKey) {
+      if (command === "commandPalette") {
+        event.preventDefault();
+        setCommandOpen(true);
+        return;
+      }
+      if (command === "undo") {
         event.preventDefault();
         undo();
-      } else if (event.key === "z" && event.shiftKey) {
+      } else if (command === "redo") {
         event.preventDefault();
         redo();
-      } else if (event.key === "s") {
+      } else if (command === "save") {
         event.preventDefault();
         void save();
-      } else if (event.key.toLowerCase() === "p") {
+      } else if (command === "preview") {
         event.preventDefault();
         window.open(`/${locale}/preview/${website.id}`, "_blank");
       }
@@ -493,17 +521,224 @@ export function EditorShell({
 
   function handleRestored(next: WebsiteConfig) {
     const cloned = cloneConfig(next);
+    const entry = createHistoryEntry(cloned, "Restored version");
     setConfig(cloned);
     setSavedConfig(cloneConfig(next));
     savedConfigRef.current = cloneConfig(next);
-    historyRef.current = [cloned];
+    historyRef.current = [entry];
     historyIndexRef.current = 0;
-    setHistory([cloned]);
+    setHistory([entry]);
     setHistoryIndex(0);
     setSavedAt(Date.now());
     flashMessage(dict.editor.restored);
     router.refresh();
   }
+
+  const commandItems = useMemo<EditorCommandItem[]>(() => {
+    const isFa = locale === "fa";
+    const sectionId = selectedSectionId;
+    const items: EditorCommandItem[] = [
+      {
+        id: "undo",
+        label: isFa ? "بازگردانی" : "Undo",
+        hint: "⌘Z",
+        group: isFa ? "ویرایش" : "Edit",
+        run: () => {
+          window.dispatchEvent(new CustomEvent("vitrin-editor-undo"));
+        },
+      },
+      {
+        id: "redo",
+        label: isFa ? "جلو" : "Redo",
+        hint: "⌘⇧Z",
+        group: isFa ? "ویرایش" : "Edit",
+        run: () => {
+          window.dispatchEvent(new CustomEvent("vitrin-editor-redo"));
+        },
+      },
+      {
+        id: "save",
+        label: isFa ? "ذخیره" : "Save",
+        hint: "⌘S",
+        group: isFa ? "ویرایش" : "Edit",
+        run: () => {
+          window.dispatchEvent(new CustomEvent("vitrin-editor-save"));
+        },
+      },
+      {
+        id: "preview",
+        label: isFa ? "پیش‌نمایش" : "Preview",
+        hint: "⌘P",
+        group: isFa ? "نمایش" : "View",
+        run: () => window.open(`/${locale}/preview/${website.id}`, "_blank"),
+      },
+      {
+        id: "add-section",
+        label: dict.editor.addSection,
+        group: isFa ? "سکشن" : "Sections",
+        run: () => setLibraryOpen(true),
+      },
+      {
+        id: "history",
+        label: isFa ? "تاریخچه" : "History",
+        group: isFa ? "ویرایش" : "Edit",
+        run: () => setHistoryOpen(true),
+      },
+      {
+        id: "quality",
+        label: isFa ? "کیفیت وب‌سایت" : "Website quality",
+        group: isFa ? "بازرسی" : "Audit",
+        run: () => setQualityOpen(true),
+      },
+      {
+        id: "viewport-mobile",
+        label: isFa ? "ویوپورت موبایل" : "Mobile viewport",
+        group: isFa ? "نمایش" : "View",
+        run: () => setViewport("390"),
+      },
+      {
+        id: "viewport-desktop",
+        label: isFa ? "ویوپورت دسکتاپ" : "Desktop viewport",
+        group: isFa ? "نمایش" : "View",
+        run: () => setViewport("1280"),
+      },
+      {
+        id: "publish",
+        label: isPublished ? dict.editor.unpublish : dict.editor.publish,
+        group: isFa ? "انتشار" : "Publish",
+        run: () => {
+          setPublishError(null);
+          setPublishOpen(true);
+        },
+      },
+      {
+        id: "magic-editorial",
+        label: isFa ? "بازتایپ ادیتوریال" : "Restyle editorial",
+        group: isFa ? "هوش مصنوعی" : "AI",
+        run: () => {
+          window.dispatchEvent(
+            new CustomEvent("vitrin-editor-ai-restyle", {
+              detail: { direction: "editorial" },
+            }),
+          );
+        },
+      },
+    ];
+
+    if (sectionId) {
+      items.push(
+        {
+          id: "dup-section",
+          label: isFa ? "تکثیر سکشن" : "Duplicate section",
+          group: isFa ? "سکشن" : "Sections",
+          run: () => {
+            window.dispatchEvent(
+              new CustomEvent("vitrin-editor-section", {
+                detail: { id: sectionId, action: "duplicate" },
+              }),
+            );
+          },
+        },
+        {
+          id: "hide-section",
+          label: isFa ? "نمایش/مخفی سکشن" : "Toggle section visibility",
+          group: isFa ? "سکشن" : "Sections",
+          run: () => {
+            window.dispatchEvent(
+              new CustomEvent("vitrin-editor-section", {
+                detail: { id: sectionId, action: "toggle" },
+              }),
+            );
+          },
+        },
+        {
+          id: "delete-section",
+          label: isFa ? "حذف سکشن" : "Delete section",
+          group: isFa ? "سکشن" : "Sections",
+          run: () => {
+            window.dispatchEvent(
+              new CustomEvent("vitrin-editor-section", {
+                detail: { id: sectionId, action: "delete" },
+              }),
+            );
+          },
+        },
+      );
+    }
+
+    return items;
+  }, [
+    dict.editor.addSection,
+    dict.editor.publish,
+    dict.editor.unpublish,
+    isPublished,
+    locale,
+    selectedSectionId,
+    website.id,
+  ]);
+
+  useEffect(() => {
+    function onUndo() {
+      undo();
+    }
+    function onRedo() {
+      redo();
+    }
+    function onSave() {
+      void save();
+    }
+    function onSection(event: Event) {
+      const detail = (event as CustomEvent<{ id: string; action: SectionAction }>)
+        .detail;
+      if (!detail?.id || !detail.action) return;
+      const current = configRef.current;
+      let result = null;
+      if (detail.action === "toggle") {
+        result = commandToggleSection(current, detail.id);
+      } else if (detail.action === "delete") {
+        result = commandDeleteSection(current, detail.id);
+      } else if (detail.action === "duplicate") {
+        result = commandDuplicateSection(current, detail.id);
+      } else if (detail.action === "move-up") {
+        result = commandMoveSection(current, detail.id, "up");
+      } else if (detail.action === "move-down") {
+        result = commandMoveSection(current, detail.id, "down");
+      }
+      if (!result) return;
+      applyConfig(result.config, result.label);
+      if (result.selectedSectionId !== undefined) {
+        setSelectedSectionId(result.selectedSectionId ?? undefined);
+      }
+    }
+    function onAiRestyle(event: Event) {
+      const direction =
+        (event as CustomEvent<{ direction?: "editorial" }>).detail?.direction ??
+        "editorial";
+      const actions = proposeEditorActions(configRef.current, {
+        intent: "restyle",
+        direction,
+      });
+      let next = configRef.current;
+      for (const action of actions) {
+        const applied = applyEditorAction(next, action);
+        if (applied.ok) next = applied.result.config;
+      }
+      applyConfig(next, `AI restyle ${direction}`);
+    }
+    window.addEventListener("vitrin-editor-undo", onUndo);
+    window.addEventListener("vitrin-editor-redo", onRedo);
+    window.addEventListener("vitrin-editor-save", onSave);
+    window.addEventListener("vitrin-editor-section", onSection);
+    window.addEventListener("vitrin-editor-ai-restyle", onAiRestyle);
+    return () => {
+      window.removeEventListener("vitrin-editor-undo", onUndo);
+      window.removeEventListener("vitrin-editor-redo", onRedo);
+      window.removeEventListener("vitrin-editor-save", onSave);
+      window.removeEventListener("vitrin-editor-section", onSection);
+      window.removeEventListener("vitrin-editor-ai-restyle", onAiRestyle);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canvas = (
     <EditorEditProvider
@@ -671,19 +906,19 @@ export function EditorShell({
         <div className="flex items-center gap-0.5 rounded-lg bg-white/[0.04] p-1">
           {(
             [
-              ["desktop", Monitor, dict.editor.desktop],
-              ["tablet", Tablet, dict.editor.tablet],
-              ["mobile", Smartphone, dict.editor.mobile],
+              ["1280", Monitor, dict.editor.desktop],
+              ["768", Tablet, dict.editor.tablet],
+              ["390", Smartphone, dict.editor.mobile],
             ] as const
           ).map(([id, Icon, label]) => (
             <button
               key={id}
               type="button"
               title={label}
-              onClick={() => setDevice(id)}
+              onClick={() => setViewport(id)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] transition",
-                device === id
+                viewport === id
                   ? "bg-white/[0.1] text-[#F7F7F8]"
                   : "text-[#77777F] hover:text-[#B5B5BC]",
               )}
@@ -698,6 +933,18 @@ export function EditorShell({
         </IconButton>
         <IconButton label={`${dict.editor.redo} ⌘⇧Z`} onClick={redo} disabled={!canRedo}>
           <Redo2 size={15} />
+        </IconButton>
+        <IconButton
+          label={locale === "fa" ? "تاریخچه" : "History"}
+          onClick={() => setHistoryOpen(true)}
+        >
+          <History size={15} />
+        </IconButton>
+        <IconButton
+          label={locale === "fa" ? "کیفیت" : "Quality"}
+          onClick={() => setQualityOpen(true)}
+        >
+          <Gauge size={15} />
         </IconButton>
         <p
           className={cn(
@@ -827,7 +1074,7 @@ export function EditorShell({
                 tablet: dict.editor.tablet,
                 mobile: dict.editor.mobile,
               }}
-              onChange={setDevice}
+              onChange={(next) => setViewport(viewportFromDevice(next))}
             />
           </div>
 
@@ -841,7 +1088,7 @@ export function EditorShell({
               }}
             />
             <div className="relative min-h-full">
-              <EditorCanvasFrame device={device} brandName={config.brand.name}>
+              <EditorCanvasFrame viewport={viewport} brandName={config.brand.name}>
                 {canvas}
               </EditorCanvasFrame>
             </div>
@@ -901,9 +1148,12 @@ export function EditorShell({
         existingTypes={new Set(config.sections.map((s) => s.type))}
         onClose={() => setLibraryOpen(false)}
         onAdd={(type) => {
-          const next = addOrShowSection(config, type);
-          applyConfig(next);
-          const added = next.sections.find((s) => s.type === type && s.visible);
+          const result = commandAddSection(config, type);
+          if (!result) return;
+          applyConfig(result.config, result.label);
+          const added = result.config.sections.find(
+            (s) => s.type === type && s.visible,
+          );
           if (added) {
             setSelectedSectionId(added.id);
             setPhonePane("inspector");
@@ -916,12 +1166,37 @@ export function EditorShell({
       <PublishDialog
         open={publishOpen}
         dict={dict}
+        locale={locale}
         isPublished={isPublished}
         changes={publishChanges}
         publishing={publishing}
         error={publishError}
+        preflight={runPublishPreflight(config)}
         onClose={() => setPublishOpen(false)}
         onConfirm={() => void confirmPublish()}
+      />
+
+      <EditorCommandPalette
+        open={commandOpen}
+        locale={locale}
+        onClose={() => setCommandOpen(false)}
+        commands={commandItems}
+      />
+
+      <HistoryPanel
+        open={historyOpen}
+        locale={locale}
+        entries={history}
+        index={historyIndex}
+        onClose={() => setHistoryOpen(false)}
+        onRestore={restoreHistory}
+      />
+
+      <QualityPanel
+        open={qualityOpen}
+        locale={locale}
+        score={scoreWebsiteQuality(config)}
+        onClose={() => setQualityOpen(false)}
       />
     </div>
   );

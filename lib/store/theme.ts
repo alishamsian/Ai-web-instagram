@@ -56,6 +56,18 @@ export type StoreCategory = {
  * Does NOT classify business vertical — keep Vertical separate upstream.
  */
 export function inferStoreMood(config: WebsiteConfig): StoreMood {
+  const explicit = config.settings.mood;
+  if (
+    explicit === "luxury" ||
+    explicit === "minimal" ||
+    explicit === "bold" ||
+    explicit === "natural" ||
+    explicit === "editorial" ||
+    explicit === "modern" ||
+    explicit === "dark"
+  ) {
+    return explicit;
+  }
   const tone = [
     ...(config.brand.tagline?.toLowerCase().split(/\s+/) ?? []),
     config.brand.name.toLowerCase(),

@@ -131,6 +131,11 @@ export function applyDesignPreset(
       colors: { ...preset.colors },
       typography: { ...preset.typography },
     },
+    settings: {
+      ...config.settings,
+      // Drive StoreRoot chrome (radius/section rhythm) via Design System mood
+      mood: presetId === "natural" ? "natural" : presetId,
+    },
   };
 }
 
