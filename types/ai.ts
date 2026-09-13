@@ -12,6 +12,20 @@ export interface Product {
   confidence: number;
   /** When true, product is hidden from the public storefront. */
   hidden?: boolean;
+  /**
+   * Vertical-specific attributes — does not pollute generic ecommerce fields.
+   * Schema comes from VerticalPack.productAttributes; values live here.
+   */
+  industryData?: ProductIndustryData;
+}
+
+/** Extensible industry payload keyed by vertical attribute definitions. */
+export interface ProductIndustryData {
+  vertical?: string;
+  attributes?: Record<
+    string,
+    string | number | boolean | string[] | null | undefined
+  >;
 }
 
 export interface Service {
@@ -38,6 +52,22 @@ export interface SEOConfig {
   keywords: string[];
 }
 
+/**
+ * Optional Vertical Engine profile attached by future AI classification.
+ * Absent today — consumers must treat as unknown, not invent values.
+ */
+export interface WebsiteBusinessProfile {
+  vertical?: string | null;
+  subVertical?: string | null;
+  style?: string | null;
+  confidence?: number | null;
+  recommendedTemplate?: string | null;
+  recommendedModules?: string[];
+  productAttributes?: string[];
+  fallbackVertical?: string | null;
+  mood?: string | null;
+}
+
 export interface WebsiteAIAnalysis {
   businessType: string;
   businessName: string;
@@ -58,6 +88,8 @@ export interface WebsiteAIAnalysis {
     subheadline: string;
   };
   aboutCopy: string;
+  /** Vertical Engine seam — optional until Instagram classification lands. */
+  businessProfile?: WebsiteBusinessProfile;
 }
 
 export interface AIAnalyzer {

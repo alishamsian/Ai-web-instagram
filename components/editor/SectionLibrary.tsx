@@ -15,6 +15,7 @@ export function SectionLibrary({
   locale,
   dict,
   existingTypes,
+  vertical,
   onClose,
   onAdd,
 }: {
@@ -22,12 +23,17 @@ export function SectionLibrary({
   locale: Locale;
   dict: Dictionary;
   existingTypes: Set<WebsiteSectionType>;
+  /** Optional Vertical Engine filter — recommended first. */
+  vertical?: string | null;
   onClose: () => void;
   onAdd: (type: WebsiteSectionType) => void;
 }) {
   const [category, setCategory] = useState<SectionCategory | "all">("all");
 
-  const library = useMemo(() => getSectionLibraryItems(), []);
+  const library = useMemo(
+    () => getSectionLibraryItems({ vertical }),
+    [vertical],
+  );
 
   const items = useMemo(
     () =>
@@ -96,9 +102,16 @@ export function SectionLibrary({
                 className="flex flex-col rounded-xl border border-white/[0.06] bg-[#111113] p-3.5 transition hover:border-white/12"
               >
                 <div className="mb-3 aspect-[16/9] rounded-lg bg-gradient-to-br from-white/[0.06] to-white/[0.02]" />
-                <p className="text-[13px] font-medium text-[#F7F7F8]">
-                  {item.label[locale]}
-                </p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[13px] font-medium text-[#F7F7F8]">
+                    {item.label[locale]}
+                  </p>
+                  {item.recommended ? (
+                    <span className="shrink-0 rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-[#B5B5BC]">
+                      {locale === "fa" ? "پیشنهادی" : "Recommended"}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 flex-1 text-[12px] leading-5 text-[#77777F]">
                   {item.description[locale]}
                 </p>

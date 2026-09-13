@@ -7,6 +7,7 @@ export type TemplateType =
   | "creator"
   | "portfolio";
 
+
 export type WebsiteSectionType =
   | "hero"
   | "about"
@@ -118,6 +119,10 @@ export interface WebsiteSettings {
   direction: "rtl" | "ltr";
   showBranding: boolean;
   published: boolean;
+  /** Ecommerce vertical id (Vertical Engine). Optional — unknown → generic. */
+  vertical?: string | null;
+  /** Template recipe id when composed from Vertical Engine. */
+  recipeId?: string | null;
 }
 
 export interface WebsiteConfig {

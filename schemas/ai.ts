@@ -23,6 +23,23 @@ export const productSchema = z.object({
   imageIds: z.array(z.string()).default([]),
   confidence: z.number().min(0).max(1).default(0.5),
   hidden: z.boolean().optional().default(false),
+  industryData: z
+    .object({
+      vertical: z.string().optional(),
+      attributes: z
+        .record(
+          z.string(),
+          z.union([
+            z.string(),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.null(),
+          ]),
+        )
+        .optional(),
+    })
+    .optional(),
 });
 
 export const serviceSchema = z.object({
@@ -94,6 +111,19 @@ export const websiteAIAnalysisSchema = z.object({
     subheadline: z.string().min(1),
   }),
   aboutCopy: z.string().min(1),
+  businessProfile: z
+    .object({
+      vertical: z.string().nullable().optional(),
+      subVertical: z.string().nullable().optional(),
+      style: z.string().nullable().optional(),
+      confidence: z.number().min(0).max(1).nullable().optional(),
+      recommendedTemplate: z.string().nullable().optional(),
+      recommendedModules: z.array(z.string()).optional(),
+      productAttributes: z.array(z.string()).optional(),
+      fallbackVertical: z.string().nullable().optional(),
+      mood: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 export type WebsiteAIAnalysisInput = z.input<typeof websiteAIAnalysisSchema>;

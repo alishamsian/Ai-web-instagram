@@ -897,6 +897,7 @@ export function EditorShell({
         open={libraryOpen}
         locale={locale}
         dict={dict}
+        vertical={config.settings.vertical}
         existingTypes={new Set(config.sections.map((s) => s.type))}
         onClose={() => setLibraryOpen(false)}
         onAdd={(type) => {
