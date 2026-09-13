@@ -34,6 +34,15 @@ function formatPrice(
 
 export type ProductCardVariant = "classic" | "minimal" | "editorial" | "compact";
 
+/**
+ * Canonical Store ProductCard (Design System).
+ * Used by StoreTemplate / StoreProductPage / catalog grids.
+ *
+ * Non-store templates still use `components/website/StoreProductCard.tsx`
+ * until Section Registry migrates them — do not delete that file yet.
+ *
+ * @see productCardContract in lib/design-system/components.ts
+ */
 export function StoreProductCard({
   config,
   product,

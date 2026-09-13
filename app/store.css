@@ -32,10 +32,20 @@
   --store-success: #2f6b4f;
   --store-warning: #b45309;
   --store-error: #b42318;
+  /* Semantic aliases (Design System) — map onto existing store tokens */
+  --store-primary: var(--store-accent);
+  --store-primary-fg: var(--store-accent-fg);
+  --store-secondary: var(--store-fg);
+  --store-secondary-fg: var(--store-bg);
+  --store-destructive: var(--store-error);
   --store-muted: var(--store-bg-subtle);
   --store-muted-fg: var(--store-fg-muted);
   --store-wrap: 1280px;
   --store-section-pad: clamp(3.25rem, 7.5vw, 6rem);
+  --store-section-pad-sm: clamp(2rem, 5vw, 3.5rem);
+  --store-section-pad-md: clamp(3rem, 7vw, 5.5rem);
+  --store-section-pad-lg: clamp(3.5rem, 8vw, 6.5rem);
+  --store-section-pad-editorial: clamp(3.25rem, 7.5vw, 6rem);
   --store-space-1: 0.25rem;
   --store-space-2: 0.5rem;
   --store-space-3: 0.75rem;
@@ -50,13 +60,21 @@
   --store-space-24: 6rem;
   --store-space-30: 7.5rem;
   --store-space-40: 10rem;
+  --store-radius-none: 0;
   --store-radius-sm: 0.1rem;
   --store-radius-md: 0.25rem;
   --store-radius-lg: 0.4rem;
   --store-radius-xl: 0.65rem;
+  --store-radius-full: 9999px;
   --store-btn-radius: 0.2rem;
   --store-ratio: 4 / 5;
+  --store-shadow-subtle: 0 1px 2px color-mix(in srgb, var(--store-fg) 6%, transparent);
+  --store-shadow-card: 0 8px 24px color-mix(in srgb, var(--store-fg) 6%, transparent);
+  --store-shadow-elevated: 0 16px 40px color-mix(in srgb, var(--store-fg) 10%, transparent);
+  --store-shadow-overlay: 0 24px 64px color-mix(in srgb, var(--store-fg) 18%, transparent);
   --store-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --store-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --store-ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
   --store-dur-fast: 180ms;
   --store-dur: 280ms;
   --store-dur-slow: 520ms;
@@ -116,13 +134,19 @@
 .store[data-mood="dark"] { --store-surface-elevated: color-mix(in srgb, var(--store-bg) 90%, #fff); }
 .store[data-mood="dark"] .store-announce { background: var(--store-surface); color: var(--store-fg); }
 
-/* Wrap */
+/* Wrap — gutters align with DS breakpoints (430 / 768 / 1280) */
 .store-wrap { width: min(var(--store-wrap), calc(100% - 1.5rem)); margin-inline: auto; }
+@media (min-width: 430px) {
+  .store-wrap { width: min(var(--store-wrap), calc(100% - 1.75rem)); }
+}
 @media (min-width: 768px) {
   .store-wrap { width: min(var(--store-wrap), calc(100% - 3rem)); }
 }
 @media (min-width: 1280px) {
   .store-wrap { width: min(var(--store-wrap), calc(100% - 4rem)); }
+}
+@media (min-width: 1440px) {
+  .store-wrap { width: min(var(--store-wrap), calc(100% - 4.5rem)); }
 }
 
 /* ── Typography ──────────────────────────────────────────── */
@@ -191,13 +215,17 @@
 .store-btn--secondary { background: var(--store-fg); color: var(--store-bg); }
 .store-btn--ghost { background: transparent; color: var(--store-fg); box-shadow: inset 0 0 0 1px var(--store-border-strong); }
 .store-btn--ghost:hover { opacity: 1; background: color-mix(in srgb, var(--store-fg) 4%, transparent); }
-.store-btn--text {
+.store-btn--outline { background: transparent; color: var(--store-fg); box-shadow: inset 0 0 0 1px var(--store-border-strong); }
+.store-btn--outline:hover { opacity: 1; background: color-mix(in srgb, var(--store-fg) 4%, transparent); }
+.store-btn--text,
+.store-btn--link {
   background: transparent; color: var(--store-fg);
   min-height: 2.25rem; padding-inline: 0.35rem;
   letter-spacing: 0.08em; text-decoration: underline;
   text-underline-offset: 0.28em;
 }
-.store-btn--text:hover { opacity: 0.7; }
+.store-btn--text:hover,
+.store-btn--link:hover { opacity: 0.7; }
 .store-btn--on-dark { background: #fff; color: #141414; }
 .store-btn--sm { min-height: 2.35rem; padding-inline: 1rem; font-size: 0.64rem; }
 .store-btn--lg { min-height: 3.15rem; padding-inline: 1.75rem; font-size: 0.74rem; }
@@ -228,6 +256,11 @@
 }
 .store-input::placeholder { color: var(--store-fg-muted); }
 .store-input:focus { outline: 2px solid var(--store-accent); outline-offset: 1px; border-color: transparent; }
+.store-input:disabled { opacity: 0.5; cursor: not-allowed; }
+.store-input--error {
+  border-color: var(--store-destructive);
+}
+.store-input--error:focus { outline-color: var(--store-destructive); }
 .store-icon-btn {
   position: relative;
   display: inline-flex;
@@ -483,6 +516,11 @@
 
 /* ── Sections ────────────────────────────────────────────── */
 .store-section { padding-block: var(--store-section-pad); }
+.store-section--sm { padding-block: var(--store-section-pad-sm); }
+.store-section--md { padding-block: var(--store-section-pad-md); }
+.store-section--lg { padding-block: var(--store-section-pad-lg); }
+.store-section--editorial { padding-block: var(--store-section-pad-editorial); }
+.store-section--full { padding-block: 0; }
 .store-section--soft { background: var(--store-bg-subtle); }
 .store-section__head { max-width: 36rem; margin-bottom: clamp(1.35rem, 3.5vw, 2.5rem); }
 .store-section__head--row {

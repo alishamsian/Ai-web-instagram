@@ -134,76 +134,8 @@ export function applyDesignPreset(
   };
 }
 
-export const SECTION_LIBRARY: {
-  type: WebsiteConfig["sections"][number]["type"];
-  category: "featured" | "commerce" | "content" | "media" | "social" | "conversion" | "navigation";
-  label: { fa: string; en: string };
-  description: { fa: string; en: string };
-}[] = [
-  {
-    type: "hero",
-    category: "featured",
-    label: { fa: "هیرو", en: "Hero" },
-    description: { fa: "تیتر اصلی و تصویر برند", en: "Primary headline and brand image" },
-  },
-  {
-    type: "products",
-    category: "commerce",
-    label: { fa: "محصولات", en: "Products" },
-    description: { fa: "شبکه محصولات فروشگاه", en: "Product grid for the shop" },
-  },
-  {
-    type: "about",
-    category: "content",
-    label: { fa: "درباره / داستان برند", en: "About / Brand story" },
-    description: { fa: "روایت کوتاه برند", en: "Short brand narrative" },
-  },
-  {
-    type: "gallery",
-    category: "media",
-    label: { fa: "گالری", en: "Gallery" },
-    description: { fa: "نمایش تصاویر و لوک‌بوک", en: "Lookbook and image showcase" },
-  },
-  {
-    type: "instagram-feed",
-    category: "media",
-    label: { fa: "فید اینستاگرام", en: "Instagram feed" },
-    description: { fa: "نمایش پست‌های اینستا", en: "Surface Instagram posts" },
-  },
-  {
-    type: "testimonials",
-    category: "social",
-    label: { fa: "نظرات", en: "Testimonials" },
-    description: { fa: "گواهی مشتریان", en: "Customer social proof" },
-  },
-  {
-    type: "faq",
-    category: "content",
-    label: { fa: "پرسش‌ها", en: "FAQ" },
-    description: { fa: "سوالات پرتکرار", en: "Common questions" },
-  },
-  {
-    type: "contact",
-    category: "conversion",
-    label: { fa: "تماس", en: "Contact" },
-    description: { fa: "راه‌های ارتباط", en: "Ways to reach you" },
-  },
-  {
-    type: "cta",
-    category: "conversion",
-    label: { fa: "فراخوان", en: "CTA" },
-    description: { fa: "بنر دعوت به اقدام", en: "Call-to-action banner" },
-  },
-  {
-    type: "services",
-    category: "commerce",
-    label: { fa: "خدمات", en: "Services" },
-    description: { fa: "لیست خدمات", en: "Service offerings" },
-  },
-  {
-    type: "footer",
-    category: "navigation",
-    label: { fa: "فوتر", en: "Footer" },
-    description: { fa: "پایان صفحه و لینک‌ها", en: "Page footer and links" },
-  },
-];
+export { getSectionLibraryItems as getSectionLibrary } from "@/lib/store/registry/library-adapter";
+import { getSectionLibraryItems } from "@/lib/store/registry/library-adapter";
+
+/** @deprecated Prefer getSectionLibraryItems() — kept for existing imports. */
+export const SECTION_LIBRARY = getSectionLibraryItems();

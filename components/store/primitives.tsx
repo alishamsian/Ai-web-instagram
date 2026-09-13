@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils";
 export type StoreButtonVariant =
   | "primary"
   | "secondary"
+  | "outline"
   | "ghost"
+  | "link"
   | "text"
   | "on-dark";
 
@@ -25,8 +27,8 @@ function buttonClass(
   const v =
     variant === "primary"
       ? "solid"
-      : variant === "secondary"
-        ? "secondary"
+      : variant === "link"
+        ? "text"
         : variant;
   return cn(
     "store-btn",
@@ -81,9 +83,16 @@ export const StoreLinkButton = forwardRef<
 
 export const StoreInput = forwardRef<
   HTMLInputElement,
-  InputHTMLAttributes<HTMLInputElement>
->(function StoreInput({ className, ...props }, ref) {
-  return <input ref={ref} className={cn("store-input", className)} {...props} />;
+  InputHTMLAttributes<HTMLInputElement> & { error?: boolean }
+>(function StoreInput({ className, error, ...props }, ref) {
+  return (
+    <input
+      ref={ref}
+      className={cn("store-input", error && "store-input--error", className)}
+      aria-invalid={error || undefined}
+      {...props}
+    />
+  );
 });
 
 export const StoreIconButton = forwardRef<

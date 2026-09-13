@@ -4,19 +4,11 @@ import { useMemo, useState } from "react";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import type { WebsiteSectionType } from "@/types/website";
-import { SECTION_LIBRARY } from "@/components/editor/editor-presets";
+import { getSectionLibraryItems } from "@/lib/store/registry/library-adapter";
+import { SECTION_CATEGORIES } from "@/lib/store/registry/categories";
+import type { SectionCategory } from "@/lib/store/registry/types";
 import { cn } from "@/lib/utils";
 import { Plus, X } from "lucide-react";
-
-const CATEGORIES = [
-  { id: "featured", fa: "ویژه", en: "Featured" },
-  { id: "commerce", fa: "فروش", en: "Commerce" },
-  { id: "content", fa: "محتوا", en: "Content" },
-  { id: "media", fa: "رسانه", en: "Media" },
-  { id: "social", fa: "اعتبار اجتماعی", en: "Social proof" },
-  { id: "conversion", fa: "تبدیل", en: "Conversion" },
-  { id: "navigation", fa: "ناوبری", en: "Navigation" },
-] as const;
 
 export function SectionLibrary({
   open,
@@ -33,17 +25,22 @@ export function SectionLibrary({
   onClose: () => void;
   onAdd: (type: WebsiteSectionType) => void;
 }) {
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]["id"] | "all">(
-    "all",
-  );
+  const [category, setCategory] = useState<SectionCategory | "all">("all");
+
+  const library = useMemo(() => getSectionLibraryItems(), []);
 
   const items = useMemo(
     () =>
-      SECTION_LIBRARY.filter(
+      library.filter(
         (item) => category === "all" || item.category === category,
       ),
-    [category],
+    [category, library],
   );
+
+  const categories = useMemo(() => {
+    const used = new Set(library.map((item) => item.category));
+    return SECTION_CATEGORIES.filter((item) => used.has(item.id));
+  }, [library]);
 
   if (!open) return null;
 
@@ -80,7 +77,7 @@ export function SectionLibrary({
             label={locale === "fa" ? "همه" : "All"}
             onClick={() => setCategory("all")}
           />
-          {CATEGORIES.map((item) => (
+          {categories.map((item) => (
             <Chip
               key={item.id}
               active={category === item.id}

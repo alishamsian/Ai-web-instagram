@@ -3,7 +3,10 @@ import { createId } from "@/lib/utils";
 import { mergeInstagramData } from "@/lib/instagram";
 import { InstagramUrlError, isDemoUsername, normalizeInstagramUrl } from "@/lib/instagram/url";
 import { getAIAnalyzer } from "@/lib/ai";
-import { persistImportMedia } from "@/lib/storage";
+import {
+  ensureWebsiteConfigMediaHosted,
+  persistImportMedia,
+} from "@/lib/storage";
 import { generateWebsiteConfig, websiteSlug, allocateUniqueSlug } from "@/lib/website";
 import { readStore, writeStore } from "@/lib/database/store";
 import { getInstagramCollector as resolveCollector } from "@/lib/instagram/collector";
@@ -418,7 +421,6 @@ export async function processImportJob(
 
     await updateJob(jobId, { status: "generating", stage: "creating_website" });
     const config = generateWebsiteConfig({ imported, analysis, locale });
-    imported.websiteConfig = config;
 
     const generatedWebsiteId = createId("web");
     const baseSlug = websiteSlug(analysis.businessName, imported.username);
@@ -433,6 +435,16 @@ export async function processImportJob(
       workspaceId: job.workspaceId,
       websiteId: existingForWorkspace?.id,
     });
+
+    // Final gate: never save a site that still hotlinks Instagram CDN.
+    await withJobHeartbeat(jobId, () =>
+      ensureWebsiteConfigMediaHosted(config, {
+        slugHint: slug || imported.username,
+        workspaceId: job.workspaceId,
+      }),
+    );
+    imported.websiteConfig = config;
+
     let websiteId = generatedWebsiteId;
 
     await writeStore((draft) => {

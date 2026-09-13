@@ -16,7 +16,7 @@ import {
 import { ProductPageView } from "@/components/website/ProductPage";
 import { WebsiteShell } from "@/components/website/shell";
 import { SiteNavProvider } from "@/components/website/SiteNavContext";
-import { StoreTemplate } from "@/components/store/StoreTemplate";
+import { StoreRenderer } from "@/components/store/StoreRenderer";
 import { EditorSectionFrame } from "@/components/editor/EditorSectionFrame";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { polishWebsiteConfig } from "@/lib/website/polish";
@@ -65,7 +65,7 @@ export function WebsiteRenderer({
       }}
     >
       {view.template === "store" ? (
-        <StoreTemplate
+        <StoreRenderer
           config={view}
           productSlug={productSlug}
           websiteId={websiteId}

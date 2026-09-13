@@ -91,6 +91,10 @@ export function sectionLabel(type: WebsiteSectionType, locale: Locale): string {
     services: { fa: "خدمات", en: "Services" },
     gallery: { fa: "گالری", en: "Gallery" },
     "featured-posts": { fa: "پست‌های ویژه", en: "Featured" },
+    "featured-products": { fa: "محصولات ویژه", en: "Featured products" },
+    categories: { fa: "دسته‌ها", en: "Categories" },
+    "product-spotlight": { fa: "اسپات‌لایت", en: "Spotlight" },
+    bestsellers: { fa: "پرفروش‌ها", en: "Bestsellers" },
     "instagram-feed": { fa: "فید اینستا", en: "Instagram" },
     testimonials: { fa: "نظرات", en: "Testimonials" },
     faq: { fa: "پرسش‌ها", en: "FAQ" },
@@ -98,6 +102,7 @@ export function sectionLabel(type: WebsiteSectionType, locale: Locale): string {
     location: { fa: "موقعیت", en: "Location" },
     social: { fa: "شبکه‌ها", en: "Social" },
     cta: { fa: "فراخوان", en: "CTA" },
+    promo: { fa: "پرومو", en: "Promo" },
     footer: { fa: "فوتر", en: "Footer" },
   };
   return map[type]?.[locale] ?? type;

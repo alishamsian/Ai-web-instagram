@@ -14,11 +14,17 @@ import { isSupabaseSchemaReady } from "@/lib/database/supabase-store";
 import { createId } from "@/lib/utils";
 import type { InstagramImport } from "@/types/instagram";
 import type { StoredMedia } from "@/types/media";
+import type { WebsiteConfig } from "@/types/website";
 
 export function getMediaStorage() {
   if (isR2Configured()) return new R2MediaStorage();
   if (isSupabaseConfigured()) return new SupabaseMediaStorage();
   return new LocalMediaStorage();
+}
+
+/** Real hosting is available — never leave Instagram CDN hotlinks in the product. */
+export function mustHostMedia() {
+  return isSupabaseConfigured() || isR2Configured() || !allowMockServices();
 }
 
 function extensionFor(contentType: string, url: string) {
@@ -103,15 +109,48 @@ async function mapPool<T>(
   await Promise.all(Array.from({ length: pool }, () => run()));
 }
 
+async function uploadOne(params: {
+  key: string;
+  body: Uint8Array;
+  contentType: string;
+  originalUrl: string;
+  mediaType: "image" | "video";
+  workspaceId: string;
+  result: Record<string, StoredMedia>;
+  mediaId: string;
+  urlMap: Map<string, string>;
+  setOriginalUrl: (url: string, assetId: string) => void;
+}) {
+  const storage = getMediaStorage();
+  const stored = await storage.upload({
+    key: params.key,
+    body: params.body,
+    contentType: params.contentType,
+  });
+  params.urlMap.set(params.originalUrl, stored.publicUrl);
+  params.setOriginalUrl(stored.publicUrl, stored.id);
+  params.result[params.mediaId] = {
+    ...stored,
+    originalUrl: params.originalUrl,
+    publicUrl: stored.publicUrl,
+  };
+  await recordMediaAsset({
+    workspaceId: params.workspaceId,
+    originalUrl: params.originalUrl,
+    storageKey: params.key,
+    publicUrl: stored.publicUrl,
+    type: params.mediaType,
+  });
+  return stored;
+}
+
 /**
  * Download Instagram CDN assets, store them, rewrite import URLs.
- * In production, refuses to leave hotlinked fbcdn URLs when persistence fails
- * for a majority of assets.
+ * When hosting is configured, refuses to leave any hotlinked IG CDN URLs.
  */
 export async function persistImportMedia(
   imported: InstagramImport,
 ): Promise<Record<string, StoredMedia>> {
-  const storage = getMediaStorage();
   const result: Record<string, StoredMedia> = {};
   const urlMap = new Map<string, string>();
 
@@ -133,98 +172,128 @@ export async function persistImportMedia(
     return result;
   }
 
-  const downloaded = await downloadMediaUrls(candidates);
-  let persisted = 0;
-  let failed = 0;
+  const attemptPersist = async (urls: string[]) => {
+    if (urls.length === 0) return { persisted: 0, failed: 0 };
+    const downloaded = await downloadMediaUrls(urls);
+    let persisted = 0;
+    let failed = 0;
 
-  // Keep uploads modest — parallel large videos often trip Storage "fetch failed".
-  await mapPool(imported.media, 3, async (media) => {
-    if (!isInstagramCdnUrl(media.originalUrl)) {
-      result[media.id] = {
-        id: media.id,
-        originalUrl: media.originalUrl,
-        storageKey: `${imported.username}/${media.id}`,
-        publicUrl: media.originalUrl,
-        type: media.type,
-        createdAt: new Date(),
-      };
-      return;
-    }
+    const pending = imported.media.filter(
+      (m) => isInstagramCdnUrl(m.originalUrl) && urls.includes(m.originalUrl),
+    );
 
-    const file = downloaded.get(media.originalUrl);
-    if (!file) {
-      failed += 1;
-      result[media.id] = {
-        id: media.id,
-        originalUrl: media.originalUrl,
-        storageKey: `${imported.username}/${media.id}`,
-        publicUrl: media.originalUrl,
-        type: media.type,
-        createdAt: new Date(),
-      };
-      return;
-    }
+    // Modest concurrency — parallel large videos often trip Storage "fetch failed".
+    await mapPool(pending, 3, async (media) => {
+      const file = downloaded.get(media.originalUrl);
+      if (!file) {
+        failed += 1;
+        result[media.id] = {
+          id: media.id,
+          originalUrl: media.originalUrl,
+          storageKey: `${imported.username}/${media.id}`,
+          publicUrl: media.originalUrl,
+          type: media.type,
+          createdAt: new Date(),
+        };
+        return;
+      }
 
-    const originalUrl = media.originalUrl;
-    const ext = extensionFor(file.contentType, originalUrl);
-    const key = `${imported.username}/${media.id}.${ext}`;
-    try {
-      const stored = await storage.upload({
-        key,
-        body: file.body,
-        contentType:
-          file.contentType ||
-          (media.type === "video" ? "video/mp4" : "image/jpeg"),
-      });
-      urlMap.set(originalUrl, stored.publicUrl);
-      media.originalUrl = stored.publicUrl;
-      media.storedAssetId = stored.id;
-      persisted += 1;
-      result[media.id] = {
-        ...stored,
-        originalUrl,
-        publicUrl: stored.publicUrl,
-      };
-      await recordMediaAsset({
-        workspaceId: imported.workspaceId,
-        originalUrl,
-        storageKey: key,
-        publicUrl: stored.publicUrl,
-        type: media.type,
-      });
-    } catch (error) {
-      failed += 1;
-      console.error("[media] upload failed", key, error);
-      result[media.id] = {
-        id: media.id,
-        originalUrl: media.originalUrl,
-        storageKey: key,
-        publicUrl: media.originalUrl,
-        type: media.type,
-        createdAt: new Date(),
-      };
-    }
-  });
+      const originalUrl = media.originalUrl;
+      const ext = extensionFor(file.contentType, originalUrl);
+      const key = `${imported.username}/${media.id}.${ext}`;
+      try {
+        await uploadOne({
+          key,
+          body: file.body,
+          contentType:
+            file.contentType ||
+            (media.type === "video" ? "video/mp4" : "image/jpeg"),
+          originalUrl,
+          mediaType: media.type,
+          workspaceId: imported.workspaceId,
+          result,
+          mediaId: media.id,
+          urlMap,
+          setOriginalUrl: (url, assetId) => {
+            media.originalUrl = url;
+            media.storedAssetId = assetId;
+          },
+        });
+        persisted += 1;
+      } catch (error) {
+        failed += 1;
+        console.error("[media] upload failed", key, error);
+        result[media.id] = {
+          id: media.id,
+          originalUrl: media.originalUrl,
+          storageKey: key,
+          publicUrl: media.originalUrl,
+          type: media.type,
+          createdAt: new Date(),
+        };
+      }
+    });
+
+    return { persisted, failed };
+  };
+
+  let totals = await attemptPersist(candidates);
+
+  // Second pass for anything still on Instagram CDN (transient CDN / Storage blips).
+  const stillIg = imported.media
+    .filter((m) => isInstagramCdnUrl(m.originalUrl))
+    .map((m) => m.originalUrl);
+  if (stillIg.length > 0) {
+    console.warn(
+      `[media] retrying ${stillIg.length} assets after first persist pass`,
+    );
+    await new Promise((r) => setTimeout(r, 800));
+    const retry = await attemptPersist(stillIg);
+    totals = {
+      persisted: totals.persisted + retry.persisted,
+      failed: retry.failed,
+    };
+  }
 
   applyUrlMap(imported, urlMap);
 
+  // Mark non-IG items that were never candidates.
+  for (const media of imported.media) {
+    if (result[media.id]) continue;
+    result[media.id] = {
+      id: media.id,
+      originalUrl: media.originalUrl,
+      storageKey: `${imported.username}/${media.id}`,
+      publicUrl: media.originalUrl,
+      type: media.type,
+      createdAt: new Date(),
+    };
+  }
+
   const igLeft = imported.media.filter((m) => isInstagramCdnUrl(m.originalUrl))
     .length;
-  // When real storage is configured, never ship hotlinked IG CDN URLs — browsers
-  // routinely get ERR_CONNECTION_CLOSED on cdninstagram.com / fbcdn.net.
-  const mustPersist =
-    isSupabaseConfigured() || isR2Configured() || !allowMockServices();
-  if (
-    mustPersist &&
-    candidates.length > 0 &&
-    (persisted === 0 || igLeft > candidates.length / 2)
-  ) {
+  if (mustHostMedia() && igLeft > 0) {
     throw new Error(
-      `MEDIA_PERSIST_FAILED: stored ${persisted}/${candidates.length} Instagram assets (${failed} failed).`,
+      `MEDIA_PERSIST_FAILED: stored ${totals.persisted}/${candidates.length} Instagram assets (${igLeft} still on CDN, ${totals.failed} failed).`,
     );
   }
 
   return result;
+}
+
+/** Every Instagram CDN URL still present on a website config (media + brand logo). */
+export function instagramHotlinksInConfig(config: WebsiteConfig): string[] {
+  const urls = new Set<string>();
+  if (config.brand?.logo && isInstagramCdnUrl(config.brand.logo)) {
+    urls.add(config.brand.logo);
+  }
+  for (const asset of Object.values(config.media ?? {})) {
+    if (asset.url && isInstagramCdnUrl(asset.url)) urls.add(asset.url);
+    if (asset.videoUrl && isInstagramCdnUrl(asset.videoUrl)) {
+      urls.add(asset.videoUrl);
+    }
+  }
+  return [...urls];
 }
 
 export function rewriteWebsiteMediaUrls(
@@ -242,31 +311,21 @@ export function rewriteWebsiteMediaUrls(
   }
 }
 
-export async function persistWebsiteConfigMedia(
+async function hostUrlMap(
+  urls: string[],
   slugHint: string,
-  media: Record<
-    string,
-    { url: string; videoUrl?: string | null; alt: string; type: "image" | "video" }
-  >,
   workspaceId?: string,
-): Promise<number> {
-  const storage = getMediaStorage();
-  const urls = new Set<string>();
-  for (const asset of Object.values(media)) {
-    if (isInstagramCdnUrl(asset.url)) urls.add(asset.url);
-    if (asset.videoUrl && isInstagramCdnUrl(asset.videoUrl)) {
-      urls.add(asset.videoUrl);
-    }
-  }
-  if (urls.size === 0) return 0;
-
-  const downloaded = await downloadMediaUrls([...urls]);
+): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
-  let index = 0;
+  if (urls.length === 0) return urlMap;
 
-  for (const [original, file] of downloaded) {
+  const storage = getMediaStorage();
+  const downloaded = await downloadMediaUrls(urls);
+  const entries = [...downloaded.entries()];
+  await mapPool(entries, 3, async ([original, file]) => {
     const ext = extensionFor(file.contentType, original);
-    const key = `${slugHint}/legacy-${index++}.${ext}`;
+    const hash = Buffer.from(original).toString("base64url").slice(0, 16);
+    const key = `${slugHint}/cfg-${hash}.${ext}`;
     try {
       const stored = await storage.upload({
         key,
@@ -283,11 +342,76 @@ export async function persistWebsiteConfigMedia(
           type: file.contentType.startsWith("video") ? "video" : "image",
         });
       }
-    } catch {
-      // leave original
+    } catch (error) {
+      console.error("[media] config upload failed", key, error);
     }
+  });
+
+  return urlMap;
+}
+
+/**
+ * Last-line safety net: host any remaining Instagram CDN URLs on a website
+ * config (including brand.logo). Throws MEDIA_PERSIST_FAILED if any remain
+ * when hosting is required.
+ */
+export async function ensureWebsiteConfigMediaHosted(
+  config: WebsiteConfig,
+  opts: { slugHint: string; workspaceId?: string },
+): Promise<number> {
+  let hotlinks = instagramHotlinksInConfig(config);
+  if (hotlinks.length === 0) return 0;
+
+  const apply = (urlMap: Map<string, string>) => {
+    if (urlMap.size === 0) return;
+    rewriteWebsiteMediaUrls(config.media, urlMap);
+    if (config.brand.logo && urlMap.has(config.brand.logo)) {
+      config.brand.logo = urlMap.get(config.brand.logo);
+    }
+  };
+
+  apply(await hostUrlMap(hotlinks, opts.slugHint, opts.workspaceId));
+
+  hotlinks = instagramHotlinksInConfig(config);
+  if (hotlinks.length > 0) {
+    console.warn(
+      `[media] config still has ${hotlinks.length} IG URLs — retrying`,
+    );
+    await new Promise((r) => setTimeout(r, 800));
+    apply(await hostUrlMap(hotlinks, opts.slugHint, opts.workspaceId));
   }
 
+  hotlinks = instagramHotlinksInConfig(config);
+  if (mustHostMedia() && hotlinks.length > 0) {
+    throw new Error(
+      `MEDIA_PERSIST_FAILED: ${hotlinks.length} Instagram CDN URLs remain on website config after hosting attempts.`,
+    );
+  }
+
+  return (
+    Object.values(config.media).filter(
+      (a) =>
+        !isInstagramCdnUrl(a.url) &&
+        (!a.videoUrl || !isInstagramCdnUrl(a.videoUrl)),
+    ).length
+  );
+}
+
+/** Host remaining IG CDN URLs inside a media map (legacy helper). */
+export async function persistWebsiteConfigMedia(
+  slugHint: string,
+  media: WebsiteConfig["media"],
+  workspaceId?: string,
+): Promise<number> {
+  const urls = new Set<string>();
+  for (const asset of Object.values(media)) {
+    if (isInstagramCdnUrl(asset.url)) urls.add(asset.url);
+    if (asset.videoUrl && isInstagramCdnUrl(asset.videoUrl)) {
+      urls.add(asset.videoUrl);
+    }
+  }
+  if (urls.size === 0) return 0;
+  const urlMap = await hostUrlMap([...urls], slugHint, workspaceId);
   rewriteWebsiteMediaUrls(media, urlMap);
   return urlMap.size;
 }

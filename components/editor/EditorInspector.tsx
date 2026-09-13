@@ -26,6 +26,9 @@ import {
 } from "@/components/editor/editor-presets";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { MediaPicker } from "@/components/editor/MediaPicker";
+import { SchemaInspectorPanel } from "@/components/editor/SchemaInspectorPanel";
+import { getSectionSchema } from "@/lib/store/registry";
+import type { ElementSchemaGroup } from "@/lib/store/registry/element-schema";
 import {
   readSectionSetting,
   type ProductSource,
@@ -138,6 +141,7 @@ export function EditorInspector({
           sectionId={selected.id}
           sectionType={selected.type}
           dict={dict}
+          locale={locale}
           tab={sectionTab}
           onChange={onChange}
         />
@@ -485,6 +489,7 @@ function SectionInspector({
   sectionId,
   sectionType,
   dict,
+  locale,
   tab,
   onChange,
 }: {
@@ -492,6 +497,7 @@ function SectionInspector({
   sectionId: string;
   sectionType: WebsiteSectionType;
   dict: Dictionary;
+  locale: Locale;
   tab: SectionTab;
   onChange: (next: WebsiteConfig) => void;
 }) {
@@ -502,9 +508,36 @@ function SectionInspector({
   const showLayout = tab === "layout";
   const showStyle = tab === "style";
 
+  const schema = getSectionSchema(sectionType);
+  const schemaDriven = Boolean(
+    schema &&
+      (sectionType === "hero" ||
+        sectionType === "products" ||
+        sectionType === "gallery"),
+  );
+
+  const schemaGroups: ElementSchemaGroup[] =
+    tab === "content"
+      ? ["content", "actions", "media", "data"]
+      : tab === "layout"
+        ? ["layout", "responsive"]
+        : ["style", "typography", "visibility"];
+
   return (
     <div className="space-y-4">
-      {showContent && sectionType === "hero" ? (
+      {schemaDriven && schema ? (
+        <SchemaInspectorPanel
+          config={config}
+          section={section}
+          schema={schema}
+          groups={schemaGroups}
+          locale={locale}
+          onChange={onChange}
+        />
+      ) : null}
+
+      {/* Legacy controls — skipped for schema-driven hero/gallery content/layout */}
+      {!schemaDriven && showContent && sectionType === "hero" ? (
         <>
           <InspectorGroup title={dict.editor.content} defaultOpen>
             <Field label={dict.editor.heroHeadline}>
@@ -592,7 +625,7 @@ function SectionInspector({
         </>
       ) : null}
 
-      {showLayout && sectionType === "hero" ? (
+      {!schemaDriven && showLayout && sectionType === "hero" ? (
         <InspectorGroup title={dict.editor.layout} defaultOpen>
           <Field label={dict.editor.heroStyle}>
             <Segmented
@@ -670,10 +703,11 @@ function SectionInspector({
           dict={dict}
           onChange={onChange}
           mode="content"
+          listOnly={schemaDriven}
         />
       ) : null}
 
-      {showLayout && sectionType === "products" ? (
+      {!schemaDriven && showLayout && sectionType === "products" ? (
         <ProductsSectionInspector
           config={config}
           sectionId={sectionId}
@@ -683,7 +717,10 @@ function SectionInspector({
         />
       ) : null}
 
-      {showContent && sectionType === "gallery" && config.content.gallery ? (
+      {!schemaDriven &&
+      showContent &&
+      sectionType === "gallery" &&
+      config.content.gallery ? (
         <InspectorGroup title={dict.editor.content} defaultOpen>
           <Field label={dict.editor.galleryTitle}>
             <Input
@@ -750,6 +787,7 @@ function SectionInspector({
       ) : null}
 
       {showContent &&
+      !schemaDriven &&
       !["hero", "about", "products", "gallery", "faq", "contact"].includes(
         sectionType,
       ) ? (
@@ -767,7 +805,7 @@ function SectionInspector({
         />
       ) : null}
 
-      {showStyle ? (
+      {showStyle && !schemaDriven ? (
         <InspectorGroup title={dict.editor.advanced} defaultOpen>
           <label className="flex items-center justify-between gap-3 text-[13px]">
             <span>{dict.editor.sectionVisible}</span>
@@ -802,12 +840,15 @@ function ProductsSectionInspector({
   dict,
   onChange,
   mode = "content",
+  listOnly = false,
 }: {
   config: WebsiteConfig;
   sectionId: string;
   dict: Dictionary;
   onChange: (next: WebsiteConfig) => void;
   mode?: "content" | "layout";
+  /** When schema panel owns source/columns, only render product list. */
+  listOnly?: boolean;
 }) {
   const products = config.content.products;
   const section = config.sections.find((s) => s.id === sectionId);
@@ -917,22 +958,24 @@ function ProductsSectionInspector({
 
   return (
     <div className="space-y-4">
-      <InspectorGroup title={dict.editor.content} defaultOpen>
-        <Field label={dict.editor.productsTitle}>
-          <Input
-            value={products.title}
-            onChange={(event) =>
-              onChange({
-                ...config,
-                content: {
-                  ...config.content,
-                  products: { ...products, title: event.target.value },
-                },
-              })
-            }
-          />
-        </Field>
-      </InspectorGroup>
+      {!listOnly ? (
+        <InspectorGroup title={dict.editor.content} defaultOpen>
+          <Field label={dict.editor.productsTitle}>
+            <Input
+              value={products.title}
+              onChange={(event) =>
+                onChange({
+                  ...config,
+                  content: {
+                    ...config.content,
+                    products: { ...products, title: event.target.value },
+                  },
+                })
+              }
+            />
+          </Field>
+        </InspectorGroup>
+      ) : null}
 
       <InspectorGroup title={dict.editor.productPicker} defaultOpen>
         <Input

@@ -31,6 +31,15 @@ function categoryLabel(product: CatalogProduct, isFa: boolean) {
   return isFa ? "محصول" : "Product";
 }
 
+/**
+ * Legacy multi-template ProductCard (`.spc` styles in globals.css).
+ * Still required by `components/website/sections.tsx` for non-store templates.
+ *
+ * Canonical Store card: `@/components/store/StoreProductCard`
+ * Migration path: Section Registry → Store DS primitives; then deprecate this.
+ *
+ * @see productCardContract in lib/design-system/components.ts
+ */
 export function StoreProductCard({
   config,
   product,

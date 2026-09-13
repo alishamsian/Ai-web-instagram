@@ -14,6 +14,10 @@ export type WebsiteSectionType =
   | "services"
   | "gallery"
   | "featured-posts"
+  | "featured-products"
+  | "categories"
+  | "product-spotlight"
+  | "bestsellers"
   | "instagram-feed"
   | "testimonials"
   | "faq"
@@ -21,6 +25,7 @@ export type WebsiteSectionType =
   | "location"
   | "social"
   | "cta"
+  | "promo"
   | "footer";
 
 export interface ColorConfig {

@@ -1,14 +1,10 @@
 import type { WebsiteConfig } from "@/types/website";
 import type { Product } from "@/types/ai";
+import { moodChrome, type StoreMood } from "@/lib/design-system/themes";
+import { primitiveColor } from "@/lib/design-system/primitives";
 
-export type StoreMood =
-  | "luxury"
-  | "minimal"
-  | "bold"
-  | "natural"
-  | "editorial"
-  | "modern"
-  | "dark";
+export type { StoreMood };
+export { STORE_THEME_IDS } from "@/lib/design-system/themes";
 
 /** Full semantic token set — single source of truth for Store visuals. */
 export type StoreTokens = {
@@ -55,6 +51,10 @@ export type StoreCategory = {
   href: string;
 };
 
+/**
+ * Infers visual mood from brand signals.
+ * Does NOT classify business vertical — keep Vertical separate upstream.
+ */
 export function inferStoreMood(config: WebsiteConfig): StoreMood {
   const tone = [
     ...(config.brand.tagline?.toLowerCase().split(/\s+/) ?? []),
@@ -107,72 +107,11 @@ export function buildStoreTokens(config: WebsiteConfig): StoreTokens {
     borderStrong: mixApprox(fg, bg, 0.18),
     accent,
     accentForeground: accentFg,
-    success: "#2F6B4F",
-    warning: "#B45309",
-    error: "#B42318",
+    success: primitiveColor.success,
+    warning: primitiveColor.warning,
+    error: primitiveColor.error,
     ...chrome,
   };
-}
-
-function moodChrome(mood: StoreMood) {
-  switch (mood) {
-    case "luxury":
-      return {
-        radiusSm: "0",
-        radiusMd: "0.15rem",
-        radiusLg: "0.25rem",
-        radiusXl: "0.4rem",
-        sectionPad: "clamp(3.5rem, 8vw, 6.5rem)",
-        buttonRadius: "0.15rem",
-      };
-    case "bold":
-      return {
-        radiusSm: "0.2rem",
-        radiusMd: "0.4rem",
-        radiusLg: "0.65rem",
-        radiusXl: "1rem",
-        sectionPad: "clamp(2.75rem, 6vw, 5rem)",
-        buttonRadius: "0.35rem",
-      };
-    case "minimal":
-    case "modern":
-      return {
-        radiusSm: "0.15rem",
-        radiusMd: "0.35rem",
-        radiusLg: "0.5rem",
-        radiusXl: "0.75rem",
-        sectionPad: "clamp(3rem, 7vw, 5.5rem)",
-        buttonRadius: "0.35rem",
-      };
-    case "natural":
-      return {
-        radiusSm: "0.25rem",
-        radiusMd: "0.5rem",
-        radiusLg: "0.75rem",
-        radiusXl: "1rem",
-        sectionPad: "clamp(3.25rem, 7.5vw, 6rem)",
-        buttonRadius: "0.5rem",
-      };
-    case "dark":
-      return {
-        radiusSm: "0.15rem",
-        radiusMd: "0.3rem",
-        radiusLg: "0.5rem",
-        radiusXl: "0.75rem",
-        sectionPad: "clamp(3rem, 7vw, 5.5rem)",
-        buttonRadius: "0.25rem",
-      };
-    case "editorial":
-    default:
-      return {
-        radiusSm: "0.1rem",
-        radiusMd: "0.25rem",
-        radiusLg: "0.4rem",
-        radiusXl: "0.65rem",
-        sectionPad: "clamp(3.25rem, 7.5vw, 6rem)",
-        buttonRadius: "0.2rem",
-      };
-  }
 }
 
 /** Lightweight hex mix without color libs. */
