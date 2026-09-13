@@ -84,8 +84,22 @@ function attachMediaAndProducts(
     };
   }
 
+  const sourceByKey = new Map<
+    string,
+    NonNullable<BusinessProfile["products"]>[number]
+  >();
+  for (const source of profile.products ?? []) {
+    if (source.id) sourceByKey.set(`id:${source.id}`, source);
+    if (source.name?.trim()) {
+      sourceByKey.set(`name:${source.name.trim().toLowerCase()}`, source);
+    }
+  }
+
   const items: Product[] = products.map((product, index) => {
-    const imageUrl = profile.products?.[index]?.imageUrl;
+    const source =
+      (product.id ? sourceByKey.get(`id:${product.id}`) : undefined) ??
+      sourceByKey.get(`name:${product.name.toLowerCase()}`);
+    const imageUrl = source?.imageUrl;
     if (!imageUrl) return product;
     const id = `biz-product-img-${index + 1}`;
     media[id] = {

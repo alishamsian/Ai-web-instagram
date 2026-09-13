@@ -2,9 +2,12 @@ import type { WebsiteConfig } from "@/types/website";
 import type { GeneratedWebsiteContent } from "@/lib/business/content/schema";
 import type { Product } from "@/types/ai";
 import type { BusinessProfile } from "@/lib/business/types";
-import { isAllowedSchemaPath } from "@/lib/store/registry/element-schema";
 
-const APPROVED_CONTENT_PATHS = new Set([
+/**
+ * Strict allowlist for generated-content writes.
+ * Broader schema editor paths are intentionally NOT used here.
+ */
+export const GENERATED_CONTENT_ALLOWLIST = new Set([
   "brand.name",
   "brand.tagline",
   "content.hero.headline",
@@ -13,18 +16,25 @@ const APPROVED_CONTENT_PATHS = new Set([
   "content.about.title",
   "content.about.body",
   "content.products.title",
+  "seo.title",
+  "seo.description",
 ]);
+
+const SECTION_SETTING_KEYS = new Set(["kicker", "title", "description"]);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function setPathImmutable(
+function setAllowedPath(
   root: Record<string, unknown>,
   path: string,
   value: unknown,
 ): Record<string, unknown> {
-  if (!isAllowedSchemaPath(path) && !APPROVED_CONTENT_PATHS.has(path)) {
+  if (!GENERATED_CONTENT_ALLOWLIST.has(path)) {
+    return root;
+  }
+  if (typeof value !== "string") {
     return root;
   }
   const parts = path.split(".");
@@ -42,82 +52,99 @@ function setPathImmutable(
 
 /**
  * Apply generated semantic content onto WebsiteConfig.
- * Immutable, path-safe — no CSS, no JSX, no unknown bags.
+ * Immutable + explicit allowlist only.
  */
 export function applyGeneratedContent(
   config: WebsiteConfig,
   content: GeneratedWebsiteContent,
 ): WebsiteConfig {
-  const before = structuredClone(config) as unknown as Record<string, unknown>;
-  let next = before;
+  let next = structuredClone(config) as unknown as Record<string, unknown>;
 
-  next = setPathImmutable(next, "brand.name", content.brandName);
+  next = setAllowedPath(next, "brand.name", content.brandName);
   if (content.tagline) {
-    next = setPathImmutable(next, "brand.tagline", content.tagline);
+    next = setAllowedPath(next, "brand.tagline", content.tagline);
   }
-  next = setPathImmutable(next, "content.hero.headline", content.hero.headline);
-  next = setPathImmutable(
+  next = setAllowedPath(next, "content.hero.headline", content.hero.headline);
+  next = setAllowedPath(
     next,
     "content.hero.subheadline",
     content.hero.subheadline,
   );
-  next = setPathImmutable(next, "content.hero.cta", content.hero.cta);
+  next = setAllowedPath(next, "content.hero.cta", content.hero.cta);
 
   if (content.about) {
-    next = setPathImmutable(next, "content.about.title", content.about.title);
-    next = setPathImmutable(next, "content.about.body", content.about.body);
+    next = setAllowedPath(next, "content.about.title", content.about.title);
+    next = setAllowedPath(next, "content.about.body", content.about.body);
   }
   if (content.productsTitle) {
-    next = setPathImmutable(
-      next,
-      "content.products.title",
-      content.productsTitle,
-    );
+    next = setAllowedPath(next, "content.products.title", content.productsTitle);
   }
+
+  next = setAllowedPath(next, "seo.title", content.brandName);
+  next = setAllowedPath(
+    next,
+    "seo.description",
+    content.hero.subheadline.slice(0, 160),
+  );
 
   const typed = next as unknown as WebsiteConfig;
   typed.sections = typed.sections.map((section) => {
     const copy = content.sectionCopy[section.type];
-    if (!copy) return section;
+    if (!copy) return { ...section };
+    const settings: Record<string, unknown> = { ...section.settings };
+    if (copy.kicker && SECTION_SETTING_KEYS.has("kicker")) {
+      settings.kicker = copy.kicker;
+    }
+    if (copy.title && SECTION_SETTING_KEYS.has("title")) {
+      settings.title = copy.title;
+    }
+    if (copy.description && SECTION_SETTING_KEYS.has("description")) {
+      settings.description = copy.description;
+    }
     return {
       ...section,
-      settings: {
-        ...section.settings,
-        ...(copy.kicker ? { kicker: copy.kicker } : {}),
-        ...(copy.title ? { title: copy.title } : {}),
-        ...(copy.description ? { description: copy.description } : {}),
-      },
+      settings,
     };
   });
-
-  typed.seo = {
-    ...typed.seo,
-    title: content.brandName,
-    description: content.hero.subheadline.slice(0, 160),
-  };
 
   return typed;
 }
 
 /**
- * Map BusinessProfile products → existing Product model.
- * Never invents price/currency when missing.
+ * Map BusinessProfile products → Product model.
+ * - Skips products without a real name (no "Product N" fabrication)
+ * - Never invents price/currency/category
+ * - confidence comes from source or 0 (unknown), never forced to 1
  */
 export function mapBusinessProductsToCatalog(
   profile: BusinessProfile,
 ): Product[] {
-  return (profile.products ?? []).map((product, index) => {
-    const imageIds: string[] = [];
-    // Media attachment happens in pipeline when media map is built
-    return {
-      id: product.id ?? `biz-${index + 1}`,
-      name: product.name?.trim() || `Product ${index + 1}`,
+  const out: Product[] = [];
+  for (const product of profile.products ?? []) {
+    const name = product.name?.trim();
+    if (!name) continue;
+
+    const attrCategory = product.attributes?.category;
+    const category =
+      typeof attrCategory === "string" && attrCategory.trim()
+        ? attrCategory.trim()
+        : "";
+
+    const confidence =
+      typeof product.confidence === "number" &&
+      Number.isFinite(product.confidence)
+        ? Math.max(0, Math.min(1, product.confidence))
+        : 0;
+
+    out.push({
+      id: product.id,
+      name,
       description: product.description?.trim() || "",
-      category: "",
+      category,
       price: product.price ?? null,
       currency: product.currency ?? null,
-      imageIds,
-      confidence: 1,
+      imageIds: [],
+      confidence,
       industryData: product.attributes
         ? {
             attributes: Object.fromEntries(
@@ -128,6 +155,12 @@ export function mapBusinessProductsToCatalog(
             ),
           }
         : undefined,
-    } satisfies Product;
-  });
+    });
+  }
+  return out;
+}
+
+/** Test helper: reject unsafe generated paths */
+export function isGeneratedContentPathAllowed(path: string): boolean {
+  return GENERATED_CONTENT_ALLOWLIST.has(path);
 }

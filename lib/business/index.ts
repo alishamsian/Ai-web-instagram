@@ -10,6 +10,7 @@ export {
   safeParseBusinessProfile,
   coerceBusinessProfile,
   businessProfileSchema,
+  sanitizeHttpUrl,
 } from "@/lib/business/schema";
 
 export { normalizeBusinessProfile } from "@/lib/business/normalize";
@@ -20,7 +21,9 @@ export {
   classifyBusiness,
   CONFIDENCE,
   confidenceBand,
+  clampConfidence,
   resolveRecommendedModules,
+  mergeHybridAnalysis,
   type BusinessAnalysis,
 } from "@/lib/business/understanding";
 
@@ -34,5 +37,7 @@ export {
   generateWebsiteFromBusinessProfileSync,
   applyGeneratedContent,
   mapBusinessProductsToCatalog,
+  isGeneratedContentPathAllowed,
+  GENERATED_CONTENT_ALLOWLIST,
   type GenerateWebsiteResult,
 } from "@/lib/business/generation";

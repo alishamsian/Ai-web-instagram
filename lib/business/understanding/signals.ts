@@ -75,16 +75,32 @@ export function buildSignalCorpus(profile: BusinessProfile): SignalCorpus {
 }
 
 export function keywordHits(corpus: SignalCorpus, keywords: string[]): number {
-  let hits = 0;
+  return keywordHitDetails(corpus, keywords).length;
+}
+
+export function keywordHitDetails(
+  corpus: SignalCorpus,
+  keywords: string[],
+): Array<{ keyword: string; source: string }> {
+  const hits: Array<{ keyword: string; source: string }> = [];
   for (const keyword of keywords) {
     const needle = keyword.toLowerCase().trim();
     if (!needle) continue;
     if (needle.includes(" ")) {
-      if (corpus.text.includes(needle)) hits += 1;
+      if (corpus.text.includes(needle)) {
+        hits.push({ keyword: needle, source: "text" });
+      }
       continue;
     }
     if (corpus.tokens.includes(needle) || corpus.text.includes(needle)) {
-      hits += 1;
+      const source = corpus.productSignals.some((s) =>
+        s.toLowerCase().includes(needle),
+      )
+        ? "signals.productSignals"
+        : corpus.contentSignals.some((s) => s.toLowerCase().includes(needle))
+          ? "signals.contentSignals"
+          : "text";
+      hits.push({ keyword: needle, source });
     }
   }
   return hits;

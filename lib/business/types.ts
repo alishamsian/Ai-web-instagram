@@ -1,6 +1,5 @@
 /**
  * Canonical business intake model — source-agnostic (Instagram / manual / import).
- * Not a second WebsiteConfig. Feeds Understanding → Vertical → Recipe → WebsiteConfig.
  */
 
 export type BusinessSource = "instagram" | "manual" | "import" | "unknown";
@@ -24,6 +23,8 @@ export type BusinessProductInput = {
   price?: number | null;
   currency?: string | null;
   attributes?: Record<string, unknown>;
+  /** Source confidence when known — never invent 1.0 */
+  confidence?: number | null;
 };
 
 export type BusinessProfile = {
@@ -43,6 +44,7 @@ export type BusinessProfile = {
   brand?: {
     name?: string | null;
     tagline?: string | null;
+    description?: string | null;
     logoUrl?: string | null;
     colors?: string[];
   };

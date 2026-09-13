@@ -6,4 +6,6 @@ export {
 export {
   applyGeneratedContent,
   mapBusinessProductsToCatalog,
+  isGeneratedContentPathAllowed,
+  GENERATED_CONTENT_ALLOWLIST,
 } from "@/lib/business/generation/apply-content";

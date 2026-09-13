@@ -1,5 +1,13 @@
 export type BusinessAnalysisSource = "rules" | "ai" | "hybrid";
 
+export type ClassificationEvidence = {
+  signal: string;
+  source: string;
+  weight: number;
+  vertical?: string;
+  subVertical?: string;
+};
+
 export type BusinessAnalysis = {
   vertical: string;
   subVertical?: string | null;
@@ -14,8 +22,10 @@ export type BusinessAnalysis = {
   contentSignals: string[];
   brandSignals: string[];
   source: BusinessAnalysisSource;
-  /** Debug / tests — rule score breakdown */
+  /** Vertical score totals */
   scores?: Record<string, number>;
+  /** Explainable classification evidence */
+  evidence?: ClassificationEvidence[];
 };
 
 export type ClassificationRule = {
