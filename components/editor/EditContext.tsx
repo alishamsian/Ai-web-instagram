@@ -60,6 +60,8 @@ type EditorEditApi = {
   /** Open section library to insert after this section (null = end / empty). */
   onRequestInsert?: (afterSectionId: string | null) => void;
   onBrowseTemplates?: () => void;
+  /** Reveal / focus the inspector for the current selection. */
+  onOpenInspector?: () => void;
   isSectionVisible?: (sectionId: string) => boolean;
 };
 
@@ -80,6 +82,7 @@ export function EditorEditProvider({
   onReorderSections,
   onRequestInsert,
   onBrowseTemplates,
+  onOpenInspector,
   children,
 }: {
   enabled: boolean;
@@ -100,6 +103,7 @@ export function EditorEditProvider({
   ) => void;
   onRequestInsert?: (afterSectionId: string | null) => void;
   onBrowseTemplates?: () => void;
+  onOpenInspector?: () => void;
   children: ReactNode;
 }) {
   const onChangeText = useCallback(
@@ -189,6 +193,7 @@ export function EditorEditProvider({
         onReorderSections,
         onRequestInsert,
         onBrowseTemplates,
+        onOpenInspector,
         isSectionVisible,
       }}
     >
@@ -291,6 +296,7 @@ export function EditableText({
       className={cn("editor-editable", className)}
       contentEditable={editing}
       suppressContentEditableWarning
+      spellCheck={editing}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onBlur={(event) => {

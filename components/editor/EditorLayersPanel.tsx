@@ -90,17 +90,32 @@ export function EditorLayersPanel({
 
   useEffect(() => {
     if (!selectedSectionId) return;
-    setExpanded((prev) => ({ ...prev, [selectedSectionId]: true }));
-    const selectedTreeId = selectedField
-      ? treeItems.find(
-          (item) =>
-            item.kind === "block" &&
-            item.sectionId === selectedSectionId &&
-            item.field === selectedField,
-        )?.id
+    setExpanded((prev) =>
+      prev[selectedSectionId] === true
+        ? prev
+        : { ...prev, [selectedSectionId]: true },
+    );
+
+    if (!selectedField) {
+      setFocusId((prev) =>
+        prev === `section:${selectedSectionId}`
+          ? prev
+          : `section:${selectedSectionId}`,
+      );
+      return;
+    }
+
+    const section = config.sections.find((entry) => entry.id === selectedSectionId);
+    const block = section
+      ? (SECTION_LAYER_BLOCKS[section.type] ?? []).find(
+          (entry) => entry.field === selectedField,
+        )
+      : undefined;
+    const nextFocus = block
+      ? `block:${selectedSectionId}:${block.id}`
       : `section:${selectedSectionId}`;
-    if (selectedTreeId) setFocusId(selectedTreeId);
-  }, [selectedSectionId, selectedField, treeItems]);
+    setFocusId((prev) => (prev === nextFocus ? prev : nextFocus));
+  }, [selectedSectionId, selectedField, config.sections]);
 
   function reorder(from: number, to: number) {
     const result = commandReorderSections(config, from, to);

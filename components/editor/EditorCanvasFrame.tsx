@@ -55,8 +55,9 @@ function FrameChrome({
       <div
         className={cn(
           "editor-frame-chrome absolute start-0 top-0 origin-top-left overflow-hidden bg-white",
-            isMobile ? "rounded-[1.35rem]" : "rounded-[8px]",
+          isMobile ? "rounded-[1.25rem]" : "rounded-[8px]",
         )}
+        data-device={isMobile ? "mobile" : "desktop"}
         style={{
           width: targetWidth,
           height: frameHeight,
@@ -64,11 +65,11 @@ function FrameChrome({
         }}
       >
         {isMobile ? (
-          <div className="flex h-6 items-center justify-center border-b border-black/[0.04] bg-[#F7F7F5]">
-            <span className="h-1 w-14 rounded-full bg-black/10" />
+          <div className="flex h-6 items-center justify-center border-b border-black/[0.045] bg-[#F6F6F4]">
+            <span className="h-1 w-14 rounded-full bg-black/[0.12]" />
           </div>
         ) : (
-          <div className="flex h-7 items-center gap-1.5 border-b border-black/[0.04] bg-[#F5F5F3] px-2.5">
+          <div className="flex h-7 items-center gap-1.5 border-b border-black/[0.045] bg-[#F4F4F2] px-2.5">
             <span className="size-1.5 rounded-full bg-black/12" />
             <span className="size-1.5 rounded-full bg-black/12" />
             <span className="size-1.5 rounded-full bg-black/12" />
@@ -130,13 +131,23 @@ export function EditorCanvasFrame({
 
   if (splitPreview) {
     const half = hostWidth > 0 ? hostWidth / 2 : 0;
-    const deskScale = computeScale(half, desktopWidth, zoom === "fit" ? "fit" : zoom, pad);
-    const mobScale = computeScale(half, mobileWidth, zoom === "fit" ? "fit" : zoom, pad);
+    const deskScale = computeScale(
+      half,
+      desktopWidth,
+      zoom === "fit" ? "fit" : zoom,
+      pad,
+    );
+    const mobScale = computeScale(
+      half,
+      mobileWidth,
+      zoom === "fit" ? "fit" : zoom,
+      pad,
+    );
     return (
       <div
         ref={hostRef}
         className={cn(
-          "editor-canvas-anim flex min-h-full w-full items-start justify-center gap-5 overflow-x-auto px-4 py-10",
+          "editor-canvas-anim flex min-h-full w-full items-start justify-center gap-0 overflow-x-auto px-4 py-10",
           className,
         )}
       >
@@ -150,6 +161,7 @@ export function EditorCanvasFrame({
         >
           {children}
         </FrameChrome>
+        <div className="editor-frame-split-gap mx-4" aria-hidden />
         <FrameChrome
           targetWidth={mobileWidth}
           frameHeight={720}

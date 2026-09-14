@@ -68,6 +68,7 @@ import {
   type EditorZoomMode,
   type EditorPanelWidth,
   EDITOR_HISTORY_LIMIT,
+  resolveEscapeCascade,
 } from "@/lib/editor";
 import { ArrowLeft, PanelLeft, PanelRight } from "lucide-react";
 
@@ -524,30 +525,67 @@ export function EditorShell({
       if (!command) return;
 
       if (command === "escape") {
-        if (typing) {
+        const step = resolveEscapeCascade({
+          typing: Boolean(typing),
+          hasField: Boolean(selectedField),
+          hasSection: Boolean(selectedSectionId),
+          hasOverlay:
+            libraryOpen ||
+            publishOpen ||
+            commandOpen ||
+            historyOpen ||
+            qualityOpen ||
+            focusMode,
+        });
+        if (step === "blur-editing") {
           event.preventDefault();
           (document.activeElement as HTMLElement | null)?.blur?.();
           return;
         }
-        if (focusMode) {
-          setFocusMode(false);
+        if (step === "clear-field") {
+          event.preventDefault();
+          setSelectedField(undefined);
           return;
         }
-        setSelectedSectionId(undefined);
-        setSelectedField(undefined);
-        setLibraryOpen(false);
-        setPublishOpen(false);
-        setCommandOpen(false);
-        setHistoryOpen(false);
-        setQualityOpen(false);
-        setPhonePane("canvas");
-        setTabletInspectorOpen(false);
+        if (step === "clear-section") {
+          event.preventDefault();
+          setSelectedSectionId(undefined);
+          setSelectedField(undefined);
+          return;
+        }
+        if (step === "dismiss-overlays") {
+          event.preventDefault();
+          setFocusMode(false);
+          setLibraryOpen(false);
+          setPublishOpen(false);
+          setCommandOpen(false);
+          setHistoryOpen(false);
+          setQualityOpen(false);
+          setPhonePane("canvas");
+          setTabletInspectorOpen(false);
+        }
         return;
       }
 
       if (command === "focusMode") {
         event.preventDefault();
         setFocusMode((v) => !v);
+        return;
+      }
+
+      if (command === "zoomFit") {
+        event.preventDefault();
+        setZoom("fit");
+        return;
+      }
+      if (command === "zoom100") {
+        event.preventDefault();
+        setZoom("100");
+        return;
+      }
+      if (command === "zoom75") {
+        event.preventDefault();
+        setZoom("75");
         return;
       }
 
@@ -609,7 +647,7 @@ export function EditorShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyIndex, history, config, dirty, selectedSectionId, locale, website.id, focusMode]);
+  }, [historyIndex, history, config, dirty, selectedSectionId, selectedField, locale, website.id, focusMode, libraryOpen, publishOpen, commandOpen, historyOpen, qualityOpen]);
 
   function selectField(path: EditorFieldPath, sectionId?: string) {
     setSelectedField(path);
@@ -959,10 +997,43 @@ export function EditorShell({
         run: () => setViewport("390"),
       },
       {
+        id: "viewport-tablet",
+        label: isFa ? "ویوپورت تبلت" : "Tablet viewport",
+        group: isFa ? "نمایش" : "View",
+        run: () => setViewport("768"),
+      },
+      {
         id: "viewport-desktop",
         label: isFa ? "ویوپورت دسکتاپ" : "Desktop viewport",
         group: isFa ? "نمایش" : "View",
         run: () => setViewport("1280"),
+      },
+      {
+        id: "zoom-fit",
+        label: dict.editor.zoomFit,
+        hint: "⌘0",
+        group: isFa ? "نمایش" : "View",
+        run: () => setZoom("fit"),
+      },
+      {
+        id: "zoom-100",
+        label: dict.editor.zoom100,
+        hint: "⌘1",
+        group: isFa ? "نمایش" : "View",
+        run: () => setZoom("100"),
+      },
+      {
+        id: "zoom-75",
+        label: dict.editor.zoom75,
+        hint: "⌘2",
+        group: isFa ? "نمایش" : "View",
+        run: () => setZoom("75"),
+      },
+      {
+        id: "split-preview",
+        label: dict.editor.splitPreview,
+        group: isFa ? "نمایش" : "View",
+        run: () => setSplitPreview((v) => !v),
       },
       {
         id: "publish",
@@ -1065,6 +1136,10 @@ export function EditorShell({
     dict.editor.quality,
     dict.editor.focusMode,
     dict.editor.focusModeExit,
+    dict.editor.zoomFit,
+    dict.editor.zoom75,
+    dict.editor.zoom100,
+    dict.editor.splitPreview,
     focusMode,
     isPublished,
     locale,
@@ -1158,6 +1233,12 @@ export function EditorShell({
       onBrowseTemplates={() => {
         setSelectedSectionId(undefined);
         setSiteGroup("site");
+        setPhonePane("inspector");
+        setTabletInspectorOpen(true);
+      }}
+      onOpenInspector={() => {
+        setRightCollapsed(false);
+        setFocusMode(false);
         setPhonePane("inspector");
         setTabletInspectorOpen(true);
       }}

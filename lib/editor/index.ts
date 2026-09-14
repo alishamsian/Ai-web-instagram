@@ -89,6 +89,15 @@ export {
 } from "@/lib/editor/layer-tree";
 
 export {
+  resolveCanvasDropEdge,
+  shouldShowSectionChrome,
+  resolveEscapeCascade,
+  sectionNeedsScrollIntoView,
+  type CanvasDropEdge,
+  type EscapeCascadeStep,
+} from "@/lib/editor/canvas-interaction";
+
+export {
   loadEditorUiState,
   saveEditorUiState,
   editorFieldToSchemaPath,

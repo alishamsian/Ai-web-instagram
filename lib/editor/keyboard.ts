@@ -10,7 +10,10 @@ export type EditorKeyCommand =
   | "focusMode"
   | "searchProperties"
   | "toggleLeftPanel"
-  | "toggleRightPanel";
+  | "toggleRightPanel"
+  | "zoomFit"
+  | "zoom100"
+  | "zoom75";
 
 export function resolveEditorKeyCommand(
   event: Pick<
@@ -37,6 +40,11 @@ export function resolveEditorKeyCommand(
   }
 
   if (!meta) return null;
+
+  // Zoom: ⌘0 Fit · ⌘1 100% · ⌘2 75% (avoid conflicting with browser tab shortcuts when possible)
+  if (!options.typing && key === "0") return "zoomFit";
+  if (!options.typing && key === "1") return "zoom100";
+  if (!options.typing && key === "2") return "zoom75";
 
   if (key === "/" || key === "?") return "searchProperties";
   if (key.toLowerCase() === "b" && !event.shiftKey) return "toggleLeftPanel";

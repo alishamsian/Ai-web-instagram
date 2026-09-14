@@ -424,9 +424,18 @@ export function SchemaInspectorPanel({
     if (!rankedGroups.length) return;
     const searching = Boolean(query.trim());
     if (searching) {
-      const next: Record<string, boolean> = {};
-      for (const [group] of rankedGroups) next[group] = true;
-      setOpenGroups(next);
+      setOpenGroups((prev) => {
+        const next: Record<string, boolean> = {};
+        let changed = false;
+        for (const [group] of rankedGroups) {
+          next[group] = true;
+          if (!prev[group]) changed = true;
+        }
+        for (const key of Object.keys(prev)) {
+          if (!(key in next)) changed = true;
+        }
+        return changed ? next : prev;
+      });
       return;
     }
     const preferred =
@@ -436,7 +445,12 @@ export function SchemaInspectorPanel({
         ),
       )?.[0] ?? rankedGroups[0]?.[0];
     if (!preferred) return;
-    setOpenGroups({ [preferred]: true });
+    setOpenGroups((prev) => {
+      if (prev[preferred] === true && Object.keys(prev).length === 1) {
+        return prev;
+      }
+      return { [preferred]: true };
+    });
   }, [section.id, selectedField, query, rankedGroups]);
 
   useEffect(() => {
