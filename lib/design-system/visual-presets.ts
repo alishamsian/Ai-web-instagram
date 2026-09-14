@@ -100,7 +100,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "تصویر تمام‌قد، لایه‌بندی کنترل‌شده و CTA شناور", en: "Full-bleed imagery, restrained layers and floating action" },
     signature: { composition: "full-bleed", typography: "high-contrast-sans", spacing: "heroic", media: "cover-focus", cta: "floating-solid" },
     recommendedSections: { navbar: "transparent-overlay", hero: "immersive", content: "image-led", products: "rail", gallery: "masonry", trust: "overlay-stats", conversion: "floating" },
-    recommendedVariants: { hero: "overlay", "featured-products": "rail", products: "classic", gallery: "lookbook", cta: "promo" },
+    recommendedVariants: { hero: "overlay", "featured-products": "rail", products: "rail", gallery: "masonry", cta: "promo", trust: "metrics" },
     responsive: { mobile: "crop-safe-stack", tablet: "full-bleed", desktop: "full-height" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -190,7 +190,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "بلوک‌های متنوع با یک نقطه تمرکز واضح", en: "Variable blocks with one unmistakable focal point" },
     signature: { composition: "bento", typography: "mixed-scale", spacing: "tight-rhythm", media: "mixed-crop", cta: "block-action" },
     recommendedSections: { navbar: "minimal", hero: "bento", content: "bento-story", products: "bento-products", gallery: "collage", trust: "metric-cards", conversion: "featured-block" },
-    recommendedVariants: { hero: "minimal", products: "classic", gallery: "grid", about: "story", cta: "banner" },
+    recommendedVariants: { hero: "minimal", products: "rail", gallery: "collage", about: "image-led", cta: "minimal", trust: "inline" },
     responsive: { mobile: "priority-stack", tablet: "bento-2", desktop: "bento-12" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -208,7 +208,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "تصویرمحور، تک‌رنگ و مناسب پورتفولیو", en: "Image-led, monochrome and portfolio-ready" },
     signature: { composition: "gallery-first", typography: "mono-sans", spacing: "measured", media: "edge-to-edge", cta: "text-link" },
     recommendedSections: { navbar: "portfolio", hero: "gallery-hero", content: "captioned", products: "case-grid", gallery: "masonry", trust: "clients", conversion: "contact-link" },
-    recommendedVariants: { hero: "overlay", products: "editorial", gallery: "lookbook", about: "editorial", cta: "banner" },
+    recommendedVariants: { hero: "overlay", products: "editorial", gallery: "masonry", about: "editorial", cta: "minimal", trust: "quotes" },
     responsive: { mobile: "single-flow", tablet: "masonry-2", desktop: "masonry-3" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
     designHints: {

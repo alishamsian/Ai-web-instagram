@@ -10,7 +10,7 @@ export type TemplateType =
 export type WebsiteSectionType =
   | "hero" | "about" | "products" | "services" | "gallery" | "featured-posts"
   | "featured-products" | "categories" | "product-spotlight" | "bestsellers" | "instagram-feed"
-  | "testimonials" | "faq" | "contact" | "location" | "social" | "cta" | "promo" | "footer"
+  | "testimonials" | "trust" | "faq" | "contact" | "location" | "social" | "cta" | "promo" | "footer"
   | "shop-by-concern" | "shop-by-skin-type" | "routine" | "ingredient-story" | "product-finder"
   | "lookbook" | "shop-the-look" | "collection-story" | "style-guide" | "designer-spotlight" | "fit-guide"
   | "shop-by-material" | "shop-by-occasion" | "stack-builder" | "jewelry-care"

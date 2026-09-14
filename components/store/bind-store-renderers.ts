@@ -18,8 +18,10 @@ import {
   renderProductSpotlightSection,
   renderProductsSection,
   renderPromoSection,
+  renderTrustSection,
   renderUnsupportedStoreSection,
 } from "@/components/store/section-adapters";
+import { ensureVariantRenderersBound } from "@/components/store/variants/bind-variant-renderers";
 import {
   renderBrewGuideSection,
   renderCoffeeFinderSection,
@@ -71,8 +73,9 @@ export function ensureStoreSectionRenderersBound() {
     contact: renderContactSection,
     cta: renderPromoSection,
     promo: renderPromoSection,
+    trust: renderTrustSection,
     footer: renderFooterSection,
-    testimonials: renderUnsupportedStoreSection,
+    testimonials: renderTrustSection,
     services: renderUnsupportedStoreSection,
     location: renderUnsupportedStoreSection,
     social: renderUnsupportedStoreSection,
@@ -114,6 +117,7 @@ export function ensureStoreSectionRenderersBound() {
     projects: renderProjectsSection,
     "room-inspiration": renderRoomInspirationSection,
   });
+  ensureVariantRenderersBound();
 }
 
 // Bind on module evaluation for Store client tree.

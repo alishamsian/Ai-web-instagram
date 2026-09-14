@@ -305,6 +305,32 @@ const PRODUCT_CARD_VARIANTS: SectionVariant[] = [
       recommendedForPresets: ["quiet-luxury", "minimal-editorial"],
     },
   ),
+  v(
+    "rail",
+    { fa: "ریلی افقی", en: "Horizontal rail" },
+    {
+      signature: {
+        composition: "horizontal-product-rail",
+        alignment: "start",
+        typography: "compact-meta",
+        density: "comfortable",
+        media: "portrait-rail",
+        cta: "card-action",
+        hierarchy: "scroll-browse",
+      },
+      responsive: {
+        mobile: "rail-scroll",
+        tablet: "rail-scroll",
+        desktop: "rail-scroll",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsPrice: true,
+        supportsMultipleItems: true,
+      },
+      recommendedForPresets: ["immersive-cinema", "bold-commerce"],
+    },
+  ),
 ];
 
 /**
@@ -527,6 +553,58 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
           },
         },
       ),
+      v(
+        "spotlight",
+        { fa: "اسپات‌لایت", en: "Spotlight" },
+        {
+          signature: {
+            composition: "hero-product-plus-support",
+            alignment: "start",
+            typography: "feature-display",
+            density: "spacious",
+            media: "hero-portrait",
+            cta: "primary-inline",
+            hierarchy: "lead-then-grid",
+          },
+          responsive: {
+            mobile: "priority-content-first",
+            tablet: "asymmetric",
+            desktop: "asymmetric",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsPrice: true,
+            supportsDescription: true,
+          },
+        },
+      ),
+      v(
+        "editorial",
+        { fa: "ادیتوریال", en: "Editorial" },
+        {
+          signature: {
+            composition: "featured-editorial-stage",
+            alignment: "start",
+            typography: "editorial-serif",
+            density: "spacious",
+            media: "large-product",
+            cta: "understated",
+            hierarchy: "story-product",
+          },
+          responsive: {
+            mobile: "media-first",
+            tablet: "editorial-stack",
+            desktop: "asymmetric",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsPrice: true,
+            supportsDescription: true,
+          },
+        },
+      ),
     ],
     verticals: ["*"],
     capabilities: withCaps({ dataSource: true }),
@@ -702,6 +780,32 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
           },
         },
       ),
+      v(
+        "rail",
+        { fa: "ریلی", en: "Rail" },
+        {
+          signature: {
+            composition: "bestseller-horizontal-rail",
+            alignment: "start",
+            typography: "compact-meta",
+            density: "compact",
+            media: "portrait-rail",
+            cta: "card-action",
+            hierarchy: "scroll-browse",
+          },
+          responsive: {
+            mobile: "rail-scroll",
+            tablet: "rail-scroll",
+            desktop: "rail-scroll",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsPrice: true,
+            supportsBadge: true,
+          },
+        },
+      ),
     ],
     verticals: ["*"],
     capabilities: withCaps({ dataSource: true }),
@@ -761,6 +865,30 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
             supportsImage: true,
             supportsDescription: true,
             supportsRichText: true,
+          },
+        },
+      ),
+      v(
+        "image-led",
+        { fa: "تصویرمحور", en: "Image-led" },
+        {
+          signature: {
+            composition: "about-image-dominant",
+            alignment: "start",
+            typography: "compact-caption",
+            density: "comfortable",
+            media: "dominant-cover",
+            cta: "none",
+            hierarchy: "media-then-copy",
+          },
+          responsive: {
+            mobile: "media-first",
+            tablet: "media-first",
+            desktop: "asymmetric",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsDescription: true,
           },
         },
       ),
@@ -845,6 +973,56 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
             supportsMultipleItems: true,
             supportsReorder: true,
           },
+        },
+      ),
+      v(
+        "masonry",
+        { fa: "میسونری", en: "Masonry" },
+        {
+          signature: {
+            composition: "variable-masonry",
+            alignment: "start",
+            typography: "meta-quiet",
+            density: "comfortable",
+            media: "variable-ratio",
+            cta: "none",
+            hierarchy: "rhythm-tiles",
+          },
+          responsive: {
+            mobile: "grid-2",
+            tablet: "masonry-2",
+            desktop: "bento-priority-stack",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+          },
+          recommendedForPresets: ["mono-gallery", "bento-creative"],
+        },
+      ),
+      v(
+        "collage",
+        { fa: "کلاژ", en: "Collage" },
+        {
+          signature: {
+            composition: "offset-collage",
+            alignment: "center",
+            typography: "quiet-caption",
+            density: "spacious",
+            media: "overlapping-frames",
+            cta: "none",
+            hierarchy: "asymmetric-stage",
+          },
+          responsive: {
+            mobile: "priority-content-first",
+            tablet: "centered-collapse",
+            desktop: "asymmetric",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+          },
+          recommendedForPresets: ["bento-creative"],
         },
       ),
     ],
@@ -940,6 +1118,118 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     category: "social",
     label: { fa: "نظرات", en: "Testimonials" },
     description: { fa: "گواهی مشتریان", en: "Customer social proof" },
+    variants: [
+      v(
+        "quotes",
+        { fa: "نقل‌قول", en: "Quotes" },
+        {
+          default: true,
+          signature: {
+            composition: "testimonial-quote-cards",
+            alignment: "start",
+            typography: "quote-serif",
+            density: "comfortable",
+            media: "none",
+            cta: "none",
+            hierarchy: "quote-author",
+          },
+          responsive: {
+            mobile: "priority-content-first",
+            tablet: "grid-2",
+            desktop: "grid-3",
+          },
+          capabilities: {
+            supportsMultipleItems: true,
+            supportsRichText: true,
+          },
+        },
+      ),
+    ],
+    verticals: ["*"],
+    capabilities: withCaps(),
+    preview: { thumbnailTone: "neutral", aspect: "16/9" },
+  },
+  {
+    type: "trust",
+    category: "social",
+    label: { fa: "اعتماد", en: "Trust" },
+    description: {
+      fa: "اثبات اجتماعی و نشانه‌های اعتماد",
+      en: "Social proof and trust signals",
+    },
+    variants: [
+      v(
+        "metrics",
+        { fa: "شاخص‌ها", en: "Metrics" },
+        {
+          default: true,
+          signature: {
+            composition: "trust-metric-row",
+            alignment: "center",
+            typography: "stat-display",
+            density: "comfortable",
+            media: "none",
+            cta: "none",
+            hierarchy: "equal-stats",
+          },
+          responsive: {
+            mobile: "priority-content-first",
+            tablet: "grid-3",
+            desktop: "grid-4",
+          },
+          capabilities: {
+            supportsMultipleItems: true,
+          },
+        },
+      ),
+      v(
+        "inline",
+        { fa: "ردیفی", en: "Inline" },
+        {
+          signature: {
+            composition: "trust-inline-strip",
+            alignment: "center",
+            typography: "meta-quiet",
+            density: "compact",
+            media: "none",
+            cta: "none",
+            hierarchy: "reassurance-row",
+          },
+          responsive: {
+            mobile: "priority-content-first",
+            tablet: "centered-collapse",
+            desktop: "centered-collapse",
+          },
+          capabilities: {
+            supportsMultipleItems: true,
+          },
+        },
+      ),
+      v(
+        "quotes",
+        { fa: "نقل‌قول", en: "Quotes" },
+        {
+          signature: {
+            composition: "trust-quote-proof",
+            alignment: "start",
+            typography: "quote-serif",
+            density: "spacious",
+            media: "none",
+            cta: "none",
+            hierarchy: "quote-author",
+          },
+          responsive: {
+            mobile: "priority-content-first",
+            tablet: "grid-2",
+            desktop: "grid-3",
+          },
+          capabilities: {
+            supportsMultipleItems: true,
+            supportsRichText: true,
+          },
+        },
+      ),
+    ],
     verticals: ["*"],
     capabilities: withCaps(),
     preview: { thumbnailTone: "neutral", aspect: "16/9" },
@@ -1069,6 +1359,30 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
             supportsPrimaryCTA: true,
             supportsBadge: true,
           },
+        },
+      ),
+      v(
+        "minimal",
+        { fa: "مینیمال", en: "Minimal" },
+        {
+          signature: {
+            composition: "cta-type-led",
+            alignment: "start",
+            typography: "restrained-heading",
+            density: "spacious",
+            media: "none",
+            cta: "quiet-outline",
+            hierarchy: "title-only-cta",
+          },
+          responsive: {
+            mobile: "centered-collapse",
+            tablet: "centered-collapse",
+            desktop: "centered-collapse",
+          },
+          capabilities: {
+            supportsPrimaryCTA: true,
+          },
+          motion: "none",
         },
       ),
     ],
