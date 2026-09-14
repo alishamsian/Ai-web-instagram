@@ -60,6 +60,19 @@ export interface WebsiteConfig {
   settings: WebsiteSettings;
   media: Record<string, { url: string; alt: string; type: "image" | "video"; videoUrl?: string | null }>;
 }
-export interface WebsiteRecord { id: string; workspaceId: string; importId: string; slug: string; config: WebsiteConfig; status: "draft" | "published" | "unpublished"; version: number; createdAt: string; updatedAt: string; publishedAt: string | null; }
+export interface WebsiteRecord {
+  id: string;
+  workspaceId: string;
+  importId: string;
+  slug: string;
+  config: WebsiteConfig;
+  status: "draft" | "published" | "unpublished";
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
+  /** Soft-delete timestamp — product queries exclude when set. */
+  deletedAt?: string | null;
+}
 export interface WebsiteVersion { id: string; websiteId: string; version: number; config: WebsiteConfig; createdAt: string; }
 export interface DomainRecord { id: string; websiteId: string; host: string; createdAt: string; }

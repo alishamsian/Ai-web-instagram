@@ -29,7 +29,7 @@ import { resolveWorkspaceWebsite } from "@/lib/dashboard/primary-site";
 /** Dashboard chrome: sidebar + header tools. Nav items live in nav-items.ts */
 async function NavWithMetrics(props: {
   workspaceId: string;
-  plan: "free" | "pro";
+  plan: "free" | "pro" | "business";
   locale: "fa" | "en";
   dict: ReturnType<typeof getDictionary>;
   websiteHref: string;
@@ -69,7 +69,7 @@ async function HeaderUsage({
   workspaceName,
 }: {
   workspaceId: string;
-  plan: "free" | "pro";
+  plan: "free" | "pro" | "business";
   locale: "fa" | "en";
   workspaceName: string;
 }) {

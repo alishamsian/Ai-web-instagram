@@ -75,6 +75,7 @@ export {
   softDeleteColumns,
   restoreSoftDeleteColumns,
   isSoftDeleted,
+  excludeSoftDeleted,
   SOFT_DELETE_ENTITIES,
   type SoftDeleteMeta,
   type SoftDeleteEntity,
@@ -97,3 +98,42 @@ export {
   type DailyMetricKey,
   type DailyMetricIncrement,
 } from "@/lib/admin/metrics";
+export {
+  resolveDateRange,
+  resolveComparisonPeriod,
+  dateKeysInRange,
+  type DateRange,
+  type DateRangePreset,
+  type ComparisonPeriod,
+} from "@/lib/admin/dates";
+export type {
+  MetricResult,
+  ComparableMetric,
+  DashboardKpis,
+  RevenueMetrics,
+  UserMetrics,
+  WebsiteMetrics,
+  ImportMetrics,
+  AIMetrics,
+  SystemHealthMetrics,
+  ActivityItem,
+  AlertSummary,
+} from "@/lib/admin/contracts";
+export { DASHBOARD_METRIC_SOURCES } from "@/lib/admin/contracts";
+export {
+  getAdminDashboardMetrics,
+  getAdminUsers,
+  getAdminWorkspaces,
+  getAdminWebsites,
+  getAdminImports,
+  getAdminJobs,
+  getAdminRevenue,
+  getAdminOrders,
+  getAdminAIUsage,
+  getAdminSystemHealth,
+  getAdminAlerts,
+  getAdminActivity,
+  getAdminUserMetrics,
+  getAdminWebsiteMetrics,
+  getAdminImportMetrics,
+} from "@/lib/admin/queries";

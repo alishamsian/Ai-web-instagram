@@ -13,6 +13,7 @@ import {
 } from "@/components/dashboard/ui";
 import { WaitlistForm } from "@/components/dashboard/WaitlistForm";
 import { cn } from "@/lib/utils";
+import { isProPlan, normalizePlanId } from "@/lib/config/plans";
 
 export default async function BillingPage({
   params,
@@ -24,7 +25,8 @@ export default async function BillingPage({
   const session = await getSession();
   if (!session) redirect(`/${locale}/login`);
 
-  const current = session.workspace.plan === "pro" ? "pro" : "free";
+  const current = normalizePlanId(session.workspace.plan);
+  const isPaid = isProPlan(current);
 
   return (
     <PageStack>
@@ -37,27 +39,31 @@ export default async function BillingPage({
       <Panel
         title={dict.dashboard.currentPlan}
         description={
-          current === "pro"
+          isPaid
             ? dict.dashboard.billingBody
             : dict.dashboard.freeForever
         }
         action={
           <StatusBadge tone="accent">
-            {current === "pro"
+            {current === "business"
               ? locale === "fa"
-                ? "حرفه‌ای"
-                : "Pro"
-              : locale === "fa"
-                ? "شروع"
-                : "Starter"}
+                ? "بیزنس"
+                : "Business"
+              : current === "pro"
+                ? locale === "fa"
+                  ? "حرفه‌ای"
+                  : "Pro"
+                : locale === "fa"
+                  ? "شروع"
+                  : "Starter"}
           </StatusBadge>
         }
       >
         <div className="px-5 py-5 text-sm text-muted-foreground">
-          {current === "pro"
+          {isPaid
             ? locale === "fa"
-              ? "همه قابلیت‌های حرفه‌ای برای این ورک‌اسپیس فعال است."
-              : "All Pro capabilities are active on this workspace."
+              ? "قابلیت‌های پلن پولی برای این ورک‌اسپیس فعال است."
+              : "Paid-plan capabilities are active on this workspace."
             : dict.dashboard.freeForever}
         </div>
       </Panel>
@@ -66,7 +72,7 @@ export default async function BillingPage({
         {pricing.plans.map((plan) => {
           const active =
             (plan.id === "free" && current === "free") ||
-            (plan.id === "pro" && current === "pro");
+            (plan.id === "pro" && (current === "pro" || current === "business"));
           const featured = plan.featured;
           return (
             <article

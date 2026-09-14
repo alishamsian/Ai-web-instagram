@@ -43,6 +43,14 @@ export function isSoftDeleted(row: {
   return Boolean(row.deleted_at ?? row.deletedAt);
 }
 
+/** Product queries must exclude soft-deleted rows by default. */
+export function excludeSoftDeleted<T extends {
+  deleted_at?: string | null;
+  deletedAt?: string | null;
+}>(rows: T[]): T[] {
+  return rows.filter((row) => !isSoftDeleted(row));
+}
+
 /** Entities where soft-delete has meaningful recovery value. */
 export const SOFT_DELETE_ENTITIES = ["websites", "workspaces"] as const;
 export type SoftDeleteEntity = (typeof SOFT_DELETE_ENTITIES)[number];

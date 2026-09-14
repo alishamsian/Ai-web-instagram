@@ -2,6 +2,8 @@ import { cache } from "react";
 import type { AppStore } from "@/lib/database/store";
 import { readBlobStore, writeBlobStore } from "@/lib/database/supabase-blob-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { normalizePlanId } from "@/lib/admin/entitlements";
+import { isSoftDeleted } from "@/lib/admin/soft-delete";
 import type { ImportJob } from "@/types/jobs";
 import type { InstagramImport } from "@/types/instagram";
 import type { User, Workspace } from "@/types/user";
@@ -53,6 +55,7 @@ export type WebsiteRow = {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 };
 
 export type DomainRow = {
@@ -126,12 +129,13 @@ function mapWorkspace(row: {
   name: string;
   plan: string;
   created_at: string;
+  deleted_at?: string | null;
 }): Workspace {
   return {
     id: row.id,
     ownerId: row.owner_id,
     name: row.name,
-    plan: row.plan === "pro" ? "pro" : "free",
+    plan: normalizePlanId(row.plan),
     createdAt: row.created_at,
   };
 }
@@ -193,6 +197,7 @@ export function mapWebsiteRow(row: WebsiteRow): WebsiteRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     publishedAt: row.published_at,
+    deletedAt: row.deleted_at ?? null,
   };
 }
 
@@ -250,20 +255,30 @@ async function readTableStore(): Promise<AppStore> {
         },
       ),
     ),
-    workspaces: (workspaces.data ?? []).map((row) =>
-      mapWorkspace(
-        row as {
-          id: string;
-          owner_id: string;
-          name: string;
-          plan: string;
-          created_at: string;
-        },
+    workspaces: (workspaces.data ?? [])
+      .filter(
+        (row) =>
+          !isSoftDeleted(
+            row as { deleted_at?: string | null },
+          ),
+      )
+      .map((row) =>
+        mapWorkspace(
+          row as {
+            id: string;
+            owner_id: string;
+            name: string;
+            plan: string;
+            created_at: string;
+            deleted_at?: string | null;
+          },
+        ),
       ),
-    ),
     jobs: (jobs.data ?? []).map((row) => mapJob(row as JobRow)),
     imports: (imports.data ?? []).map((row) => mapImport(row as ImportRow)),
-    websites: (websites.data ?? []).map((row) => mapWebsite(row as WebsiteRow)),
+    websites: (websites.data ?? [])
+      .filter((row) => !isSoftDeleted(row as WebsiteRow))
+      .map((row) => mapWebsite(row as WebsiteRow)),
     versions: (versions.data ?? []).map((row) => ({
       id: row.id as string,
       websiteId: row.website_id as string,

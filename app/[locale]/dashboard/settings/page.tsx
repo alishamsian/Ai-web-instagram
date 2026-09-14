@@ -19,6 +19,7 @@ import {
   SoftBanner,
   StatusBadge,
 } from "@/components/dashboard/ui";
+import { normalizePlanId } from "@/lib/config/plans";
 
 export default async function SettingsPage({
   params,
@@ -34,15 +35,20 @@ export default async function SettingsPage({
     getWorkspaceNotificationSettings(session.workspace.id),
   ]);
   const isFa = locale === "fa";
+  const plan = normalizePlanId(session.workspace.plan);
 
   const planLabel =
-    session.workspace.plan === "pro"
+    plan === "business"
       ? isFa
-        ? "حرفه‌ای"
-        : "Pro"
-      : isFa
-        ? "شروع"
-        : "Starter";
+        ? "بیزنس"
+        : "Business"
+      : plan === "pro"
+        ? isFa
+          ? "حرفه‌ای"
+          : "Pro"
+        : isFa
+          ? "شروع"
+          : "Starter";
 
   return (
     <PageStack>

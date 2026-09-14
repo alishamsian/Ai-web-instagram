@@ -88,11 +88,11 @@ export function EditorShell({
 }: {
   website: WebsiteRecord;
   locale: Locale;
-  plan?: "free" | "pro";
+  plan?: "free" | "pro" | "business";
 }) {
   const dict = getDictionary(locale);
   const router = useRouter();
-  const canRemoveBranding = plan === "pro";
+  const canRemoveBranding = plan === "pro" || plan === "business";
 
   const [config, setConfig] = useState<WebsiteConfig>(() =>
     polishWebsiteConfig(cloneConfig(website.config)),

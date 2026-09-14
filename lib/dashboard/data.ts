@@ -56,6 +56,7 @@ async function fetchWorkspaceDashboardData(
         .from("websites")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
         .order("updated_at", { ascending: false }),
       db
         .from("instagram_imports")
@@ -83,7 +84,7 @@ async function fetchWorkspaceDashboardData(
 
   const store = await readStore();
   const websites = store.websites
-    .filter((item) => item.workspaceId === workspaceId)
+    .filter((item) => item.workspaceId === workspaceId && !item.deletedAt)
     .sort(
       (a, b) =>
         new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
@@ -137,6 +138,7 @@ export const getWorkspaceWebsites = cache(
             .from("websites")
             .select("*")
             .eq("workspace_id", workspaceId)
+            .is("deleted_at", null)
             .order("updated_at", { ascending: false });
           return (data ?? []).map((row) => mapWebsiteRow(row as WebsiteRow));
         },

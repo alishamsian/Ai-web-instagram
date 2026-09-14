@@ -8,6 +8,7 @@ import {
 } from "@/lib/database/supabase-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readStore } from "@/lib/database/store";
+import { isSoftDeleted } from "@/lib/admin/soft-delete";
 import type { DomainRecord, WebsiteRecord } from "@/types/website";
 
 export async function getWebsiteById(
@@ -19,12 +20,15 @@ export async function getWebsiteById(
       .from("websites")
       .select("*")
       .eq("id", id)
+      .is("deleted_at", null)
       .maybeSingle();
     if (error || !data) return null;
     return mapWebsiteRow(data as WebsiteRow);
   }
   const store = await readStore();
-  return store.websites.find((w) => w.id === id) ?? null;
+  const site = store.websites.find((w) => w.id === id);
+  if (!site || isSoftDeleted(site)) return null;
+  return site;
 }
 
 export async function getWebsiteForWorkspace(
@@ -46,14 +50,17 @@ export async function getPublishedWebsiteBySlug(
       .select("*")
       .eq("slug", slug)
       .eq("status", "published")
+      .is("deleted_at", null)
       .maybeSingle();
     if (error || !data) return null;
     return mapWebsiteRow(data as WebsiteRow);
   }
   const store = await readStore();
   return (
-    store.websites.find((w) => w.slug === slug && w.status === "published") ??
-    null
+    store.websites.find(
+      (w) =>
+        w.slug === slug && w.status === "published" && !isSoftDeleted(w),
+    ) ?? null
   );
 }
 
@@ -149,22 +156,26 @@ export async function getPublishedSlugByCustomHost(
     const db = getSupabaseAdmin();
     const { data, error } = await db
       .from("domains")
-      .select("host, website_id, websites!inner(slug, status)")
+      .select("host, website_id, websites!inner(slug, status, deleted_at)")
       .eq("host", normalized)
       .maybeSingle();
     if (error || !data) return null;
     const website = data.websites as unknown as {
       slug: string;
       status: string;
+      deleted_at?: string | null;
     };
-    if (website.status !== "published") return null;
+    if (website.status !== "published" || website.deleted_at) return null;
     return website.slug;
   }
   const store = await readStore();
   const domain = (store.domains ?? []).find((d) => d.host === normalized);
   if (!domain) return null;
   const site = store.websites.find(
-    (w) => w.id === domain.websiteId && w.status === "published",
+    (w) =>
+      w.id === domain.websiteId &&
+      w.status === "published" &&
+      !isSoftDeleted(w),
   );
   return site?.slug ?? null;
 }
@@ -175,12 +186,15 @@ export async function countWebsitesForWorkspace(workspaceId: string) {
     const { count, error } = await db
       .from("websites")
       .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId);
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null);
     if (error) return 0;
     return count ?? 0;
   }
   const store = await readStore();
-  return store.websites.filter((w) => w.workspaceId === workspaceId).length;
+  return store.websites.filter(
+    (w) => w.workspaceId === workspaceId && !isSoftDeleted(w),
+  ).length;
 }
 
 export async function listPublishedWebsiteSlugs(): Promise<
@@ -192,6 +206,7 @@ export async function listPublishedWebsiteSlugs(): Promise<
       .from("websites")
       .select("slug, updated_at")
       .eq("status", "published")
+      .is("deleted_at", null)
       .order("updated_at", { ascending: false })
       .limit(5000);
     if (error || !data) return [];
@@ -202,6 +217,6 @@ export async function listPublishedWebsiteSlugs(): Promise<
   }
   const store = await readStore();
   return store.websites
-    .filter((w) => w.status === "published")
+    .filter((w) => w.status === "published" && !isSoftDeleted(w))
     .map((w) => ({ slug: w.slug, updatedAt: w.updatedAt }));
 }

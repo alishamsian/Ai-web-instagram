@@ -10,7 +10,7 @@ export interface Workspace {
   id: string;
   ownerId: string;
   name: string;
-  plan: "free" | "pro";
+  plan: "free" | "pro" | "business";
   createdAt: string;
 }
 

@@ -551,6 +551,9 @@ export async function processImportJob(
         userId: job.userId,
         provider: process.env.AI_API_KEY ? "openai" : "mock",
         model: process.env.AI_MODEL ?? null,
+        promptVersion: "import_analyze.v1",
+        schemaVersion: "business_intelligence.v1",
+        rendererVersion: "website_config.v1",
       });
       const aiStarted = Date.now();
       analysis = await withJobHeartbeat(jobId, () =>
@@ -567,6 +570,9 @@ export async function processImportJob(
         userId: job.userId,
         provider: process.env.AI_API_KEY ? "openai" : "mock",
         model: process.env.AI_MODEL ?? null,
+        promptVersion: "import_analyze.v1",
+        schemaVersion: "business_intelligence.v1",
+        rendererVersion: "website_config.v1",
         latencyMs: Date.now() - aiStarted,
       });
     } catch (error) {
@@ -575,6 +581,11 @@ export async function processImportJob(
         status: "failed",
         workspaceId: job.workspaceId,
         userId: job.userId,
+        provider: process.env.AI_API_KEY ? "openai" : "mock",
+        model: process.env.AI_MODEL ?? null,
+        promptVersion: "import_analyze.v1",
+        schemaVersion: "business_intelligence.v1",
+        rendererVersion: "website_config.v1",
         errorMessage:
           error instanceof Error ? error.message.slice(0, 200) : "ai_error",
       });

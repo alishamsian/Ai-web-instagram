@@ -8,6 +8,7 @@ import { isSupabaseSchemaReady } from "@/lib/database/supabase-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { validatePasswordStrength } from "@/lib/auth/password";
+import { normalizePlanId } from "@/lib/admin/entitlements";
 import type { Session, User, Workspace } from "@/types/user";
 
 
@@ -37,6 +38,7 @@ async function loadWorkspaceForUserUncached(
         .from("workspaces")
         .select("*")
         .eq("owner_id", userId)
+        .is("deleted_at", null)
         .order("created_at")
         .limit(1)
         .maybeSingle(),
@@ -80,7 +82,7 @@ async function loadWorkspaceForUserUncached(
         id: workspaceRow.id,
         ownerId: workspaceRow.owner_id,
         name: workspaceRow.name,
-        plan: workspaceRow.plan === "pro" ? "pro" : "free",
+        plan: normalizePlanId(workspaceRow.plan),
         createdAt: workspaceRow.created_at,
       },
     } satisfies Session;
