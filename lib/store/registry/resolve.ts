@@ -58,7 +58,7 @@ export function isKnownStoreSection(type: string): boolean {
   return hasSection(type);
 }
 
-/** Stable React keys — never use array index. */
+/** Stable React keys — include variant so composition swaps remount cleanly. */
 export function sectionRenderKey(section: SectionConfig): string {
-  return section.id;
+  return `${section.id}:${section.variant ?? "default"}`;
 }

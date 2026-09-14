@@ -35,6 +35,7 @@ import {
   commandPatchSectionSettings,
   applyCommandResult,
 } from "@/lib/editor";
+import { SectionVariantLibrary } from "@/components/editor/variant-library/SectionVariantLibrary";
 import { getSectionVariants } from "@/lib/store/registry/catalog";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { MediaPicker } from "@/components/editor/MediaPicker";
@@ -115,7 +116,7 @@ export function EditorInspector({
   propertySearchFocus?: number;
   onSectionTabChange: (tab: SectionTab) => void;
   onSiteGroupChange: (group: SiteGroup) => void;
-  onChange: (next: WebsiteConfig) => void;
+  onChange: (next: WebsiteConfig, label?: string) => void;
   onRestored: (next: WebsiteConfig) => void;
   onOpenSections?: () => void;
   onAddSection?: () => void;
@@ -832,7 +833,7 @@ function SectionInspector({
   selectedField?: EditorFieldPath;
   viewport: "desktop" | "tablet" | "mobile";
   propertySearchFocus?: number;
-  onChange: (next: WebsiteConfig) => void;
+  onChange: (next: WebsiteConfig, label?: string) => void;
 }) {
   const [propertyQuery, setPropertyQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -870,12 +871,12 @@ function SectionInspector({
 
   return (
     <div className="space-y-3">
-      <SectionVariantPicker
-        sectionType={sectionType}
+      <SectionVariantLibrary
+        config={config}
         sectionId={sectionId}
+        sectionType={sectionType}
         currentVariant={section.variant}
         locale={locale}
-        config={config}
         onChange={onChange}
       />
       {schemaDriven ? (
@@ -1553,62 +1554,6 @@ function ProductPageInspector({
           />
         </label>
       </InspectorGroup>
-    </div>
-  );
-}
-
-function SectionVariantPicker({
-  sectionType,
-  sectionId,
-  currentVariant,
-  locale,
-  config,
-  onChange,
-}: {
-  sectionType: WebsiteSectionType;
-  sectionId: string;
-  currentVariant?: string;
-  locale: Locale;
-  config: WebsiteConfig;
-  onChange: (next: WebsiteConfig) => void;
-}) {
-  const variants = getSectionVariants(sectionType);
-  if (variants.length < 2) return null;
-  const active = currentVariant ?? variants[0]?.id;
-
-  return (
-    <div className="space-y-1.5">
-      <p className="text-[10px] font-semibold tracking-wide text-[color:var(--ed-subtle)] uppercase">
-        {locale === "fa" ? "واریانت" : "Variant"}
-      </p>
-      <div className="flex flex-wrap gap-1" role="group" aria-label="Variant">
-        {variants.map((variant) => {
-          const selected = active === variant.id;
-          return (
-            <button
-              key={variant.id}
-              type="button"
-              aria-pressed={selected}
-              className={cn(
-                "min-h-8 rounded-md px-2.5 text-[11px] font-medium transition",
-                selected
-                  ? "bg-[color:var(--ed-select-soft)] text-[color:var(--ed-fg)]"
-                  : "text-[color:var(--ed-muted)] hover:bg-[color:var(--ed-bg-hover)] hover:text-[color:var(--ed-fg)]",
-              )}
-              onClick={() => {
-                const result = commandSetSectionVariant(
-                  config,
-                  sectionId,
-                  variant.id,
-                );
-                if (result) onChange(result.config);
-              }}
-            >
-              {variant.label[locale]}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

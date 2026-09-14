@@ -53,6 +53,11 @@ export {
 } from "@/lib/editor/commands";
 
 export {
+  applySectionVariant,
+  buildVariantPreviewConfig,
+} from "@/lib/editor/apply-section-variant";
+
+export {
   commandAddProduct,
   commandDeleteProduct,
   commandDuplicateProduct,

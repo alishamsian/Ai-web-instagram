@@ -180,7 +180,9 @@ describe("store section resolve", () => {
     expect(sectionIsDimmed(config.sections[1]!, "editor")).toBe(true);
 
     const body = resolveStoreBodySections(config, "editor");
-    expect(body.every((s) => sectionRenderKey(s) === s.id)).toBe(true);
+    expect(
+      body.every((s) => sectionRenderKey(s) === `${s.id}:${s.variant ?? "default"}`),
+    ).toBe(true);
     expect(body.some((s) => s.type === "footer")).toBe(false);
   });
 
