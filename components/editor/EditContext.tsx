@@ -57,6 +57,9 @@ type EditorEditApi = {
     toId: string,
     place: SectionDropPlace,
   ) => void;
+  /** Open section library to insert after this section (null = end / empty). */
+  onRequestInsert?: (afterSectionId: string | null) => void;
+  onBrowseTemplates?: () => void;
   isSectionVisible?: (sectionId: string) => boolean;
 };
 
@@ -75,6 +78,8 @@ export function EditorEditProvider({
   onHoverSection,
   onSectionAction,
   onReorderSections,
+  onRequestInsert,
+  onBrowseTemplates,
   children,
 }: {
   enabled: boolean;
@@ -93,6 +98,8 @@ export function EditorEditProvider({
     toId: string,
     place: SectionDropPlace,
   ) => void;
+  onRequestInsert?: (afterSectionId: string | null) => void;
+  onBrowseTemplates?: () => void;
   children: ReactNode;
 }) {
   const onChangeText = useCallback(
@@ -180,6 +187,8 @@ export function EditorEditProvider({
         onChangeText,
         onSectionAction,
         onReorderSections,
+        onRequestInsert,
+        onBrowseTemplates,
         isSectionVisible,
       }}
     >

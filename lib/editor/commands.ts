@@ -1,7 +1,14 @@
-import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
+import type {
+  TemplateType,
+  WebsiteConfig,
+  WebsiteSectionType,
+} from "@/types/website";
 import { cloneWebsiteConfig, type EditorCommandResult } from "@/lib/editor/types";
 import { hasSection } from "@/lib/store/registry/catalog";
-import { addOrShowSection } from "@/components/editor/editor-utils";
+import {
+  addOrShowSection,
+  applyTemplate,
+} from "@/components/editor/editor-utils";
 import {
   applySchemaFieldUpdate,
   type ElementFieldSchema,
@@ -131,12 +138,15 @@ export function commandReorderSectionRelative(
 export function commandAddSection(
   config: WebsiteConfig,
   type: WebsiteSectionType,
+  options?: { afterSectionId?: string | null },
 ): EditorCommandResult | null {
   if (!hasSection(type)) return null;
-  const next = addOrShowSection(config, type);
+  const next = addOrShowSection(config, type, options);
+  const added = next.sections.find((s) => s.type === type && s.visible);
   return {
     config: next,
     label: `Add ${type}`,
+    selectedSectionId: added?.id ?? null,
   };
 }
 
@@ -178,6 +188,38 @@ export function commandSetBrandColor(
   };
 }
 
+export function commandSetBrandTypography(
+  config: WebsiteConfig,
+  patch: Partial<WebsiteConfig["brand"]["typography"]>,
+): EditorCommandResult {
+  return {
+    config: {
+      ...config,
+      brand: {
+        ...config.brand,
+        typography: { ...config.brand.typography, ...patch },
+      },
+    },
+    label: "Change typography",
+  };
+}
+
+export function commandSetBrandDesign(
+  config: WebsiteConfig,
+  patch: NonNullable<WebsiteConfig["brand"]["design"]>,
+): EditorCommandResult {
+  return {
+    config: {
+      ...config,
+      brand: {
+        ...config.brand,
+        design: { ...(config.brand.design ?? {}), ...patch },
+      },
+    },
+    label: "Change design",
+  };
+}
+
 export function commandApplyThemePreset(
   config: WebsiteConfig,
   presetId: DesignPresetId,
@@ -185,6 +227,16 @@ export function commandApplyThemePreset(
   return {
     config: applyDesignPreset(config, presetId),
     label: `Apply theme ${presetId}`,
+  };
+}
+
+export function commandApplyTemplate(
+  config: WebsiteConfig,
+  templateId: TemplateType,
+): EditorCommandResult {
+  return {
+    config: applyTemplate(config, templateId),
+    label: `Apply template ${templateId}`,
   };
 }
 

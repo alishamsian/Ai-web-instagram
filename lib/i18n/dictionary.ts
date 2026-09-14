@@ -722,6 +722,20 @@ export const fa = {
     statusUnpublished: "لغو انتشار",
     publishedAt: "آخرین انتشار",
     neverPublished: "هنوز منتشر نشده",
+    designSystem: "سیستم طراحی",
+    designContentWidth: "عرض محتوا",
+    designSectionSpacing: "فاصله بخش‌ها",
+    designRadius: "گردی گوشه",
+    designShadow: "سایه",
+    radiusSharp: "تیز",
+    radiusSoft: "نرم",
+    radiusRounded: "گرد",
+    shadowNone: "بدون",
+    shadowSubtle: "ملایم",
+    shadowElevated: "برجسته",
+    templateConfirmTitle: "اعمال قالب؟",
+    templateConfirmBody:
+      "ترتیب پیشنهادی بخش‌ها به «{name}» تغییر می‌کند. محتوای متن حفظ می‌شود.",
   },
 };
 
@@ -1446,6 +1460,20 @@ export const en: Dictionary = {
     statusUnpublished: "Unpublished",
     publishedAt: "Last published",
     neverPublished: "Not published yet",
+    designSystem: "Design system",
+    designContentWidth: "Content width",
+    designSectionSpacing: "Section spacing",
+    designRadius: "Corner radius",
+    designShadow: "Shadows",
+    radiusSharp: "Sharp",
+    radiusSoft: "Soft",
+    radiusRounded: "Rounded",
+    shadowNone: "None",
+    shadowSubtle: "Subtle",
+    shadowElevated: "Elevated",
+    templateConfirmTitle: "Apply template?",
+    templateConfirmBody:
+      "Suggested section order will switch to “{name}”. Your copy stays intact.",
   },
 };
 

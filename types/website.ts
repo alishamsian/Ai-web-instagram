@@ -76,6 +76,19 @@ export interface TypographyConfig {
   scale: "editorial" | "compact" | "bold";
 }
 
+/** Global layout / shape / elevation — optional for backward compatibility. */
+export type DesignContentWidth = "narrow" | "default" | "wide";
+export type DesignSectionSpacing = "compact" | "comfortable" | "spacious";
+export type DesignRadius = "sharp" | "soft" | "rounded";
+export type DesignShadow = "none" | "subtle" | "elevated";
+
+export interface BrandDesignConfig {
+  contentWidth?: DesignContentWidth;
+  sectionSpacing?: DesignSectionSpacing;
+  radius?: DesignRadius;
+  shadow?: DesignShadow;
+}
+
 export interface HeroConfig {
   style: "editorial" | "split" | "minimal" | "overlay" | "menu" | "fan";
   headline: string;
@@ -167,6 +180,8 @@ export interface WebsiteConfig {
     tagline?: string;
     colors: ColorConfig;
     typography: TypographyConfig;
+    /** Optional global design tokens (layout / radius / shadow). */
+    design?: BrandDesignConfig;
   };
   content: {
     hero: HeroConfig;

@@ -313,3 +313,91 @@ export function LayoutPanel({
     </div>
   );
 }
+
+export function DesignSystemPanel({
+  config,
+  dict,
+  onChange,
+}: {
+  config: WebsiteConfig;
+  dict: Dictionary;
+  onChange: (next: WebsiteConfig) => void;
+}) {
+  const design = {
+    contentWidth: config.brand.design?.contentWidth ?? "default",
+    sectionSpacing: config.brand.design?.sectionSpacing ?? "comfortable",
+    radius: config.brand.design?.radius ?? "soft",
+    shadow: config.brand.design?.shadow ?? "subtle",
+  } as const;
+
+  function patch(next: Partial<typeof design>) {
+    onChange({
+      ...config,
+      brand: {
+        ...config.brand,
+        design: { ...(config.brand.design ?? {}), ...next },
+      },
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          {dict.editor.designContentWidth}
+        </p>
+        <Segmented
+          value={design.contentWidth}
+          onChange={(contentWidth) => patch({ contentWidth })}
+          options={[
+            { id: "narrow", label: dict.editor.widthNarrow },
+            { id: "default", label: dict.editor.widthMedium },
+            { id: "wide", label: dict.editor.widthFull },
+          ]}
+        />
+      </div>
+      <div className="space-y-2">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          {dict.editor.designSectionSpacing}
+        </p>
+        <Segmented
+          value={design.sectionSpacing}
+          onChange={(sectionSpacing) => patch({ sectionSpacing })}
+          options={[
+            { id: "compact", label: dict.editor.spacingCompact },
+            { id: "comfortable", label: dict.editor.spacingComfortable },
+            { id: "spacious", label: dict.editor.spacingSpacious },
+          ]}
+        />
+      </div>
+      <div className="space-y-2">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          {dict.editor.designRadius}
+        </p>
+        <Segmented
+          value={design.radius}
+          onChange={(radius) => patch({ radius })}
+          options={[
+            { id: "sharp", label: dict.editor.radiusSharp },
+            { id: "soft", label: dict.editor.radiusSoft },
+            { id: "rounded", label: dict.editor.radiusRounded },
+          ]}
+        />
+      </div>
+      <div className="space-y-2">
+        <p className="text-[11px] font-medium text-muted-foreground">
+          {dict.editor.designShadow}
+        </p>
+        <Segmented
+          value={design.shadow}
+          onChange={(shadow) => patch({ shadow })}
+          options={[
+            { id: "none", label: dict.editor.shadowNone },
+            { id: "subtle", label: dict.editor.shadowSubtle },
+            { id: "elevated", label: dict.editor.shadowElevated },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}

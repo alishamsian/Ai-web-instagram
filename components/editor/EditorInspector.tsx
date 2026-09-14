@@ -9,6 +9,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import {
   BrandPanel,
   ColorsPanel,
+  DesignSystemPanel,
   TypographyPanel,
 } from "@/components/editor/EditorPanels";
 import { ContentPanel } from "@/components/editor/ContentSections";
@@ -21,9 +22,9 @@ import {
 } from "@/components/editor/ExtraPanels";
 import {
   DESIGN_PRESETS,
-  applyDesignPreset,
   type DesignPresetId,
 } from "@/components/editor/editor-presets";
+import { commandApplyThemePreset } from "@/lib/editor/commands";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { MediaPicker } from "@/components/editor/MediaPicker";
 import { SchemaInspectorPanel } from "@/components/editor/SchemaInspectorPanel";
@@ -77,6 +78,8 @@ export function EditorInspector({
   onRestored,
   onOpenSections,
   onAddSection,
+  onBrowseTemplates,
+  viewport = "desktop",
 }: {
   config: WebsiteConfig;
   dict: Dictionary;
@@ -97,6 +100,8 @@ export function EditorInspector({
   onRestored: (next: WebsiteConfig) => void;
   onOpenSections?: () => void;
   onAddSection?: () => void;
+  onBrowseTemplates?: () => void;
+  viewport?: "desktop" | "tablet" | "mobile";
 }) {
   const selected = useMemo(
     () => config.sections.find((s) => s.id === selectedSectionId),
@@ -171,6 +176,7 @@ export function EditorInspector({
           locale={locale}
           tab={sectionTab}
           selectedField={selectedField}
+          viewport={viewport}
           onChange={onChange}
         />
       </InspectorShell>
@@ -211,6 +217,16 @@ export function EditorInspector({
               >
                 <Plus size={14} />
                 {dict.editor.emptyQuickAdd}
+              </button>
+            ) : null}
+            {onBrowseTemplates ? (
+              <button
+                type="button"
+                className="editor-empty-action"
+                onClick={onBrowseTemplates}
+              >
+                <Settings2 size={14} />
+                {dict.editor.template}
               </button>
             ) : null}
             <button
@@ -279,6 +295,13 @@ export function EditorInspector({
               </InspectorBlock>
               <InspectorBlock title={dict.editor.typography} collapsed>
                 <TypographyPanel
+                  config={config}
+                  dict={dict}
+                  onChange={onChange}
+                />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.designSystem} collapsed>
+                <DesignSystemPanel
                   config={config}
                   dict={dict}
                   onChange={onChange}
@@ -576,11 +599,13 @@ function WebsiteQuickSettings({
                 key={preset.id}
                 type="button"
                 data-active={active}
-                onClick={() =>
-                  onChange(
-                    applyDesignPreset(config, preset.id as DesignPresetId),
-                  )
-                }
+                onClick={() => {
+                  const result = commandApplyThemePreset(
+                    config,
+                    preset.id as DesignPresetId,
+                  );
+                  onChange(result.config);
+                }}
                 className="editor-preset-card"
               >
                 <div className="editor-preset-strip">
@@ -689,6 +714,7 @@ function SectionInspector({
   locale,
   tab,
   selectedField,
+  viewport,
   onChange,
 }: {
   config: WebsiteConfig;
@@ -698,6 +724,7 @@ function SectionInspector({
   locale: Locale;
   tab: SectionTab;
   selectedField?: EditorFieldPath;
+  viewport: "desktop" | "tablet" | "mobile";
   onChange: (next: WebsiteConfig) => void;
 }) {
   const section = config.sections.find((s) => s.id === sectionId);
@@ -734,6 +761,7 @@ function SectionInspector({
           groups={schemaGroups}
           locale={locale}
           selectedField={selectedField}
+          viewport={viewport}
           onChange={onChange}
         />
       ) : null}

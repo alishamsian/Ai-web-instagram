@@ -1,4 +1,9 @@
-import type { ColorConfig, TypographyConfig, WebsiteConfig } from "@/types/website";
+import type {
+  BrandDesignConfig,
+  ColorConfig,
+  TypographyConfig,
+  WebsiteConfig,
+} from "@/types/website";
 
 export type DesignPresetId =
   | "minimal"
@@ -7,7 +12,8 @@ export type DesignPresetId =
   | "bold"
   | "natural"
   | "modern"
-  | "dark";
+  | "dark"
+  | "soft";
 
 export interface DesignPreset {
   id: DesignPresetId;
@@ -15,6 +21,9 @@ export interface DesignPreset {
   description: { fa: string; en: string };
   colors: ColorConfig;
   typography: TypographyConfig;
+  design: Required<BrandDesignConfig>;
+  /** Maps to settings.mood / Store chrome */
+  mood: NonNullable<WebsiteConfig["settings"]["mood"]>;
 }
 
 export const DESIGN_PRESETS: DesignPreset[] = [
@@ -31,6 +40,34 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       muted: "#EEEEEE",
     },
     typography: { heading: "sans", body: "sans", scale: "compact" },
+    design: {
+      contentWidth: "default",
+      sectionSpacing: "comfortable",
+      radius: "soft",
+      shadow: "subtle",
+    },
+    mood: "minimal",
+  },
+  {
+    id: "soft",
+    label: { fa: "نرم", en: "Soft" },
+    description: { fa: "سطوح ملایم و فاصله باز", en: "Gentle surfaces and open rhythm" },
+    colors: {
+      primary: "#2C2A28",
+      secondary: "#FBF8F4",
+      accent: "#9A7B6A",
+      background: "#FBF8F4",
+      foreground: "#2C2A28",
+      muted: "#EFEAE3",
+    },
+    typography: { heading: "serif", body: "sans", scale: "editorial" },
+    design: {
+      contentWidth: "narrow",
+      sectionSpacing: "spacious",
+      radius: "rounded",
+      shadow: "subtle",
+    },
+    mood: "natural",
   },
   {
     id: "luxury",
@@ -45,6 +82,13 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       muted: "#1A1A1A",
     },
     typography: { heading: "serif", body: "sans", scale: "editorial" },
+    design: {
+      contentWidth: "narrow",
+      sectionSpacing: "spacious",
+      radius: "sharp",
+      shadow: "elevated",
+    },
+    mood: "luxury",
   },
   {
     id: "editorial",
@@ -59,6 +103,13 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       muted: "#EDE7DF",
     },
     typography: { heading: "serif", body: "sans", scale: "editorial" },
+    design: {
+      contentWidth: "default",
+      sectionSpacing: "spacious",
+      radius: "sharp",
+      shadow: "subtle",
+    },
+    mood: "editorial",
   },
   {
     id: "bold",
@@ -73,6 +124,13 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       muted: "#F0F0F0",
     },
     typography: { heading: "display", body: "sans", scale: "bold" },
+    design: {
+      contentWidth: "wide",
+      sectionSpacing: "comfortable",
+      radius: "rounded",
+      shadow: "none",
+    },
+    mood: "bold",
   },
   {
     id: "natural",
@@ -87,11 +145,18 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       muted: "#E8E4DC",
     },
     typography: { heading: "serif", body: "sans", scale: "editorial" },
+    design: {
+      contentWidth: "default",
+      sectionSpacing: "comfortable",
+      radius: "rounded",
+      shadow: "subtle",
+    },
+    mood: "natural",
   },
   {
     id: "modern",
-    label: { fa: "مدرن", en: "Modern" },
-    description: { fa: "خنک و دقیق", en: "Cool and precise" },
+    label: { fa: "استودیو", en: "Studio" },
+    description: { fa: "خنک، دقیق، حرفه‌ای", en: "Cool, precise, professional" },
     colors: {
       primary: "#0F172A",
       secondary: "#F8FAFC",
@@ -101,6 +166,13 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       muted: "#E2E8F0",
     },
     typography: { heading: "sans", body: "sans", scale: "compact" },
+    design: {
+      contentWidth: "default",
+      sectionSpacing: "compact",
+      radius: "soft",
+      shadow: "subtle",
+    },
+    mood: "modern",
   },
   {
     id: "dark",
@@ -115,9 +187,17 @@ export const DESIGN_PRESETS: DesignPreset[] = [
       muted: "#161618",
     },
     typography: { heading: "sans", body: "sans", scale: "bold" },
+    design: {
+      contentWidth: "default",
+      sectionSpacing: "comfortable",
+      radius: "soft",
+      shadow: "elevated",
+    },
+    mood: "dark",
   },
 ];
 
+/** Applies theme values only — never destroys content. */
 export function applyDesignPreset(
   config: WebsiteConfig,
   presetId: DesignPresetId,
@@ -130,11 +210,11 @@ export function applyDesignPreset(
       ...config.brand,
       colors: { ...preset.colors },
       typography: { ...preset.typography },
+      design: { ...preset.design },
     },
     settings: {
       ...config.settings,
-      // Drive StoreRoot chrome (radius/section rhythm) via Design System mood
-      mood: presetId === "natural" ? "natural" : presetId,
+      mood: preset.mood,
     },
   };
 }

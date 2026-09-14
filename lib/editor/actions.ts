@@ -2,11 +2,16 @@
  * Constrained EditorAction model — AI and tools must produce these, not raw CSS/HTML.
  */
 
-import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
+import type {
+  TemplateType,
+  WebsiteConfig,
+  WebsiteSectionType,
+} from "@/types/website";
 import type { ElementFieldSchema } from "@/lib/store/registry/element-schema";
 import type { DesignPresetId } from "@/components/editor/editor-presets";
 import {
   commandAddSection,
+  commandApplyTemplate,
   commandApplyThemePreset,
   commandDeleteSection,
   commandDuplicateSection,
@@ -33,7 +38,8 @@ export type EditorAction =
   | { type: "hideSection"; sectionId: string }
   | { type: "showSection"; sectionId: string }
   | { type: "deleteSection"; sectionId: string }
-  | { type: "addSection"; sectionType: WebsiteSectionType };
+  | { type: "addSection"; sectionType: WebsiteSectionType }
+  | { type: "applyTemplate"; templateId: TemplateType };
 
 const PROTECTED_PATHS = [
   "content.products.items",
@@ -153,6 +159,12 @@ export function applyEditorAction(
       return result
         ? { ok: true, result }
         : { ok: false, reason: "Unknown or invalid section" };
+    }
+    case "applyTemplate": {
+      return {
+        ok: true,
+        result: commandApplyTemplate(config, action.templateId),
+      };
     }
     default:
       return { ok: false, reason: "Unknown action" };

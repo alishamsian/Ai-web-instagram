@@ -270,29 +270,75 @@ export function ensureSectionContent(
 export function addOrShowSection(
   config: WebsiteConfig,
   type: WebsiteSectionType,
+  options?: { afterSectionId?: string | null },
 ): WebsiteConfig {
   const withContent = ensureSectionContent(config, type);
   const existing = withContent.sections.find((s) => s.type === type);
+  const afterId = options?.afterSectionId;
+
   if (existing) {
-    return {
-      ...withContent,
-      sections: withContent.sections.map((s) =>
-        s.type === type ? { ...s, visible: true } : s,
-      ),
-    };
+    let sections = withContent.sections.map((s) =>
+      s.type === type ? { ...s, visible: true } : s,
+    );
+    if (afterId) {
+      sections = moveSectionAfter(sections, existing.id, afterId);
+    }
+    return { ...withContent, sections };
   }
+
   const section = {
     id: `${type}-${Date.now().toString(36)}`,
     type,
     visible: true,
   };
-  const withoutFooter = withContent.sections.filter((s) => s.type !== "footer");
+
+  if (type === "footer") {
+    return {
+      ...withContent,
+      sections: [...withContent.sections.filter((s) => s.type !== "footer"), section],
+    };
+  }
+
+  let sections = withContent.sections.filter((s) => s.type !== "footer");
   const footer = withContent.sections.filter((s) => s.type === "footer");
+
+  if (afterId) {
+    const idx = sections.findIndex((s) => s.id === afterId);
+    if (idx >= 0) {
+      sections = [
+        ...sections.slice(0, idx + 1),
+        section,
+        ...sections.slice(idx + 1),
+      ];
+    } else {
+      sections = [...sections, section];
+    }
+  } else {
+    sections = [...sections, section];
+  }
+
   return {
     ...withContent,
-    sections:
-      type === "footer"
-        ? [...withContent.sections, section]
-        : [...withoutFooter, section, ...footer],
+    sections: [...sections, ...footer],
   };
+}
+
+function moveSectionAfter(
+  sections: WebsiteConfig["sections"],
+  sectionId: string,
+  afterSectionId: string,
+): WebsiteConfig["sections"] {
+  if (sectionId === afterSectionId) return sections;
+  const next = [...sections];
+  const from = next.findIndex((s) => s.id === sectionId);
+  if (from < 0) return sections;
+  const [item] = next.splice(from, 1);
+  if (!item) return sections;
+  const insertAt = next.findIndex((s) => s.id === afterSectionId);
+  if (insertAt < 0) {
+    next.push(item);
+    return next;
+  }
+  next.splice(insertAt + 1, 0, item);
+  return next;
 }

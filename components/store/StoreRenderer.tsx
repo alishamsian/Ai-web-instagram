@@ -17,6 +17,8 @@ import { StoreProductPage } from "@/components/store/StoreProductPage";
 import { StoreQuickView } from "@/components/store/StoreQuickView";
 import { StoreCartDrawer } from "@/components/store/StoreCartDrawer";
 import { EditorSectionFrame } from "@/components/editor/EditorSectionFrame";
+import { CanvasEmptyState } from "@/components/editor/CanvasEmptyState";
+import { useEditorEdit } from "@/components/editor/EditContext";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { getSectionDefinition } from "@/lib/store/registry";
 import {
@@ -107,12 +109,24 @@ function StoreHome({
 
   const footerSection = resolveStoreFooterSection(config);
   const showFooter = shouldRenderFooter(config, mode);
+  const edit = useEditorEdit();
 
   return (
     <>
       <StoreAnnouncement config={config} />
       <StoreHeader config={config} hasCategories={categories.length > 0} />
       <main>
+        {mode === "editor" && bodySections.length === 0 ? (
+          <CanvasEmptyState
+            locale={config.settings.language}
+            onAddSection={() => edit?.onRequestInsert?.(null)}
+            onBrowseTemplates={
+              edit?.onBrowseTemplates
+                ? () => edit.onBrowseTemplates?.()
+                : undefined
+            }
+          />
+        ) : null}
         {bodySections.map((section) => {
           const body = renderRegisteredStoreSection({
             config,

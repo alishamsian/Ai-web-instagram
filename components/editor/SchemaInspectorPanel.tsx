@@ -15,10 +15,15 @@ import {
   flattenElementFields,
   getSchemaValue,
   isSchemaFieldActive,
-  RESPONSIVE_BREAKPOINTS,
 } from "@/lib/store/registry/element-schema";
 import type { EditorFieldPath } from "@/components/editor/EditContext";
 import { schemaFieldMatchesEditorPath } from "@/lib/editor";
+import {
+  resolveResponsiveValue,
+  resetResponsiveOverride,
+  setResponsiveOverride,
+  type ViewportBucket,
+} from "@/lib/editor/responsive";
 import { Input, Textarea } from "@/components/ui/input";
 import { MediaPicker } from "@/components/editor/MediaPicker";
 import { cn } from "@/lib/utils";
@@ -49,9 +54,84 @@ function asResponsive(
     return value as ResponsiveValue<number | string>;
   }
   if (typeof value === "number" || typeof value === "string") {
-    return { desktop: value };
+    return { base: value };
   }
   return {};
+}
+
+function ResponsiveNumberControl({
+  field,
+  value,
+  locale,
+  disabled,
+  viewport,
+  onChange,
+}: {
+  field: ElementFieldSchema;
+  value: unknown;
+  locale: Locale;
+  disabled?: boolean;
+  viewport: ViewportBucket;
+  onChange: (next: unknown) => void;
+}) {
+  const current = asResponsive(value);
+  const resolved = resolveResponsiveValue<number | string>(current, viewport);
+  const display =
+    resolved.value == null ? "" : String(resolved.value);
+  const hasOverride =
+    viewport === "desktop"
+      ? current.base !== undefined
+      : current[viewport] !== undefined;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium capitalize text-[color:var(--ed-muted)]">
+          {viewport}
+        </span>
+        <span className="text-[10px] text-[color:var(--ed-subtle)]">
+          {resolved.inherited
+            ? locale === "fa"
+              ? "ارث‌بری"
+              : "Inherited"
+            : locale === "fa"
+              ? "بازنویسی"
+              : "Override"}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          disabled={disabled}
+          min={field.min}
+          max={field.max}
+          step={field.step ?? 1}
+          className="h-9 flex-1 rounded-lg"
+          value={display}
+          onChange={(event) => {
+            const raw = event.target.value.trim();
+            if (!raw) {
+              onChange(resetResponsiveOverride(current, viewport));
+              return;
+            }
+            const n = Number(raw);
+            if (!Number.isFinite(n)) return;
+            onChange(setResponsiveOverride(current, viewport, n));
+          }}
+        />
+        {hasOverride && viewport !== "desktop" ? (
+          <button
+            type="button"
+            disabled={disabled}
+            className="h-9 shrink-0 rounded-lg border border-[color:var(--ed-border)] px-2 text-[11px] text-[color:var(--ed-muted)] hover:bg-[color:var(--ed-bg-hover)]"
+            onClick={() => onChange(resetResponsiveOverride(current, viewport))}
+          >
+            {locale === "fa" ? "بازنشانی" : "Reset"}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function SchemaFieldControl({
@@ -60,6 +140,7 @@ export function SchemaFieldControl({
   config,
   locale,
   disabled,
+  viewport = "desktop",
   onChange,
 }: {
   field: ElementFieldSchema;
@@ -67,49 +148,22 @@ export function SchemaFieldControl({
   config: WebsiteConfig;
   locale: Locale;
   disabled?: boolean;
+  viewport?: ViewportBucket;
   onChange: (next: unknown) => void;
 }) {
   const kind = field.kind === "richText" ? "textarea" : field.kind;
   const options = field.options ?? [];
 
   if (field.responsive && (kind === "number" || kind === "responsive")) {
-    const current = asResponsive(value);
     return (
-      <div className="grid gap-2">
-        {RESPONSIVE_BREAKPOINTS.map((bp) => (
-          <label
-            key={bp}
-            className="flex items-center justify-between gap-2 text-[12px]"
-          >
-            <span className="capitalize text-muted-foreground">{bp}</span>
-            <Input
-              type="number"
-              disabled={disabled}
-              min={field.min}
-              max={field.max}
-              step={field.step ?? 1}
-              className="h-9 w-24 rounded-lg"
-              value={
-                current[bp] == null && current.base == null
-                  ? ""
-                  : String(current[bp] ?? current.base ?? "")
-              }
-              onChange={(event) => {
-                const raw = event.target.value.trim();
-                const next: ResponsiveValue<number> = { ...current } as ResponsiveValue<number>;
-                if (!raw) {
-                  delete next[bp];
-                } else {
-                  const n = Number(raw);
-                  if (!Number.isFinite(n)) return;
-                  next[bp] = n;
-                }
-                onChange(next);
-              }}
-            />
-          </label>
-        ))}
-      </div>
+      <ResponsiveNumberControl
+        field={field}
+        value={value}
+        locale={locale}
+        disabled={disabled}
+        viewport={viewport}
+        onChange={onChange}
+      />
     );
   }
 
@@ -277,6 +331,7 @@ export function SchemaInspectorPanel({
   groups,
   locale,
   selectedField,
+  viewport = "desktop",
   onChange,
 }: {
   config: WebsiteConfig;
@@ -285,6 +340,7 @@ export function SchemaInspectorPanel({
   groups: ElementSchemaGroup[];
   locale: Locale;
   selectedField?: EditorFieldPath;
+  viewport?: ViewportBucket;
   onChange: (next: WebsiteConfig) => void;
 }) {
   const fields = useMemo(() => flattenElementFields(schema), [schema]);
@@ -362,6 +418,7 @@ export function SchemaInspectorPanel({
                       value={values[field.key]}
                       config={config}
                       locale={locale}
+                      viewport={viewport}
                       onChange={(nextValue) => {
                         const result = applySchemaFieldUpdate({
                           config,

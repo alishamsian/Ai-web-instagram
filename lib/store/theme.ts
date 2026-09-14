@@ -2,6 +2,7 @@ import type { WebsiteConfig } from "@/types/website";
 import type { Product } from "@/types/ai";
 import { moodChrome, type StoreMood } from "@/lib/design-system/themes";
 import { primitiveColor } from "@/lib/design-system/primitives";
+import { applyDesignChrome } from "@/lib/design-system/brand-design";
 
 export type { StoreMood };
 export { STORE_THEME_IDS } from "@/lib/design-system/themes";
@@ -23,13 +24,17 @@ export type StoreTokens = {
   success: string;
   warning: string;
   error: string;
-  /** Mood-driven chrome */
+  /** Mood-driven chrome (overridable via brand.design) */
   radiusSm: string;
   radiusMd: string;
   radiusLg: string;
   radiusXl: string;
   sectionPad: string;
   buttonRadius: string;
+  wrap: string;
+  shadowSubtle: string;
+  shadowCard: string;
+  shadowElevated: string;
 };
 
 export type StoreCatalogProduct = Product & {
@@ -103,7 +108,7 @@ export function buildStoreTokens(config: WebsiteConfig): StoreTokens {
   const accent = c.accent || c.primary;
   const accentFg = c.secondary || bg;
 
-  const chrome = moodChrome(mood);
+  const chrome = applyDesignChrome(moodChrome(mood), config.brand.design);
 
   return {
     background: bg,
@@ -122,7 +127,16 @@ export function buildStoreTokens(config: WebsiteConfig): StoreTokens {
     success: primitiveColor.success,
     warning: primitiveColor.warning,
     error: primitiveColor.error,
-    ...chrome,
+    radiusSm: chrome.radiusSm,
+    radiusMd: chrome.radiusMd,
+    radiusLg: chrome.radiusLg,
+    radiusXl: chrome.radiusXl,
+    sectionPad: chrome.sectionPad,
+    buttonRadius: chrome.buttonRadius,
+    wrap: chrome.wrap,
+    shadowSubtle: chrome.shadowSubtle,
+    shadowCard: chrome.shadowCard,
+    shadowElevated: chrome.shadowElevated,
   };
 }
 

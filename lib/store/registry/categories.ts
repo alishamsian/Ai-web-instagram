@@ -6,12 +6,12 @@ export const SECTION_CATEGORIES: {
   fa: string;
   en: string;
 }[] = [
-  { id: "featured", fa: "ویژه", en: "Featured" },
-  { id: "commerce", fa: "فروش", en: "Commerce" },
-  { id: "content", fa: "محتوا", en: "Content" },
-  { id: "media", fa: "رسانه", en: "Media" },
+  { id: "featured", fa: "هیرو و ویژه", en: "Hero & featured" },
+  { id: "commerce", fa: "فروش و محصولات", en: "Commerce" },
+  { id: "content", fa: "درباره و محتوا", en: "About & content" },
+  { id: "media", fa: "گالری و رسانه", en: "Gallery & media" },
   { id: "editorial", fa: "ادیتوریال", en: "Editorial" },
-  { id: "social", fa: "اعتبار اجتماعی", en: "Social proof" },
-  { id: "conversion", fa: "تبدیل", en: "Conversion" },
-  { id: "navigation", fa: "ناوبری", en: "Navigation" },
+  { id: "social", fa: "نظرات و اعتماد", en: "Testimonials" },
+  { id: "conversion", fa: "CTA و تماس", en: "CTA & contact" },
+  { id: "navigation", fa: "فوتر و ناوبری", en: "Footer & nav" },
 ];

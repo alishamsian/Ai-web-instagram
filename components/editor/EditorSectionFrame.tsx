@@ -18,6 +18,7 @@ import {
   EyeOff,
   GripVertical,
   MoreHorizontal,
+  Plus,
   Trash2,
 } from "lucide-react";
 
@@ -262,6 +263,30 @@ export function EditorSectionFrame({
       ) : null}
 
       {children}
+
+      {edit.onRequestInsert && !dragging ? (
+        <div
+          data-editor-chrome
+          className={cn(
+            "editor-insert-rail",
+            (hovered || selected) && "editor-insert-rail-visible",
+          )}
+        >
+          <button
+            type="button"
+            className="editor-insert-rail-btn"
+            aria-label="Add section"
+            title="Add section"
+            onClick={(event) => {
+              event.stopPropagation();
+              edit.onRequestInsert?.(sectionId);
+            }}
+          >
+            <Plus size={12} />
+            <span>Add</span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

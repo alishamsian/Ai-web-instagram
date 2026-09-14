@@ -18,6 +18,8 @@ import { WebsiteShell } from "@/components/website/shell";
 import { SiteNavProvider } from "@/components/website/SiteNavContext";
 import { StoreRenderer } from "@/components/store/StoreRenderer";
 import { EditorSectionFrame } from "@/components/editor/EditorSectionFrame";
+import { CanvasEmptyState } from "@/components/editor/CanvasEmptyState";
+import { useEditorEdit } from "@/components/editor/EditContext";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { polishWebsiteConfig } from "@/lib/website/polish";
 import { cn } from "@/lib/utils";
@@ -55,6 +57,11 @@ export function WebsiteRenderer({
 }) {
   const view = polishWebsiteConfig(config);
   const locale = view.settings.language;
+  const edit = useEditorEdit();
+  const visibleSections = view.sections.filter(
+    (section) => section.visible || mode === "editor",
+  );
+  const bodySections = visibleSections.filter((s) => s.type !== "footer");
 
   return (
     <SiteNavProvider
@@ -79,9 +86,19 @@ export function WebsiteRenderer({
           {productSlug ? (
             <ProductPageView config={view} productSlug={productSlug} />
           ) : (
-            view.sections
-              .filter((section) => section.visible || mode === "editor")
-              .map((section) => {
+            <>
+              {mode === "editor" && bodySections.length === 0 ? (
+                <CanvasEmptyState
+                  locale={locale}
+                  onAddSection={() => edit?.onRequestInsert?.(null)}
+                  onBrowseTemplates={
+                    edit?.onBrowseTemplates
+                      ? () => edit.onBrowseTemplates?.()
+                      : undefined
+                  }
+                />
+              ) : null}
+              {visibleSections.map((section) => {
                 const Comp = sectionMap[section.type as keyof typeof sectionMap];
                 if (!Comp) return null;
                 const body = (
@@ -104,7 +121,8 @@ export function WebsiteRenderer({
                     {body}
                   </EditorSectionFrame>
                 );
-              })
+              })}
+            </>
           )}
         </WebsiteShell>
       )}

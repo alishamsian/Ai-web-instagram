@@ -7,7 +7,7 @@ import type { TemplateType, WebsiteConfig } from "@/types/website";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "@/components/editor/MediaPicker";
-import { applyTemplate } from "@/components/editor/editor-utils";
+import { commandApplyTemplate } from "@/lib/editor/commands";
 import { templates, templateOrder } from "@/lib/website/templates";
 import { cn } from "@/lib/utils";
 
@@ -396,6 +396,15 @@ export function TemplatePanel({
   locale: Locale;
   onChange: (next: WebsiteConfig) => void;
 }) {
+  const [pendingId, setPendingId] = useState<TemplateType | null>(null);
+
+  function confirmApply() {
+    if (!pendingId) return;
+    const result = commandApplyTemplate(config, pendingId);
+    onChange(result.config);
+    setPendingId(null);
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-[12px] leading-5 text-muted-foreground">
@@ -409,12 +418,15 @@ export function TemplatePanel({
             <button
               key={id}
               type="button"
-              onClick={() => onChange(applyTemplate(config, id as TemplateType))}
+              onClick={() => {
+                if (id === config.template) return;
+                setPendingId(id);
+              }}
               className={cn(
-                "w-full rounded-2xl border px-3.5 py-3 text-start transition",
+                "editor-template-card w-full px-3.5 py-3 text-start transition",
                 active
-                  ? "border-[color:rgba(91,141,239,0.55)] bg-white shadow-[0_0_0_3px_rgba(91,141,239,0.14)]"
-                  : "border-border bg-white hover:border-ink/30",
+                  ? "border-[color:var(--ed-accent)] bg-[color:var(--ed-bg-soft)]"
+                  : "border-[color:var(--ed-border)] bg-white hover:border-[color:var(--ed-border-strong)]",
               )}
             >
               <p className="text-sm font-medium text-ink">{def.name[locale]}</p>
@@ -425,6 +437,52 @@ export function TemplatePanel({
           );
         })}
       </div>
+
+      {pendingId ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="template-confirm-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label={dict.editor.cancel}
+            onClick={() => setPendingId(null)}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-t-2xl border border-white/10 bg-[#0D0D0F] p-5 shadow-2xl sm:rounded-2xl">
+            <p
+              id="template-confirm-title"
+              className="text-[15px] font-medium text-[#F7F7F8]"
+            >
+              {dict.editor.templateConfirmTitle}
+            </p>
+            <p className="mt-2 text-[12px] leading-5 text-[#77777F]">
+              {dict.editor.templateConfirmBody.replace(
+                "{name}",
+                templates[pendingId].name[locale],
+              )}
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                className="min-h-10 flex-1 rounded-md border border-white/10 text-[12px] text-[#B5B5BC] hover:bg-white/[0.04]"
+                onClick={() => setPendingId(null)}
+              >
+                {dict.editor.cancel}
+              </button>
+              <button
+                type="button"
+                className="min-h-10 flex-1 rounded-md bg-[#FF6B57] text-[12px] font-medium text-white hover:bg-[#ff7d6c]"
+                onClick={confirmApply}
+              >
+                {dict.editor.applyTemplate}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

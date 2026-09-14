@@ -920,8 +920,125 @@
   .editor-skeleton,
   .editor-save-pulse[data-saving="true"],
   .editor-frame-chrome,
-  .editor-viewport-pill {
+  .editor-viewport-pill,
+  .editor-insert-rail,
+  .editor-insert-rail-btn,
+  .editor-preset-card,
+  .editor-canvas-empty-primary,
+  .editor-canvas-empty-secondary {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ── Phase 3: Design system + insertion UX ── */
+.editor-insert-rail {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -0.65rem;
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+.editor-insert-rail-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.editor-insert-rail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.5rem;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ed-accent) 45%, transparent);
+  background: var(--ed-bg-elevated);
+  color: var(--ed-fg);
+  font-size: 10px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  transition: background 120ms ease, transform 120ms ease;
+}
+.editor-insert-rail-btn:hover {
+  background: var(--ed-bg-hover);
+  transform: translateY(-1px);
+}
+.editor-insert-rail-btn:focus-visible {
+  outline: 2px solid var(--ed-accent);
+  outline-offset: 2px;
+}
+
+.editor-canvas-empty {
+  display: flex;
+  min-height: min(52vh, 28rem);
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.25rem;
+}
+.editor-canvas-empty-inner {
+  max-width: 22rem;
+  text-align: center;
+}
+.editor-canvas-empty-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: color-mix(in srgb, var(--store-fg, #111) 88%, transparent);
+}
+.editor-canvas-empty-body {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--store-fg, #111) 48%, transparent);
+}
+.editor-canvas-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.15rem;
+}
+.editor-canvas-empty-primary,
+.editor-canvas-empty-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0 0.9rem;
+  border-radius: 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 550;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.editor-canvas-empty-primary {
+  border: 0;
+  background: var(--ed-accent, #ff6b57);
+  color: #fff;
+}
+.editor-canvas-empty-primary:hover {
+  filter: brightness(1.05);
+}
+.editor-canvas-empty-secondary {
+  border: 1px solid color-mix(in srgb, var(--store-fg, #111) 14%, transparent);
+  background: transparent;
+  color: color-mix(in srgb, var(--store-fg, #111) 72%, transparent);
+}
+.editor-canvas-empty-secondary:hover {
+  background: color-mix(in srgb, var(--store-fg, #111) 4%, transparent);
+}
+.editor-canvas-empty-primary:focus-visible,
+.editor-canvas-empty-secondary:focus-visible {
+  outline: 2px solid var(--ed-accent);
+  outline-offset: 2px;
+}
+
+.editor-template-card {
+  border-radius: 0.65rem;
+  border-width: 1px;
+  border-style: solid;
 }

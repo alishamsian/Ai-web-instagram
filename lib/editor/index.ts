@@ -24,17 +24,20 @@ export {
 } from "@/lib/editor/history";
 
 export {
-  commandToggleSection,
+  commandAddSection,
+  commandApplyThemePreset,
+  commandApplyTemplate,
   commandDeleteSection,
   commandDuplicateSection,
   commandMoveSection,
   commandReorderSections,
-  commandAddSection,
-  commandSetSchemaValue,
   commandSetBrandColor,
-  commandApplyThemePreset,
-  commandSetSeoField,
+  commandSetBrandDesign,
+  commandSetBrandTypography,
   commandSetContentPath,
+  commandSetSchemaValue,
+  commandSetSeoField,
+  commandToggleSection,
   readContentPath,
 } from "@/lib/editor/commands";
 

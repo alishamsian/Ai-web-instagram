@@ -112,6 +112,9 @@ export function EditorShell({
   const [phonePane, setPhonePane] = useState<PhonePane>("canvas");
   const [tabletInspectorOpen, setTabletInspectorOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryInsertAfterId, setLibraryInsertAfterId] = useState<
+    string | null
+  >(null);
   const [publishOpen, setPublishOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -889,6 +892,16 @@ export function EditorShell({
       onHoverSection={setHoveredSectionId}
       onSectionAction={handleSectionAction}
       onReorderSections={handleReorderSections}
+      onRequestInsert={(afterId) => {
+        setLibraryInsertAfterId(afterId);
+        setLibraryOpen(true);
+      }}
+      onBrowseTemplates={() => {
+        setSelectedSectionId(undefined);
+        setSiteGroup("site");
+        setPhonePane("inspector");
+        setTabletInspectorOpen(true);
+      }}
     >
       <WebsiteRenderer
         config={config}
@@ -927,7 +940,16 @@ export function EditorShell({
       onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
       onRestored={handleRestored}
-      onAddSection={() => setLibraryOpen(true)}
+      onAddSection={() => {
+        setLibraryInsertAfterId(null);
+        setLibraryOpen(true);
+      }}
+      onBrowseTemplates={() => {
+        setSiteGroup("site");
+        setPhonePane("inspector");
+        setTabletInspectorOpen(true);
+      }}
+      viewport={device}
       onOpenSections={() => {
         setPhonePane("sections");
         setLeftNav("sections");
@@ -953,7 +975,12 @@ export function EditorShell({
       onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
       onRestored={handleRestored}
-      onAddSection={() => setLibraryOpen(true)}
+      onAddSection={() => {
+        setLibraryInsertAfterId(null);
+        setLibraryOpen(true);
+      }}
+      onBrowseTemplates={() => setSiteGroup("site")}
+      viewport={device}
       onOpenSections={() => setLeftNav("sections")}
     />
   );
@@ -973,7 +1000,10 @@ export function EditorShell({
       }}
       onSelectField={(path, sectionId) => selectField(path, sectionId)}
       onChange={applyConfig}
-      onAddSection={() => setLibraryOpen(true)}
+      onAddSection={() => {
+        setLibraryInsertAfterId(null);
+        setLibraryOpen(true);
+      }}
       onPageChange={(page) => {
         onPageChange(page);
         if (page === "product") {
@@ -1274,20 +1304,23 @@ export function EditorShell({
         dict={dict}
         vertical={config.settings.vertical}
         existingTypes={new Set(config.sections.map((s) => s.type))}
-        onClose={() => setLibraryOpen(false)}
+        onClose={() => {
+          setLibraryOpen(false);
+          setLibraryInsertAfterId(null);
+        }}
         onAdd={(type) => {
-          const result = commandAddSection(config, type);
+          const result = commandAddSection(config, type, {
+            afterSectionId: libraryInsertAfterId,
+          });
           if (!result) return;
           applyConfig(result.config, result.label);
-          const added = result.config.sections.find(
-            (s) => s.type === type && s.visible,
-          );
-          if (added) {
-            setSelectedSectionId(added.id);
+          if (result.selectedSectionId) {
+            setSelectedSectionId(result.selectedSectionId);
             setPhonePane("inspector");
             setTabletInspectorOpen(true);
           }
           setLeftNav("sections");
+          setLibraryInsertAfterId(null);
         }}
       />
 

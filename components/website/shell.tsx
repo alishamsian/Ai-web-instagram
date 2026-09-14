@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import type { WebsiteConfig } from "@/types/website";
+import {
+  resolveBrandDesign,
+  contentWidthCss,
+  sectionSpacingCss,
+  radiusChrome,
+  shadowCss,
+} from "@/lib/design-system/brand-design";
 import { cn } from "@/lib/utils";
 import { useSiteNav } from "@/components/website/SiteNavContext";
 
@@ -175,12 +182,17 @@ export function WebsiteShell({
   className?: string;
 }) {
   const c = config.brand.colors;
+  const design = resolveBrandDesign(config);
+  const radius = radiusChrome(design.radius);
+  const shadows = shadowCss(design.shadow);
   return (
     <div
       id="top"
       className={cn("vitrin-site", className)}
       data-template={config.template}
       data-scale={config.brand.typography.scale}
+      data-radius={design.radius}
+      data-shadow={design.shadow}
       style={
         {
           ["--vs-bg" as string]: c.background,
@@ -189,6 +201,12 @@ export function WebsiteShell({
           ["--vs-accent" as string]: c.accent,
           ["--vs-muted" as string]: c.muted,
           ["--vs-secondary" as string]: c.secondary,
+          ["--vs-wrap" as string]: contentWidthCss(design.contentWidth),
+          ["--vs-section-pad" as string]: sectionSpacingCss(design.sectionSpacing),
+          ["--vs-radius-md" as string]: radius.radiusMd,
+          ["--vs-radius-lg" as string]: radius.radiusLg,
+          ["--vs-btn-radius" as string]: radius.buttonRadius,
+          ["--vs-shadow-card" as string]: shadows.card,
           background: c.background,
           color: c.foreground,
         } as React.CSSProperties
