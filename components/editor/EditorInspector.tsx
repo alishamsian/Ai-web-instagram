@@ -727,6 +727,7 @@ function SectionInspector({
   viewport: "desktop" | "tablet" | "mobile";
   onChange: (next: WebsiteConfig) => void;
 }) {
+  const [propertyQuery, setPropertyQuery] = useState("");
   const section = config.sections.find((s) => s.id === sectionId);
   if (!section) return null;
 
@@ -753,6 +754,24 @@ function SectionInspector({
 
   return (
     <div className="space-y-4">
+      {schemaDriven ? (
+        <label className="editor-search-field">
+          <Search size={13} />
+          <input
+            value={propertyQuery}
+            onChange={(e) => setPropertyQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setPropertyQuery("");
+              }
+            }}
+            placeholder={dict.editor.searchProperties}
+            className="min-w-0 flex-1 bg-transparent text-[12px] text-[color:var(--ed-fg)] outline-none placeholder:text-[color:var(--ed-subtle)]"
+          />
+        </label>
+      ) : null}
+
       {schemaDriven && schema ? (
         <SchemaInspectorPanel
           config={config}
@@ -762,6 +781,7 @@ function SectionInspector({
           locale={locale}
           selectedField={selectedField}
           viewport={viewport}
+          query={propertyQuery}
           onChange={onChange}
         />
       ) : null}

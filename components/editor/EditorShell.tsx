@@ -59,6 +59,7 @@ import {
   loadEditorUiState,
   saveEditorUiState,
   panelWidthPx,
+  normalizeLeftNav,
   type HistoryEntry,
   type EditorViewportId,
   type EditorSectionTab,
@@ -107,7 +108,7 @@ export function EditorShell({
   const [historyIndex, setHistoryIndex] = useState(0);
   const [viewport, setViewport] = useState<EditorViewportId>("1280");
   const device = deviceFromViewport(viewport);
-  const [leftNav, setLeftNav] = useState<LeftNavTab>("sections");
+  const [leftNav, setLeftNav] = useState<LeftNavTab>("layers");
   const [activePage, setActivePage] = useState("home");
   const [phonePane, setPhonePane] = useState<PhonePane>("canvas");
   const [tabletInspectorOpen, setTabletInspectorOpen] = useState(false);
@@ -229,8 +230,8 @@ export function EditorShell({
         if (exists) setSelectedSectionId(saved.selectedSectionId);
       }
       if (saved.focusMode != null) setFocusMode(saved.focusMode);
-      if (saved.leftNav === "pages" || saved.leftNav === "sections") {
-        setLeftNav(saved.leftNav);
+      if (saved.leftNav) {
+        setLeftNav(normalizeLeftNav(saved.leftNav) as LeftNavTab);
       }
       if (saved.sectionTab) setSectionTab(saved.sectionTab);
       if (saved.siteGroup) setSiteGroup(saved.siteGroup);
@@ -588,7 +589,7 @@ export function EditorShell({
         ? config.sections.find((section) => section.type === type)?.id
         : undefined);
     if (matched) setSelectedSectionId(matched);
-    setLeftNav("sections");
+    setLeftNav("layers");
     setFocusMode(false);
     setPhonePane("inspector");
     setTabletInspectorOpen(true);
@@ -600,6 +601,7 @@ export function EditorShell({
     if (id) {
       setActivePage((page) => (page === "product" ? "home" : page));
       if (canvasProduct) setCanvasProduct(null);
+      setLeftNav("layers");
       setFocusMode(false);
       setPhonePane("inspector");
       setTabletInspectorOpen(true);
@@ -785,7 +787,62 @@ export function EditorShell({
         id: "add-section",
         label: dict.editor.addSection,
         group: isFa ? "سکشن" : "Sections",
-        run: () => setLibraryOpen(true),
+        run: () => {
+          setLeftNav("insert");
+          setLibraryOpen(true);
+        },
+      },
+      {
+        id: "nav-views",
+        label: dict.editor.views,
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setLeftNav("views");
+          setFocusMode(false);
+          setPhonePane("sections");
+        },
+      },
+      {
+        id: "nav-layers",
+        label: dict.editor.layers,
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setLeftNav("layers");
+          setFocusMode(false);
+          setPhonePane("sections");
+        },
+      },
+      {
+        id: "nav-insert",
+        label: dict.editor.insert,
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setLeftNav("insert");
+          setFocusMode(false);
+          setPhonePane("sections");
+        },
+      },
+      {
+        id: "nav-assets",
+        label: dict.editor.assets,
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setLeftNav("assets");
+          setFocusMode(false);
+          setPhonePane("sections");
+        },
+      },
+      {
+        id: "nav-site",
+        label: dict.editor.sitePanel,
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setLeftNav("site");
+          setSelectedSectionId(undefined);
+          setPhonePane("inspector");
+          setTabletInspectorOpen(true);
+          setFocusMode(false);
+        },
       },
       {
         id: "history",
@@ -885,6 +942,11 @@ export function EditorShell({
     return items;
   }, [
     dict.editor.addSection,
+    dict.editor.assets,
+    dict.editor.insert,
+    dict.editor.layers,
+    dict.editor.views,
+    dict.editor.sitePanel,
     dict.editor.publish,
     dict.editor.unpublish,
     dict.editor.quality,
@@ -1036,7 +1098,7 @@ export function EditorShell({
       viewport={device}
       onOpenSections={() => {
         setPhonePane("sections");
-        setLeftNav("sections");
+        setLeftNav("layers");
         setTabletInspectorOpen(false);
       }}
     />
@@ -1065,7 +1127,7 @@ export function EditorShell({
       }}
       onBrowseTemplates={() => setSiteGroup("site")}
       viewport={device}
-      onOpenSections={() => setLeftNav("sections")}
+      onOpenSections={() => setLeftNav("layers")}
     />
   );
 
@@ -1087,6 +1149,26 @@ export function EditorShell({
       onAddSection={() => {
         setLibraryInsertAfterId(null);
         setLibraryOpen(true);
+      }}
+      onInsertType={(type) => {
+        const result = commandAddSection(config, type, {
+          afterSectionId: selectedSectionId,
+        });
+        if (!result) return;
+        applyConfig(result.config, result.label);
+        if (result.selectedSectionId) {
+          setSelectedSectionId(result.selectedSectionId);
+        }
+        setLeftNav("layers");
+        setPhonePane("inspector");
+        setTabletInspectorOpen(true);
+      }}
+      onOpenSiteGroup={(group) => {
+        setSelectedSectionId(undefined);
+        setSelectedField(undefined);
+        setSiteGroup(group);
+        setPhonePane("inspector");
+        setTabletInspectorOpen(true);
       }}
       onPageChange={(page) => {
         onPageChange(page);
@@ -1412,7 +1494,7 @@ export function EditorShell({
             setPhonePane("inspector");
             setTabletInspectorOpen(true);
           }
-          setLeftNav("sections");
+          setLeftNav("layers");
           setLibraryInsertAfterId(null);
         }}
       />

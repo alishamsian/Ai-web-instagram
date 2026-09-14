@@ -17,7 +17,7 @@ import {
   isSchemaFieldActive,
 } from "@/lib/store/registry/element-schema";
 import type { EditorFieldPath } from "@/components/editor/EditContext";
-import { schemaFieldMatchesEditorPath } from "@/lib/editor";
+import { schemaFieldMatchesEditorPath, matchesInspectorQuery } from "@/lib/editor";
 import {
   resolveResponsiveValue,
   resetResponsiveOverride,
@@ -89,11 +89,18 @@ function ResponsiveNumberControl({
         <span className="text-[11px] font-medium capitalize text-[color:var(--ed-muted)]">
           {viewport}
         </span>
-        <span className="text-[10px] text-[color:var(--ed-subtle)]">
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 text-[10px] font-medium",
+            resolved.inherited
+              ? "bg-[color:var(--ed-bg-soft)] text-[color:var(--ed-subtle)]"
+              : "bg-[color:var(--ed-select-soft)] text-[color:var(--ed-fg)]",
+          )}
+        >
           {resolved.inherited
             ? locale === "fa"
-              ? "ارث‌بری"
-              : "Inherited"
+              ? `ارث‌بری${resolved.source && resolved.source !== "none" ? ` · ${resolved.source === "base" ? "desktop" : resolved.source}` : ""}`
+              : `Inherited${resolved.source && resolved.source !== "none" ? ` · ${resolved.source === "base" ? "desktop" : resolved.source}` : ""}`
             : locale === "fa"
               ? "بازنویسی"
               : "Override"}
@@ -123,10 +130,12 @@ function ResponsiveNumberControl({
           <button
             type="button"
             disabled={disabled}
-            className="h-9 shrink-0 rounded-lg border border-[color:var(--ed-border)] px-2 text-[11px] text-[color:var(--ed-muted)] hover:bg-[color:var(--ed-bg-hover)]"
+            title={locale === "fa" ? "بازنشانی به مقدار ارث‌برده" : "Reset to inherited"}
+            aria-label={locale === "fa" ? "بازنشانی به مقدار ارث‌برده" : "Reset to inherited"}
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--ed-border)] text-[13px] text-[color:var(--ed-muted)] hover:bg-[color:var(--ed-bg-hover)] hover:text-[color:var(--ed-fg)]"
             onClick={() => onChange(resetResponsiveOverride(current, viewport))}
           >
-            {locale === "fa" ? "بازنشانی" : "Reset"}
+            ↺
           </button>
         ) : null}
       </div>
@@ -332,6 +341,7 @@ export function SchemaInspectorPanel({
   locale,
   selectedField,
   viewport = "desktop",
+  query = "",
   onChange,
 }: {
   config: WebsiteConfig;
@@ -341,6 +351,7 @@ export function SchemaInspectorPanel({
   locale: Locale;
   selectedField?: EditorFieldPath;
   viewport?: ViewportBucket;
+  query?: string;
   onChange: (next: WebsiteConfig) => void;
 }) {
   const fields = useMemo(() => flattenElementFields(schema), [schema]);
@@ -359,10 +370,23 @@ export function SchemaInspectorPanel({
       const group = (field.group ?? "content") as ElementSchemaGroup;
       if (!map.has(group)) continue;
       if (!isSchemaFieldActive(field, values)) continue;
+      const groupLabel = GROUP_LABELS[group][locale];
+      if (
+        !matchesInspectorQuery(query, [
+          field.key,
+          field.path,
+          labelOf(field, locale),
+          field.description?.[locale],
+          groupLabel,
+          group,
+        ])
+      ) {
+        continue;
+      }
       map.get(group)!.push(field);
     }
     return map;
-  }, [fields, groups, values]);
+  }, [fields, groups, values, query, locale]);
 
   useEffect(() => {
     if (!selectedField) return;
@@ -372,8 +396,18 @@ export function SchemaInspectorPanel({
     node?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedField, section.id]);
 
+  const visibleCount = [...byGroup.values()].reduce(
+    (sum, list) => sum + list.length,
+    0,
+  );
+
   return (
     <div className="space-y-4">
+      {query.trim() && visibleCount === 0 ? (
+        <p className="py-6 text-center text-[12px] text-[color:var(--ed-muted)]">
+          {locale === "fa" ? "ویژگی‌ای پیدا نشد" : "No properties match"}
+        </p>
+      ) : null}
       {[...byGroup.entries()].map(([group, groupFields]) => {
         if (!groupFields.length) return null;
         return (

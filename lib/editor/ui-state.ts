@@ -3,7 +3,18 @@ import type { EditorFieldPath } from "@/components/editor/EditContext";
 
 export type EditorSectionTab = "content" | "layout" | "style";
 export type EditorSiteGroup = "style" | "content" | "site";
-export type EditorLeftNav = "pages" | "sections" | "layers";
+/** Left sidebar destinations — Views are section shortcuts, not multi-page CRUD. */
+export type EditorLeftNav =
+  | "views"
+  | "layers"
+  | "insert"
+  | "assets"
+  | "site"
+  /** @deprecated prefer views */
+  | "pages"
+  /** @deprecated prefer layers */
+  | "sections";
+
 export type EditorZoomMode = "fit" | "75" | "100";
 export type EditorPanelWidth = "narrow" | "normal" | "wide";
 
@@ -18,9 +29,26 @@ export type EditorUiPersisted = {
   panelWidth?: EditorPanelWidth;
   inspectorLight?: boolean;
   splitPreview?: boolean;
+  leftCollapsed?: boolean;
+  rightCollapsed?: boolean;
 };
 
 const PREFIX = "vitrin-editor-ui:";
+
+const LEFT_NAV_ALIASES: Record<string, EditorLeftNav> = {
+  views: "views",
+  layers: "layers",
+  insert: "insert",
+  assets: "assets",
+  site: "site",
+  pages: "views",
+  sections: "layers",
+};
+
+export function normalizeLeftNav(value: unknown): EditorLeftNav {
+  if (typeof value !== "string") return "layers";
+  return LEFT_NAV_ALIASES[value] ?? "layers";
+}
 
 export function editorUiStorageKey(websiteId: string) {
   return `${PREFIX}${websiteId}`;
@@ -32,7 +60,9 @@ export function loadEditorUiState(websiteId: string): EditorUiPersisted | null {
     const raw = window.localStorage.getItem(editorUiStorageKey(websiteId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as EditorUiPersisted;
-    return parsed && typeof parsed === "object" ? parsed : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (parsed.leftNav) parsed.leftNav = normalizeLeftNav(parsed.leftNav);
+    return parsed;
   } catch {
     return null;
   }
@@ -57,10 +87,11 @@ export function panelWidthPx(
   side: "left" | "right",
   width: EditorPanelWidth,
 ): number {
+  // Left includes ~44px icon rail.
   if (side === "left") {
-    if (width === "narrow") return 220;
-    if (width === "wide") return 300;
-    return 260;
+    if (width === "narrow") return 268;
+    if (width === "wide") return 360;
+    return 312;
   }
   if (width === "narrow") return 300;
   if (width === "wide") return 380;
@@ -93,4 +124,14 @@ export function fieldLabelFromPath(
 ): string | undefined {
   if (!path) return undefined;
   return blocks.find((b) => b.field === path)?.label[locale];
+}
+
+/** Property search across schema field labels/keys/groups. */
+export function matchesInspectorQuery(
+  query: string,
+  haystacks: Array<string | undefined | null>,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return haystacks.some((h) => Boolean(h && h.toLowerCase().includes(q)));
 }

@@ -87,9 +87,12 @@ export {
   schemaFieldMatchesEditorPath,
   fieldLabelFromPath,
   panelWidthPx,
+  normalizeLeftNav,
+  matchesInspectorQuery,
   type EditorUiPersisted,
   type EditorSectionTab,
   type EditorSiteGroup,
+  type EditorLeftNav,
   type EditorZoomMode,
   type EditorPanelWidth,
 } from "@/lib/editor/ui-state";
