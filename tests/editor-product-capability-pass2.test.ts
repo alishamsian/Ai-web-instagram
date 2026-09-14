@@ -209,6 +209,29 @@ describe("pass 2.1 — normalize identity + legacy hero", () => {
     expect(next.content.products?.items[0]?.id).toBe("p1");
   });
 
+  it("legacy identity normalization is deterministic and idempotent", () => {
+    const raw = baseConfig();
+    raw.content.products!.items = [
+      { ...raw.content.products!.items[0]!, id: undefined, slug: undefined },
+    ];
+    raw.content.services!.items = [
+      { ...raw.content.services!.items[0]!, id: undefined },
+    ];
+    raw.content.faq!.items = [{ question: "Q", answer: "A" }];
+    raw.content.testimonials = {
+      title: "Testimonials",
+      items: [{ quote: "Great", author: "A" }],
+    };
+
+    const first = normalizeCollectionIdentities(raw);
+    const second = normalizeCollectionIdentities(raw);
+    expect(second).toEqual(first);
+    expect(normalizeCollectionIdentities(first)).toEqual(first);
+    expect(first.content.products?.items[0]?.id).toBe(
+      second.content.products?.items[0]?.id,
+    );
+  });
+
   it("normalizes legacy hero menu to editorial", () => {
     resetRegistryForTests(CORE_SECTION_DEFINITIONS);
     const raw = baseConfig();
