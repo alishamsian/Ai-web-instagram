@@ -3,18 +3,29 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Locale } from "@/lib/config/env";
-import { EDITOR_VIEWPORT_PRESETS, type EditorViewportId } from "@/lib/editor";
+import { deviceFromViewport, type EditorViewportId } from "@/lib/editor";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
-  ChevronDown,
   Command,
   ExternalLink,
   Gauge,
   History,
+  Maximize2,
+  Minimize2,
   Redo2,
   Undo2,
 } from "lucide-react";
+
+const VIEWPORT_PILLS: {
+  id: EditorViewportId;
+  device: "mobile" | "tablet" | "desktop";
+  label: { fa: string; en: string };
+}[] = [
+  { id: "390", device: "mobile", label: { fa: "موبایل", en: "Mobile" } },
+  { id: "768", device: "tablet", label: { fa: "تبلت", en: "Tablet" } },
+  { id: "1280", device: "desktop", label: { fa: "دسکتاپ", en: "Desktop" } },
+];
 
 export function EditorTopBar({
   locale,
@@ -33,6 +44,9 @@ export function EditorTopBar({
   previewLabel,
   liveLabel,
   backLabel,
+  focusMode,
+  focusLabel,
+  qualityLabel,
   onUndo,
   onRedo,
   onRetrySave,
@@ -41,6 +55,7 @@ export function EditorTopBar({
   onQuality,
   onCommandPalette,
   onPublish,
+  onToggleFocus,
 }: {
   locale: Locale;
   websiteId: string;
@@ -58,6 +73,9 @@ export function EditorTopBar({
   previewLabel: string;
   liveLabel: string;
   backLabel: string;
+  focusMode: boolean;
+  focusLabel: string;
+  qualityLabel: string;
   onUndo: () => void;
   onRedo: () => void;
   onRetrySave: () => void;
@@ -66,15 +84,15 @@ export function EditorTopBar({
   onQuality: () => void;
   onCommandPalette: () => void;
   onPublish: () => void;
+  onToggleFocus: () => void;
 }) {
   const isFa = locale === "fa";
-  const current =
-    EDITOR_VIEWPORT_PRESETS.find((p) => p.id === viewport) ??
-    EDITOR_VIEWPORT_PRESETS.find((p) => p.id === "1280")!;
+  const device = deviceFromViewport(viewport);
+  const activePill =
+    VIEWPORT_PILLS.find((p) => p.device === device)?.id ?? "1280";
 
   return (
-    <header className="editor-topbar relative z-30 hidden h-12 shrink-0 items-center gap-3 border-b border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] px-3 md:flex">
-      {/* Left: back + identity */}
+    <header className="editor-topbar relative z-30 hidden h-11 shrink-0 items-center gap-3 border-b border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] px-3 md:flex">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Link
           href={`/${locale}/dashboard/website?id=${websiteId}`}
@@ -124,8 +142,7 @@ export function EditorTopBar({
         </div>
       </div>
 
-      {/* Center: history + viewport */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <div className="editor-tool-group">
           <TopIcon
             label={`${isFa ? "بازگردانی" : "Undo"} ⌘Z`}
@@ -143,36 +160,21 @@ export function EditorTopBar({
           </TopIcon>
         </div>
 
-        <div className="relative">
-          <label className="editor-viewport-select">
-            <span className="sr-only">
-              {isFa ? "عرض صفحه" : "Viewport width"}
-            </span>
-            <select
-              value={viewport === "custom" ? "1280" : viewport}
-              onChange={(e) =>
-                onViewportChange(e.target.value as EditorViewportId)
-              }
-              className="appearance-none bg-transparent pe-6 ps-2.5 text-[11px] font-medium text-[color:var(--ed-fg)] outline-none"
+        <div className="editor-viewport-pills" role="group" aria-label="Viewport">
+          {VIEWPORT_PILLS.map((pill) => (
+            <button
+              key={pill.id}
+              type="button"
+              data-active={activePill === pill.id}
+              className="editor-viewport-pill"
+              onClick={() => onViewportChange(pill.id)}
             >
-              {EDITOR_VIEWPORT_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label[locale]} · {preset.width}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={12}
-              className="pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 text-[color:var(--ed-muted)]"
-            />
-          </label>
-          <span className="ms-1.5 hidden text-[10px] tabular-nums text-[color:var(--ed-muted)] xl:inline">
-            {current.width}px
-          </span>
+              {pill.label[locale]}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Right: tools + publish */}
       <div className="flex flex-1 items-center justify-end gap-1.5">
         <div className="editor-tool-group">
           <TopIcon
@@ -181,17 +183,18 @@ export function EditorTopBar({
           >
             <Command size={14} />
           </TopIcon>
-          <TopIcon
-            label={isFa ? "تاریخچه" : "History"}
-            onClick={onHistory}
-          >
+          <TopIcon label={isFa ? "تاریخچه" : "History"} onClick={onHistory}>
             <History size={14} />
           </TopIcon>
-          <TopIcon
-            label={isFa ? "کیفیت" : "Quality"}
-            onClick={onQuality}
-          >
+          <TopIcon label={qualityLabel} onClick={onQuality}>
             <Gauge size={14} />
+          </TopIcon>
+          <TopIcon
+            label={`${focusLabel} ⌘\\`}
+            onClick={onToggleFocus}
+            active={focusMode}
+          >
+            {focusMode ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </TopIcon>
         </div>
 
@@ -234,11 +237,13 @@ function TopIcon({
   label,
   onClick,
   disabled,
+  active,
 }: {
   children: ReactNode;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
@@ -247,7 +252,8 @@ function TopIcon({
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      className="editor-icon-btn"
+      data-active={active || undefined}
+      className={cn("editor-icon-btn", active && "bg-white/[0.1] text-[color:var(--ed-fg)]")}
     >
       {children}
     </button>

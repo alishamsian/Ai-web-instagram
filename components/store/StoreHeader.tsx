@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import {
-  Heart,
-  Menu,
-  Search,
-  ShoppingBag,
-  User,
-  X,
-} from "lucide-react";
+import { Menu, Search, ShoppingBag, X } from "lucide-react";
 import type { WebsiteConfig } from "@/types/website";
 import { useSiteNav } from "@/components/website/SiteNavContext";
 import { useStoreCart } from "@/lib/store/cart";
 import { StoreIconButton } from "@/components/store/primitives";
 import { cn } from "@/lib/utils";
+
+function resolveHeroKind(config: WebsiteConfig) {
+  const raw =
+    config.sections.find((s) => s.type === "hero")?.variant ||
+    config.content.hero.style ||
+    "fan";
+  if (raw === "overlay") return "fan";
+  return raw;
+}
 
 function navLinks(isFa: boolean, hasCategories: boolean) {
   const all = isFa
@@ -27,7 +29,7 @@ function navLinks(isFa: boolean, hasCategories: boolean) {
     : [
         { href: "#shop", label: "Shop", id: "shop" },
         { href: "#categories", label: "Collections", id: "categories" },
-        { href: "#featured", label: "New Arrivals", id: "featured" },
+        { href: "#featured", label: "New", id: "featured" },
         { href: "#bestsellers", label: "Bestsellers", id: "bestsellers" },
         { href: "#story", label: "Story", id: "story" },
       ];
@@ -42,7 +44,7 @@ export function StoreAnnouncement({ config }: { config: WebsiteConfig }) {
     trust[0] ||
     (isFa
       ? "ارسال سراسری · پاسخ سریع در دایرکت · سفارش از صفحه محصول"
-      : "Free shipping on orders · Fast reply on Instagram · Order from product pages");
+      : "Nationwide shipping · Fast Instagram reply · Order from product pages");
 
   if (dismissed) return null;
 
@@ -86,6 +88,11 @@ export function StoreHeader({
   const links = navLinks(isFa, hasCategories);
   const homeHref = basePath || "#top";
   const root = basePath.replace(/\/$/, "");
+  const heroKind = resolveHeroKind(config);
+  const cinematicTop = mode === "home" && heroKind === "cinematic";
+  // fan / minimal / editorial / split → floating glass, not white-on-photo
+  const floatingTop =
+    mode === "home" && !scrolled && !cinematicTop;
 
   const sectionHref = (hash: string) =>
     mode === "pdp" ? `${root || ""}${hash}` : hash;
@@ -93,9 +100,9 @@ export function StoreHeader({
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
-      setScrolled(y > 12);
-      if (y > 120 && y > lastY.current + 4) setHidden(true);
-      else if (y < lastY.current - 4 || y < 80) setHidden(false);
+      setScrolled(y > 8);
+      if (y > 140 && y > lastY.current + 6) setHidden(true);
+      else if (y < lastY.current - 4 || y < 64) setHidden(false);
       lastY.current = y;
     };
     onScroll();
@@ -133,23 +140,39 @@ export function StoreHeader({
     }, 80);
   };
 
+  const shopLabel = isFa ? "خرید" : "Shop";
+
   return (
     <>
       <header
         className={cn(
           "store-header",
           scrolled && "store-header--solid",
-          mode === "home" && !scrolled && "store-header--overlay",
+          floatingTop && "store-header--float",
+          cinematicTop && !scrolled && "store-header--overlay",
           hidden && !menuOpen && "store-header--hidden",
         )}
       >
         <div className="store-wrap store-header__inner">
-          <a href={homeHref} className="store-logo" onClick={goHome}>
+          <a
+            href={homeHref}
+            className="store-logo"
+            onClick={goHome}
+            aria-label={config.brand.name}
+          >
             {config.brand.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={config.brand.logo} alt="" className="store-logo__mark" />
-            ) : null}
-            <span>{config.brand.name}</span>
+              <img
+                src={config.brand.logo}
+                alt=""
+                className="store-logo__mark"
+              />
+            ) : (
+              <span className="store-logo__glyph" aria-hidden>
+                {config.brand.name.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <span className="store-logo__name">{config.brand.name}</span>
           </a>
 
           <nav className="store-header__nav" aria-label="Primary">
@@ -157,6 +180,7 @@ export function StoreHeader({
               <a
                 key={link.id}
                 href={sectionHref(link.href)}
+                className="store-header__link"
                 onClick={(event) => goSection(event, link.href)}
               >
                 {link.label}
@@ -168,36 +192,31 @@ export function StoreHeader({
             <a
               href={sectionHref("#shop")}
               className="store-icon-btn"
-              aria-label={isFa ? "جستجو" : "Search"}
+              aria-label={isFa ? "جستجو در فروشگاه" : "Search shop"}
               onClick={(event) => goSection(event, "#shop")}
             >
-              <Search size={18} strokeWidth={1.6} />
+              <Search size={17} strokeWidth={1.7} />
             </a>
-            <StoreIconButton
-              className="store-header__account"
-              aria-label={isFa ? "حساب" : "Account"}
-              disabled
-              title={isFa ? "به‌زودی" : "Coming soon"}
-            >
-              <User size={18} strokeWidth={1.6} />
-            </StoreIconButton>
-            <StoreIconButton
-              aria-label={isFa ? "علاقه‌مندی‌ها" : "Wishlist"}
-              disabled
-              title={isFa ? "به‌زودی" : "Coming soon"}
-            >
-              <Heart size={18} strokeWidth={1.6} />
-            </StoreIconButton>
+
             <StoreIconButton
               className="store-header__cart"
-              aria-label={isFa ? "سبد" : "Cart"}
+              aria-label={isFa ? "سبد خرید" : "Cart"}
               onClick={() => cart.setOpen(true)}
             >
-              <ShoppingBag size={18} strokeWidth={1.6} />
+              <ShoppingBag size={17} strokeWidth={1.7} />
               {cart.count > 0 ? (
                 <span className="store-header__badge">{cart.count}</span>
               ) : null}
             </StoreIconButton>
+
+            <a
+              href={sectionHref("#shop")}
+              className="store-header__cta"
+              onClick={(event) => goSection(event, "#shop")}
+            >
+              {shopLabel}
+            </a>
+
             <StoreIconButton
               className="store-header__menu"
               aria-label={isFa ? "منو" : "Menu"}
@@ -205,7 +224,7 @@ export function StoreHeader({
               aria-controls={titleId}
               onClick={() => setMenuOpen(true)}
             >
-              <Menu size={20} strokeWidth={1.6} />
+              <Menu size={19} strokeWidth={1.7} />
             </StoreIconButton>
           </div>
         </div>
@@ -225,9 +244,21 @@ export function StoreHeader({
         />
         <div className="store-drawer__panel">
           <div className="store-drawer__top">
-            <span className="store-logo" id={titleId}>
-              {config.brand.name}
-            </span>
+            <div className="store-logo" id={titleId}>
+              {config.brand.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={config.brand.logo}
+                  alt=""
+                  className="store-logo__mark"
+                />
+              ) : (
+                <span className="store-logo__glyph" aria-hidden>
+                  {config.brand.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className="store-logo__name">{config.brand.name}</span>
+            </div>
             <StoreIconButton
               ref={closeRef}
               aria-label={isFa ? "بستن" : "Close"}
@@ -236,6 +267,7 @@ export function StoreHeader({
               <X size={20} strokeWidth={1.6} />
             </StoreIconButton>
           </div>
+
           <nav className="store-drawer__nav">
             {links.map((link) => (
               <a
@@ -268,6 +300,7 @@ export function StoreHeader({
               {isFa ? "تماس" : "Contact"}
             </a>
           </nav>
+
           <div className="store-drawer__foot">
             <button
               type="button"
@@ -280,6 +313,9 @@ export function StoreHeader({
               {isFa ? "مشاهده سبد" : "View bag"}
               {cart.count > 0 ? ` (${cart.count})` : ""}
             </button>
+            {config.brand.tagline ? (
+              <p className="store-drawer__tag">{config.brand.tagline}</p>
+            ) : null}
           </div>
         </div>
       </div>

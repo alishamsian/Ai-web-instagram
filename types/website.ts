@@ -77,7 +77,7 @@ export interface TypographyConfig {
 }
 
 export interface HeroConfig {
-  style: "editorial" | "split" | "minimal" | "overlay" | "menu";
+  style: "editorial" | "split" | "minimal" | "overlay" | "menu" | "fan";
   headline: string;
   subheadline: string;
   cta: string;

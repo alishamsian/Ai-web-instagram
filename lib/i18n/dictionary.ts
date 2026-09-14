@@ -555,6 +555,7 @@ export const fa = {
     scaleCompact: "فشرده",
     scaleBold: "پررنگ",
     styleOverlay: "پوششی",
+    styleFan: "مرکزی",
     styleSplit: "دو ستونه",
     styleMinimal: "مینیمال",
     styleEditorial: "ادیتوریال",
@@ -694,7 +695,15 @@ export const fa = {
     showProduct: "نمایش محصول",
     retrySave: "تلاش دوباره",
     publishNoProducts: "قبل از انتشار حداقل یک محصول اضافه کن.",
-    shortcutsHint: "⌘Z برگشت · ⌘⇧Z جلو · ⌘S ذخیره · ⌘P پیش‌نمایش · Del حذف",
+    shortcutsHint:
+      "⌘Z برگشت · ⌘⇧Z جلو · ⌘S ذخیره · ⌘P پیش‌نمایش · ⌘\\ تمرکز · Del حذف",
+    focusMode: "حالت تمرکز",
+    focusModeExit: "خروج از تمرکز",
+    quality: "کیفیت",
+    searchSections: "جستجوی بخش‌ها…",
+    undoFlash: "بازگشت · {label}",
+    redoFlash: "جلو · {label}",
+    noSectionsMatch: "بخشی پیدا نشد",
   },
 };
 
@@ -1252,6 +1261,7 @@ export const en: Dictionary = {
     scaleCompact: "Compact",
     scaleBold: "Bold",
     styleOverlay: "Overlay",
+    styleFan: "Centered",
     styleSplit: "Split",
     styleMinimal: "Minimal",
     styleEditorial: "Editorial",
@@ -1391,7 +1401,15 @@ export const en: Dictionary = {
     showProduct: "Show product",
     retrySave: "Retry",
     publishNoProducts: "Add at least one product before publishing.",
-    shortcutsHint: "⌘Z undo · ⌘⇧Z redo · ⌘S save · ⌘P preview · Del delete",
+    shortcutsHint:
+      "⌘Z undo · ⌘⇧Z redo · ⌘S save · ⌘P preview · ⌘\\ focus · Del delete",
+    focusMode: "Focus mode",
+    focusModeExit: "Exit focus",
+    quality: "Quality",
+    searchSections: "Search sections…",
+    undoFlash: "Undo · {label}",
+    redoFlash: "Redo · {label}",
+    noSectionsMatch: "No sections found",
   },
 };
 

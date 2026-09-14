@@ -5,7 +5,8 @@ export type EditorKeyCommand =
   | "preview"
   | "commandPalette"
   | "escape"
-  | "deleteSection";
+  | "deleteSection"
+  | "focusMode";
 
 export function resolveEditorKeyCommand(
   event: Pick<
@@ -25,6 +26,11 @@ export function resolveEditorKeyCommand(
     (key === "Delete" || key === "Backspace")
   ) {
     return "deleteSection";
+  }
+
+  // ⌘\ or Ctrl+\ — focus mode
+  if (meta && (key === "\\" || key === "Backslash")) {
+    return "focusMode";
   }
 
   if (!meta) return null;

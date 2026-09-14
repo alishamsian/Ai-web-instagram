@@ -35,6 +35,13 @@ import {
   type SectionSpacing,
   type SectionWidth,
 } from "@/components/editor/editor-selection";
+import {
+  fieldLabelFromPath,
+  type EditorSectionTab,
+  type EditorSiteGroup,
+} from "@/lib/editor";
+import type { EditorFieldPath } from "@/components/editor/EditContext";
+import { SECTION_LAYER_BLOCKS } from "@/components/editor/editor-selection";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -46,8 +53,8 @@ import {
   Type,
 } from "lucide-react";
 
-type SiteGroup = "style" | "content" | "site";
-type SectionTab = "content" | "layout" | "style";
+type SiteGroup = EditorSiteGroup;
+type SectionTab = EditorSectionTab;
 
 export function EditorInspector({
   config,
@@ -56,9 +63,14 @@ export function EditorInspector({
   websiteId,
   canRemoveBranding,
   selectedSectionId,
+  selectedField,
   activePage,
   productSlug,
   compactChrome = false,
+  sectionTab,
+  siteGroup,
+  onSectionTabChange,
+  onSiteGroupChange,
   onChange,
   onRestored,
   onOpenSections,
@@ -69,10 +81,15 @@ export function EditorInspector({
   websiteId: string;
   canRemoveBranding: boolean;
   selectedSectionId?: string;
+  selectedField?: EditorFieldPath;
   activePage: string;
   productSlug?: string | null;
   /** Hide duplicate title chrome when parent already shows a header (phone/tablet). */
   compactChrome?: boolean;
+  sectionTab: SectionTab;
+  siteGroup: SiteGroup;
+  onSectionTabChange: (tab: SectionTab) => void;
+  onSiteGroupChange: (group: SiteGroup) => void;
   onChange: (next: WebsiteConfig) => void;
   onRestored: (next: WebsiteConfig) => void;
   onOpenSections?: () => void;
@@ -81,9 +98,14 @@ export function EditorInspector({
     () => config.sections.find((s) => s.id === selectedSectionId),
     [config.sections, selectedSectionId],
   );
-  const [siteGroup, setSiteGroup] = useState<SiteGroup>("style");
-  const [siteSub, setSiteSub] = useState<string>("presets");
-  const [sectionTab, setSectionTab] = useState<SectionTab>("content");
+
+  const fieldCrumb = selected
+    ? fieldLabelFromPath(
+        selectedField,
+        SECTION_LAYER_BLOCKS[selected.type] ?? [],
+        locale,
+      )
+    : undefined;
 
   if (activePage === "product" && productSlug) {
     return (
@@ -104,14 +126,19 @@ export function EditorInspector({
   }
 
   if (selected) {
+    const sectionTitle = sectionLabel(
+      selected.type as WebsiteSectionType,
+      locale,
+    );
     return (
       <InspectorShell
         compactChrome={compactChrome}
         eyebrow={dict.editor.inspectorTab}
-        title={sectionLabel(selected.type as WebsiteSectionType, locale)}
+        title={sectionTitle}
+        breadcrumb={fieldCrumb ? [sectionTitle, fieldCrumb] : [sectionTitle]}
         hint={dict.editor.inspectorHintSection}
       >
-        <div className="mb-4 flex gap-1 rounded-xl bg-black/[0.04] p-1">
+        <div className="editor-site-group mb-4" role="tablist">
           {(
             [
               ["content", dict.editor.sectionTabContent],
@@ -122,13 +149,11 @@ export function EditorInspector({
             <button
               key={id}
               type="button"
-              onClick={() => setSectionTab(id)}
-              className={cn(
-                "flex-1 rounded-lg px-2 py-2 text-[12px] font-medium transition",
-                sectionTab === id
-                  ? "bg-white text-ink shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              role="tab"
+              aria-selected={sectionTab === id}
+              data-active={sectionTab === id}
+              onClick={() => onSectionTabChange(id)}
+              className="editor-site-group-btn"
             >
               {label}
             </button>
@@ -141,35 +166,12 @@ export function EditorInspector({
           dict={dict}
           locale={locale}
           tab={sectionTab}
+          selectedField={selectedField}
           onChange={onChange}
         />
       </InspectorShell>
     );
   }
-
-  const styleSubs = [
-    { id: "presets", label: dict.editor.designPresets },
-    { id: "colors", label: dict.editor.colors },
-    { id: "type", label: dict.editor.typography },
-  ];
-  const contentSubs = [
-    { id: "brand", label: dict.editor.brand },
-    { id: "content", label: dict.editor.content },
-    { id: "media", label: dict.editor.media },
-  ];
-  const siteSubs = [
-    { id: "seo", label: dict.editor.seo },
-    { id: "settings", label: dict.editor.settings },
-    { id: "template", label: dict.editor.template },
-    { id: "versions", label: dict.editor.versions },
-  ];
-
-  const subs =
-    siteGroup === "style"
-      ? styleSubs
-      : siteGroup === "content"
-        ? contentSubs
-        : siteSubs;
 
   return (
     <InspectorShell
@@ -178,7 +180,7 @@ export function EditorInspector({
       title={config.brand.name || dict.editor.website}
       hint={dict.editor.inspectorHintSite}
     >
-      <div className="space-y-4">
+      <div className="editor-inspector space-y-4">
         <SiteIdentityCard config={config} dict={dict} locale={locale} />
 
         <div className="editor-site-hint">
@@ -187,7 +189,7 @@ export function EditorInspector({
             <button
               type="button"
               onClick={onOpenSections}
-              className="shrink-0 rounded-lg bg-ink px-2.5 py-1.5 text-[11px] font-medium text-white"
+              className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium"
             >
               {dict.editor.pickSectionCta}
             </button>
@@ -208,16 +210,7 @@ export function EditorInspector({
               role="tab"
               aria-selected={siteGroup === id}
               data-active={siteGroup === id}
-              onClick={() => {
-                setSiteGroup(id);
-                setSiteSub(
-                  id === "style"
-                    ? "presets"
-                    : id === "content"
-                      ? "brand"
-                      : "seo",
-                );
-              }}
+              onClick={() => onSiteGroupChange(id)}
               className="editor-site-group-btn"
             >
               <Icon size={13} />
@@ -226,77 +219,79 @@ export function EditorInspector({
           ))}
         </div>
 
-        <div className="editor-site-subnav" role="tablist">
-          {subs.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={siteSub === item.id}
-              data-active={siteSub === item.id}
-              onClick={() => setSiteSub(item.id)}
-              className="editor-site-subnav-btn"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <div className="space-y-5 pt-0.5">
+          {siteGroup === "style" ? (
+            <>
+              <InspectorBlock title={dict.editor.designPresets}>
+                <WebsiteQuickSettings
+                  config={config}
+                  dict={dict}
+                  locale={locale}
+                  onChange={onChange}
+                  presetsOnly
+                />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.colors}>
+                <ColorsPanel
+                  config={config}
+                  dict={dict}
+                  locale={locale}
+                  onChange={onChange}
+                />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.typography}>
+                <TypographyPanel
+                  config={config}
+                  dict={dict}
+                  onChange={onChange}
+                />
+              </InspectorBlock>
+            </>
+          ) : null}
 
-        <div className="space-y-4 pt-1">
-          {siteGroup === "style" && siteSub === "presets" ? (
-            <WebsiteQuickSettings
-              config={config}
-              dict={dict}
-              locale={locale}
-              onChange={onChange}
-              presetsOnly
-            />
+          {siteGroup === "content" ? (
+            <>
+              <InspectorBlock title={dict.editor.brand}>
+                <BrandPanel config={config} dict={dict} onChange={onChange} />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.content}>
+                <ContentPanel config={config} dict={dict} onChange={onChange} />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.media}>
+                <MediaPanel config={config} dict={dict} onChange={onChange} />
+              </InspectorBlock>
+            </>
           ) : null}
-          {siteGroup === "style" && siteSub === "colors" ? (
-            <ColorsPanel
-              config={config}
-              dict={dict}
-              locale={locale}
-              onChange={onChange}
-            />
-          ) : null}
-          {siteGroup === "style" && siteSub === "type" ? (
-            <TypographyPanel config={config} dict={dict} onChange={onChange} />
-          ) : null}
-          {siteGroup === "content" && siteSub === "brand" ? (
-            <BrandPanel config={config} dict={dict} onChange={onChange} />
-          ) : null}
-          {siteGroup === "content" && siteSub === "content" ? (
-            <ContentPanel config={config} dict={dict} onChange={onChange} />
-          ) : null}
-          {siteGroup === "content" && siteSub === "media" ? (
-            <MediaPanel config={config} dict={dict} onChange={onChange} />
-          ) : null}
-          {siteGroup === "site" && siteSub === "seo" ? (
-            <SeoPanel config={config} dict={dict} onChange={onChange} />
-          ) : null}
-          {siteGroup === "site" && siteSub === "settings" ? (
-            <SettingsPanel
-              config={config}
-              dict={dict}
-              onChange={onChange}
-              canRemoveBranding={canRemoveBranding}
-            />
-          ) : null}
-          {siteGroup === "site" && siteSub === "template" ? (
-            <TemplatePanel
-              config={config}
-              dict={dict}
-              locale={locale}
-              onChange={onChange}
-            />
-          ) : null}
-          {siteGroup === "site" && siteSub === "versions" ? (
-            <VersionsPanel
-              websiteId={websiteId}
-              dict={dict}
-              onRestored={onRestored}
-            />
+
+          {siteGroup === "site" ? (
+            <>
+              <InspectorBlock title={dict.editor.seo}>
+                <SeoPanel config={config} dict={dict} onChange={onChange} />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.settings}>
+                <SettingsPanel
+                  config={config}
+                  dict={dict}
+                  onChange={onChange}
+                  canRemoveBranding={canRemoveBranding}
+                />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.template}>
+                <TemplatePanel
+                  config={config}
+                  dict={dict}
+                  locale={locale}
+                  onChange={onChange}
+                />
+              </InspectorBlock>
+              <InspectorBlock title={dict.editor.versions}>
+                <VersionsPanel
+                  websiteId={websiteId}
+                  dict={dict}
+                  onRestored={onRestored}
+                />
+              </InspectorBlock>
+            </>
           ) : null}
         </div>
       </div>
@@ -304,16 +299,35 @@ export function EditorInspector({
   );
 }
 
+function InspectorBlock({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-[10px] font-semibold tracking-[0.12em] text-[color:var(--ed-muted)] uppercase">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
 function InspectorShell({
   compactChrome,
   eyebrow,
   title,
+  breadcrumb,
   hint,
   children,
 }: {
   compactChrome: boolean;
   eyebrow: string;
   title: string;
+  breadcrumb?: string[];
   hint: string;
   children: ReactNode;
 }) {
@@ -324,19 +338,70 @@ function InspectorShell({
           <p className="text-[10px] font-medium tracking-[0.14em] text-[color:var(--ed-muted)] uppercase">
             {eyebrow}
           </p>
-          <p className="mt-1 truncate text-[15px] font-medium tracking-tight text-[color:var(--ed-fg)]">
-            {title}
-          </p>
+          {breadcrumb && breadcrumb.length > 1 ? (
+            <nav
+              aria-label="Breadcrumb"
+              className="editor-breadcrumb mt-1.5 flex flex-wrap items-center gap-1.5"
+            >
+              {breadcrumb.map((crumb, index) => (
+                <span key={`${crumb}-${index}`} className="contents">
+                  {index > 0 ? (
+                    <span className="text-[color:var(--ed-subtle)]">›</span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      "truncate text-[13px]",
+                      index === breadcrumb.length - 1
+                        ? "font-medium text-[color:var(--ed-fg)]"
+                        : "text-[color:var(--ed-muted)]",
+                    )}
+                  >
+                    {crumb}
+                  </span>
+                </span>
+              ))}
+            </nav>
+          ) : (
+            <p className="mt-1 truncate text-[15px] font-medium tracking-tight text-[color:var(--ed-fg)]">
+              {title}
+            </p>
+          )}
           <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--ed-muted)]">
             {hint}
           </p>
         </div>
       ) : (
-        <div className="border-b border-black/6 bg-[#FAFAF8] px-4 py-2.5">
-          <p className="text-[12px] leading-5 text-muted-foreground">{hint}</p>
+        <div className="border-b border-[color:var(--ed-border)] bg-[color:var(--ed-bg-soft)] px-4 py-2.5">
+          {breadcrumb && breadcrumb.length > 1 ? (
+            <nav
+              aria-label="Breadcrumb"
+              className="editor-breadcrumb mb-1 flex flex-wrap items-center gap-1.5"
+            >
+              {breadcrumb.map((crumb, index) => (
+                <span key={`${crumb}-${index}`} className="contents">
+                  {index > 0 ? (
+                    <span className="text-[color:var(--ed-subtle)]">›</span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      "truncate text-[12px]",
+                      index === breadcrumb.length - 1
+                        ? "font-medium text-[color:var(--ed-fg)]"
+                        : "text-[color:var(--ed-muted)]",
+                    )}
+                  >
+                    {crumb}
+                  </span>
+                </span>
+              ))}
+            </nav>
+          ) : null}
+          <p className="text-[12px] leading-5 text-[color:var(--ed-muted)]">
+            {hint}
+          </p>
         </div>
       )}
-      <div className="editor-inspector-light min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="editor-inspector editor-inspector-light min-h-0 flex-1 overflow-y-auto p-4">
         {children}
       </div>
     </div>
@@ -360,7 +425,7 @@ function SiteIdentityCard({
     <div className="editor-site-identity">
       <div className="flex items-start gap-3">
         <div
-          className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/8 text-[13px] font-semibold tracking-tight text-white shadow-sm"
+          className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 text-[13px] font-semibold tracking-tight text-white"
           style={{
             background: `linear-gradient(145deg, ${colors.accent}, ${colors.primary})`,
           }}
@@ -377,10 +442,10 @@ function SiteIdentityCard({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-semibold tracking-tight text-ink">
+          <p className="truncate text-[13px] font-semibold tracking-tight text-[color:var(--ed-fg)]">
             {config.brand.name || dict.editor.website}
           </p>
-          <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+          <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--ed-muted)]">
             {config.brand.tagline || dict.editor.siteIdentity}
           </p>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -400,26 +465,26 @@ function SiteIdentityCard({
                 />
               ))}
             </div>
-            <span className="text-[10px] text-black/20" aria-hidden>
+            <span className="text-[10px] text-[color:var(--ed-subtle)]" aria-hidden>
               ·
             </span>
-            <span className="text-[10.5px] font-medium text-muted-foreground">
+            <span className="text-[10.5px] font-medium text-[color:var(--ed-muted)]">
               {langLabel} · {dirLabel}
             </span>
             {config.settings.mood ? (
               <>
-                <span className="text-[10px] text-black/20" aria-hidden>
+                <span className="text-[10px] text-[color:var(--ed-subtle)]" aria-hidden>
                   ·
                 </span>
-                <span className="text-[10.5px] capitalize text-muted-foreground">
+                <span className="text-[10.5px] capitalize text-[color:var(--ed-muted)]">
                   {config.settings.mood}
                 </span>
               </>
             ) : null}
-            <span className="text-[10px] text-black/20" aria-hidden>
+            <span className="text-[10px] text-[color:var(--ed-subtle)]" aria-hidden>
               ·
             </span>
-            <span className="text-[10.5px] text-muted-foreground">
+            <span className="text-[10.5px] text-[color:var(--ed-muted)]">
               {locale === "fa" ? "قالب" : "Template"} · {config.template}
             </span>
           </div>
@@ -569,6 +634,7 @@ function SectionInspector({
   dict,
   locale,
   tab,
+  selectedField,
   onChange,
 }: {
   config: WebsiteConfig;
@@ -577,6 +643,7 @@ function SectionInspector({
   dict: Dictionary;
   locale: Locale;
   tab: SectionTab;
+  selectedField?: EditorFieldPath;
   onChange: (next: WebsiteConfig) => void;
 }) {
   const section = config.sections.find((s) => s.id === sectionId);
@@ -612,6 +679,7 @@ function SectionInspector({
           schema={schema}
           groups={schemaGroups}
           locale={locale}
+          selectedField={selectedField}
           onChange={onChange}
         />
       ) : null}
@@ -712,6 +780,7 @@ function SectionInspector({
               value={config.content.hero.style}
               options={(
                 [
+                  ["fan", dict.editor.styleFan],
                   ["overlay", dict.editor.styleOverlay],
                   ["split", dict.editor.styleSplit],
                   ["minimal", dict.editor.styleMinimal],

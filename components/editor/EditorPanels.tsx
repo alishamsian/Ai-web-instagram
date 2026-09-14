@@ -298,6 +298,7 @@ export function LayoutPanel({
             })
           }
           options={[
+            { id: "fan", label: dict.editor.styleFan },
             { id: "overlay", label: dict.editor.styleOverlay },
             { id: "split", label: dict.editor.styleSplit },
             { id: "minimal", label: dict.editor.styleMinimal },

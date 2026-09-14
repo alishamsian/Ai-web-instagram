@@ -171,7 +171,7 @@ export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
       ...config.content,
       hero: {
         ...config.content.hero,
-        style: isStore && !recipeDriven ? "overlay" : config.content.hero.style,
+        style: isStore && !recipeDriven ? "fan" : config.content.hero.style,
         imageId: heroImageId ?? config.content.hero.imageId,
         headline,
         subheadline,

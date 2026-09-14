@@ -76,6 +76,17 @@ export {
 } from "@/lib/editor/keyboard";
 
 export {
+  loadEditorUiState,
+  saveEditorUiState,
+  editorFieldToSchemaPath,
+  schemaFieldMatchesEditorPath,
+  fieldLabelFromPath,
+  type EditorUiPersisted,
+  type EditorSectionTab,
+  type EditorSiteGroup,
+} from "@/lib/editor/ui-state";
+
+export {
   EDITOR_VIEWPORT_PRESETS,
   viewportWidth,
   deviceFromViewport,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useEditorEdit } from "@/components/editor/EditContext";
 import {
@@ -17,7 +17,7 @@ import {
   Eye,
   EyeOff,
   GripVertical,
-  Pencil,
+  MoreHorizontal,
   Trash2,
 } from "lucide-react";
 
@@ -39,14 +39,35 @@ export function EditorSectionFrame({
   const selected = enabled && edit?.selectedSectionId === sectionId;
   const hovered =
     enabled && edit?.hoveredSectionId === sectionId && !selected;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) {
+      setMenuOpen(false);
+      return;
+    }
     const node = document.querySelector(
       `[data-editor-section="${CSS.escape(sectionId)}"]`,
     );
     node?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selected, sectionId]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    function close() {
+      setContextMenu(null);
+    }
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [contextMenu]);
 
   if (!enabled || !edit) {
     return <>{children}</>;
@@ -58,6 +79,15 @@ export function EditorSectionFrame({
     "comfortable",
   );
   const width = readSectionSetting<SectionWidth>(settings, "width", "full");
+  const hidden = edit.isSectionVisible?.(sectionId) === false;
+
+  function runAction(
+    action: "move-up" | "move-down" | "duplicate" | "toggle" | "delete",
+  ) {
+    edit?.onSectionAction?.(sectionId, action);
+    setMenuOpen(false);
+    setContextMenu(null);
+  }
 
   return (
     <div
@@ -72,6 +102,13 @@ export function EditorSectionFrame({
       )}
       onMouseEnter={() => edit.onHoverSection(sectionId)}
       onMouseLeave={() => edit.onHoverSection(undefined)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        edit.onSelectSection(sectionId);
+        setMenuOpen(false);
+        setContextMenu({ x: event.clientX, y: event.clientY });
+      }}
       onClick={(event) => {
         const target = event.target as HTMLElement;
         if (target.closest("[contenteditable='true']")) return;
@@ -84,62 +121,84 @@ export function EditorSectionFrame({
         <div
           data-editor-chrome
           className={cn(
-            "editor-section-badge pointer-events-none absolute start-2 top-2 z-20 flex max-w-[min(70%,14rem)] items-center gap-1.5",
-            "px-2 py-1 text-[10px] font-medium tracking-[0.04em] text-[#F7F7F8] uppercase sm:start-3 sm:top-3",
+            "editor-section-badge pointer-events-none absolute start-2 top-2 z-20 flex max-w-[min(70%,12rem)] items-center gap-1.5",
+            "px-2 py-1 text-[10px] font-medium text-[#F7F7F8] sm:start-3 sm:top-3",
           )}
         >
           <GripVertical size={11} className="shrink-0 opacity-50" />
-          <span className="truncate normal-case tracking-normal">{label}</span>
+          <span className="truncate">{label}</span>
+          {hidden ? <EyeOff size={10} className="opacity-70" /> : null}
         </div>
       )}
 
       {selected && edit.onSectionAction ? (
         <div
           data-editor-chrome
-          className="editor-section-toolbar absolute end-2 top-2 z-20 flex max-w-[calc(100%-5rem)] items-center gap-0.5 overflow-x-auto sm:end-3 sm:top-3 sm:max-w-none"
+          className="editor-section-toolbar absolute end-2 top-2 z-20 flex items-center gap-0.5 sm:end-3 sm:top-3"
           onClick={(event) => event.stopPropagation()}
         >
           <ChromeButton
-            label="Edit"
-            onClick={() => edit.onSelectSection(sectionId)}
-          >
-            <Pencil size={13} />
-          </ChromeButton>
-          <ChromeButton
             label="Move up"
-            onClick={() => edit.onSectionAction?.(sectionId, "move-up")}
+            onClick={() => runAction("move-up")}
           >
             <ArrowUp size={13} />
           </ChromeButton>
           <ChromeButton
             label="Move down"
-            onClick={() => edit.onSectionAction?.(sectionId, "move-down")}
+            onClick={() => runAction("move-down")}
           >
             <ArrowDown size={13} />
           </ChromeButton>
-          <ChromeButton
-            label="Duplicate"
-            onClick={() => edit.onSectionAction?.(sectionId, "duplicate")}
-          >
+          <div className="relative">
+            <ChromeButton
+              label="More"
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <MoreHorizontal size={13} />
+            </ChromeButton>
+            {menuOpen ? (
+              <SectionActionMenu
+                hidden={hidden}
+                onDuplicate={() => runAction("duplicate")}
+                onToggle={() => runAction("toggle")}
+                onDelete={() => runAction("delete")}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {contextMenu && edit.onSectionAction ? (
+        <div
+          data-editor-chrome
+          className="editor-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button type="button" onClick={() => runAction("move-up")}>
+            <ArrowUp size={13} />
+            Move up
+          </button>
+          <button type="button" onClick={() => runAction("move-down")}>
+            <ArrowDown size={13} />
+            Move down
+          </button>
+          <button type="button" onClick={() => runAction("duplicate")}>
             <Copy size={13} />
-          </ChromeButton>
-          <ChromeButton
-            label="Toggle visibility"
-            onClick={() => edit.onSectionAction?.(sectionId, "toggle")}
-          >
-            {edit.isSectionVisible?.(sectionId) === false ? (
-              <EyeOff size={13} />
-            ) : (
-              <Eye size={13} />
-            )}
-          </ChromeButton>
-          <ChromeButton
-            label="Delete"
-            danger
-            onClick={() => edit.onSectionAction?.(sectionId, "delete")}
+            Duplicate
+          </button>
+          <button type="button" onClick={() => runAction("toggle")}>
+            {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
+            {hidden ? "Show" : "Hide"}
+          </button>
+          <button
+            type="button"
+            data-danger="true"
+            onClick={() => runAction("delete")}
           >
             <Trash2 size={13} />
-          </ChromeButton>
+            Delete
+          </button>
         </div>
       ) : null}
 
@@ -148,16 +207,43 @@ export function EditorSectionFrame({
   );
 }
 
+function SectionActionMenu({
+  hidden,
+  onDuplicate,
+  onToggle,
+  onDelete,
+}: {
+  hidden: boolean;
+  onDuplicate: () => void;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="editor-more-menu">
+      <button type="button" onClick={onDuplicate}>
+        <Copy size={13} />
+        Duplicate
+      </button>
+      <button type="button" onClick={onToggle}>
+        {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
+        {hidden ? "Show" : "Hide"}
+      </button>
+      <button type="button" data-danger="true" onClick={onDelete}>
+        <Trash2 size={13} />
+        Delete
+      </button>
+    </div>
+  );
+}
+
 function ChromeButton({
   children,
   label,
   onClick,
-  danger,
 }: {
   children: ReactNode;
   label: string;
   onClick: () => void;
-  danger?: boolean;
 }) {
   return (
     <button
@@ -165,11 +251,7 @@ function ChromeButton({
       title={label}
       aria-label={label}
       onClick={onClick}
-      className={cn(
-        "inline-flex size-8 items-center justify-center rounded-[7px] text-[#B5B5BC] transition",
-        "hover:bg-white/10 hover:text-[#F7F7F8]",
-        danger && "hover:bg-red-500/15 hover:text-red-300",
-      )}
+      className="inline-flex size-7 items-center justify-center rounded-[7px] text-[#B5B5BC] transition hover:bg-white/10 hover:text-[#F7F7F8]"
     >
       {children}
     </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
@@ -17,6 +17,7 @@ import {
   GripVertical,
   MoreHorizontal,
   Plus,
+  Search,
   Trash2,
 } from "lucide-react";
 
@@ -63,12 +64,32 @@ export function EditorSidebar({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [query, setQuery] = useState("");
 
-  const tabs: { id: LeftNavTab; label: string }[] = [
-    { id: "pages", label: dict.editor.pages },
+  const activeTab: "sections" | "pages" =
+    nav === "pages" ? "pages" : "sections";
+
+  const tabs: { id: "sections" | "pages"; label: string }[] = [
     { id: "sections", label: dict.editor.sections },
-    { id: "layers", label: dict.editor.layers },
+    { id: "pages", label: dict.editor.pages },
   ];
+
+  const filteredSections = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return config.sections;
+    return config.sections.filter((section) => {
+      const label = sectionLabel(
+        section.type as WebsiteSectionType,
+        locale,
+      ).toLowerCase();
+      return label.includes(q) || section.type.toLowerCase().includes(q);
+    });
+  }, [config.sections, locale, query]);
+
+  useEffect(() => {
+    if (!selectedSectionId) return;
+    setExpanded((prev) => ({ ...prev, [selectedSectionId]: true }));
+  }, [selectedSectionId, selectedField]);
 
   function reorder(from: number, to: number) {
     if (from === to || from < 0 || to < 0) return;
@@ -108,7 +129,7 @@ export function EditorSidebar({
           <button
             key={tab.id}
             type="button"
-            data-active={nav === tab.id}
+            data-active={activeTab === tab.id}
             onClick={() => onNavChange(tab.id)}
             className="editor-panel-tab"
           >
@@ -118,7 +139,7 @@ export function EditorSidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {nav === "pages" ? (
+        {activeTab === "pages" ? (
           <ul className="space-y-0.5">
             {EDITOR_PAGES.map((page) => (
               <li key={page.id}>
@@ -137,9 +158,7 @@ export function EditorSidebar({
               </li>
             ))}
           </ul>
-        ) : null}
-
-        {nav === "sections" ? (
+        ) : (
           <div className="space-y-3">
             <button
               type="button"
@@ -149,6 +168,18 @@ export function EditorSidebar({
               <Plus size={14} />
               {dict.editor.addSection}
             </button>
+
+            {config.sections.length > 0 ? (
+              <label className="editor-search-field">
+                <Search size={13} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={dict.editor.searchSections}
+                  className="min-w-0 flex-1 bg-transparent text-[12px] text-[color:var(--ed-fg)] outline-none placeholder:text-[color:var(--ed-subtle)]"
+                />
+              </label>
+            ) : null}
 
             {config.sections.length === 0 ? (
               <div className="rounded-xl border border-white/[0.06] px-3 py-8 text-center">
@@ -163,123 +194,175 @@ export function EditorSidebar({
                   {dict.editor.addSection}
                 </button>
               </div>
+            ) : filteredSections.length === 0 ? (
+              <p className="py-6 text-center text-[12px] text-[color:var(--ed-muted)]">
+                {dict.editor.noSectionsMatch}
+              </p>
             ) : (
               <ul className="space-y-0.5">
-                {config.sections.map((section, index) => (
-                  <li
-                    key={section.id}
-                    draggable
-                    data-selected={selectedSectionId === section.id}
-                    data-dragging={dragIndex === index}
-                    onDragStart={() => setDragIndex(index)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => {
-                      if (dragIndex == null) return;
-                      reorder(dragIndex, index);
-                      setDragIndex(null);
-                    }}
-                    onDragEnd={() => setDragIndex(null)}
-                    className="editor-layer-row group relative"
-                  >
-                    <span className="inline-flex size-7 cursor-grab items-center justify-center text-[color:var(--ed-subtle)] active:cursor-grabbing">
-                      <GripVertical size={13} />
-                    </span>
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 truncate py-1.5 text-start text-[12.5px] text-[color:var(--ed-fg)]"
-                      onClick={() => onSelectSection(section.id)}
-                    >
-                      <span
-                        className={cn(
-                          !section.visible &&
-                            "text-[color:var(--ed-subtle)] line-through",
-                        )}
+                {filteredSections.map((section) => {
+                  const index = config.sections.findIndex(
+                    (s) => s.id === section.id,
+                  );
+                  const blocks = SECTION_LAYER_BLOCKS[section.type] ?? [];
+                  const open =
+                    expanded[section.id] ??
+                    selectedSectionId === section.id;
+                  const selected = selectedSectionId === section.id;
+
+                  return (
+                    <li key={section.id} className="space-y-0.5">
+                      <div
+                        draggable
+                        data-selected={selected && !selectedField}
+                        data-dragging={dragIndex === index}
+                        onDragStart={() => setDragIndex(index)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => {
+                          if (dragIndex == null) return;
+                          reorder(dragIndex, index);
+                          setDragIndex(null);
+                        }}
+                        onDragEnd={() => setDragIndex(null)}
+                        className="editor-layer-row group relative"
                       >
-                        {sectionLabel(
-                          section.type as WebsiteSectionType,
-                          locale,
-                        )}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex size-8 items-center justify-center rounded-md text-[color:var(--ed-subtle)] opacity-70 transition hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)] group-hover:opacity-100"
-                      onClick={() => {
-                        const sections = [...config.sections];
-                        sections[index] = {
-                          ...section,
-                          visible: !section.visible,
-                        };
-                        onChange({ ...config, sections });
-                      }}
-                      aria-label={
-                        section.visible
-                          ? dict.editor.sectionVisible
-                          : dict.editor.sectionHidden
-                      }
-                    >
-                      {section.visible ? (
-                        <Eye size={13} />
-                      ) : (
-                        <EyeOff size={13} />
-                      )}
-                    </button>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        className="inline-flex size-8 items-center justify-center rounded-md text-[color:var(--ed-subtle)] opacity-70 transition hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)] group-hover:opacity-100"
-                        onClick={() =>
-                          setMenuId((id) =>
-                            id === section.id ? null : section.id,
-                          )
-                        }
-                        aria-label="More"
-                      >
-                        <MoreHorizontal size={13} />
-                      </button>
-                      {menuId === section.id ? (
-                        <div className="absolute end-0 top-9 z-30 min-w-[148px] rounded-xl border border-white/10 bg-[#16161a] p-1 shadow-2xl">
-                          <MenuItem
-                            icon={<Copy size={13} />}
-                            label={dict.editor.duplicate}
-                            onClick={() => {
-                              duplicateSection(section.id);
-                              setMenuId(null);
-                            }}
-                          />
-                          <MenuItem
-                            icon={<Trash2 size={13} />}
-                            label={dict.editor.delete}
-                            danger
-                            onClick={() => {
-                              deleteSection(section.id);
-                              setMenuId(null);
-                            }}
-                          />
+                        <span className="inline-flex size-6 cursor-grab items-center justify-center text-[color:var(--ed-subtle)] active:cursor-grabbing">
+                          <GripVertical size={12} />
+                        </span>
+                        {blocks.length ? (
+                          <button
+                            type="button"
+                            className="inline-flex size-6 items-center justify-center text-[color:var(--ed-subtle)]"
+                            onClick={() =>
+                              setExpanded((prev) => ({
+                                ...prev,
+                                [section.id]: !open,
+                              }))
+                            }
+                            aria-label={open ? "Collapse" : "Expand"}
+                          >
+                            {open ? (
+                              <ChevronDown size={13} />
+                            ) : (
+                              <ChevronRight size={13} />
+                            )}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 truncate py-1.5 text-start text-[12.5px] text-[color:var(--ed-fg)]"
+                          onClick={() => onSelectSection(section.id)}
+                        >
+                          <span
+                            className={cn(
+                              !section.visible &&
+                                "text-[color:var(--ed-subtle)] line-through",
+                            )}
+                          >
+                            {sectionLabel(
+                              section.type as WebsiteSectionType,
+                              locale,
+                            )}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex size-7 items-center justify-center rounded-md text-[color:var(--ed-subtle)] opacity-0 transition hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)] group-hover:opacity-100"
+                          onClick={() => {
+                            const sections = [...config.sections];
+                            sections[index] = {
+                              ...section,
+                              visible: !section.visible,
+                            };
+                            onChange({ ...config, sections });
+                          }}
+                          aria-label={
+                            section.visible
+                              ? dict.editor.sectionVisible
+                              : dict.editor.sectionHidden
+                          }
+                        >
+                          {section.visible ? (
+                            <Eye size={13} />
+                          ) : (
+                            <EyeOff size={13} />
+                          )}
+                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            className="inline-flex size-7 items-center justify-center rounded-md text-[color:var(--ed-subtle)] opacity-0 transition hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)] group-hover:opacity-100"
+                            onClick={() =>
+                              setMenuId((id) =>
+                                id === section.id ? null : section.id,
+                              )
+                            }
+                            aria-label="More"
+                          >
+                            <MoreHorizontal size={13} />
+                          </button>
+                          {menuId === section.id ? (
+                            <div className="editor-more-menu">
+                              <MenuItem
+                                icon={<Copy size={13} />}
+                                label={dict.editor.duplicate}
+                                onClick={() => {
+                                  duplicateSection(section.id);
+                                  setMenuId(null);
+                                }}
+                              />
+                              <MenuItem
+                                icon={<Trash2 size={13} />}
+                                label={dict.editor.delete}
+                                danger
+                                onClick={() => {
+                                  deleteSection(section.id);
+                                  setMenuId(null);
+                                }}
+                              />
+                            </div>
+                          ) : null}
                         </div>
+                      </div>
+
+                      {open && blocks.length ? (
+                        <ul className="ms-8 space-y-0.5 border-s border-white/[0.06] ps-2">
+                          {blocks.map((block) => {
+                            const active =
+                              block.field != null &&
+                              selectedField === block.field &&
+                              selectedSectionId === section.id;
+                            return (
+                              <li key={block.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onSelectSection(section.id);
+                                    if (block.field) {
+                                      onSelectField(block.field, section.id);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "w-full rounded-md px-2 py-1 text-start text-[11.5px] transition",
+                                    active
+                                      ? "bg-[color:var(--ed-select-soft)] text-[color:var(--ed-fg)]"
+                                      : "text-[color:var(--ed-muted)] hover:bg-white/[0.04] hover:text-[color:var(--ed-fg)]",
+                                  )}
+                                >
+                                  {block.label[locale]}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       ) : null}
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
-        ) : null}
-
-        {nav === "layers" ? (
-          <LayersTree
-            config={config}
-            locale={locale}
-            selectedSectionId={selectedSectionId}
-            selectedField={selectedField}
-            expanded={expanded}
-            onToggle={(id) =>
-              setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
-            }
-            onSelectSection={onSelectSection}
-            onSelectField={onSelectField}
-          />
-        ) : null}
+        )}
       </div>
     </div>
   );
@@ -300,122 +383,16 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
+      data-danger={danger || undefined}
       className={cn(
         "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition",
         danger
           ? "text-red-300 hover:bg-red-500/10"
-          : "text-[#B5B5BC] hover:bg-white/[0.06] hover:text-[#F7F7F8]",
+          : "text-[color:var(--ed-muted)] hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)]",
       )}
     >
       {icon}
       {label}
     </button>
-  );
-}
-
-function LayersTree({
-  config,
-  locale,
-  selectedSectionId,
-  selectedField,
-  expanded,
-  onToggle,
-  onSelectSection,
-  onSelectField,
-}: {
-  config: WebsiteConfig;
-  locale: Locale;
-  selectedSectionId?: string;
-  selectedField?: EditorFieldPath;
-  expanded: Record<string, boolean>;
-  onToggle: (id: string) => void;
-  onSelectSection: (id: string) => void;
-  onSelectField: (path: EditorFieldPath, sectionId: string) => void;
-}) {
-  const rows = useMemo(() => config.sections, [config.sections]);
-
-  return (
-    <ul className="space-y-0.5">
-      {rows.map((section) => {
-        const open =
-          expanded[section.id] ??
-          (selectedSectionId === section.id ||
-            Boolean(
-              selectedField &&
-                SECTION_LAYER_BLOCKS[section.type]?.some(
-                  (block) => block.field === selectedField,
-                ),
-            ));
-        const blocks = SECTION_LAYER_BLOCKS[section.type] ?? [];
-        return (
-          <li key={section.id}>
-            <div
-              className={cn(
-                "editor-layer-row",
-                selectedSectionId === section.id &&
-                  !selectedField &&
-                  "bg-[color:var(--ed-select-soft)]",
-              )}
-              data-selected={
-                selectedSectionId === section.id && !selectedField
-              }
-            >
-              <button
-                type="button"
-                className="inline-flex size-6 items-center justify-center text-[#77777F]"
-                onClick={() => onToggle(section.id)}
-                aria-label={open ? "Collapse" : "Expand"}
-              >
-                {blocks.length ? (
-                  open ? (
-                    <ChevronDown size={13} />
-                  ) : (
-                    <ChevronRight size={13} />
-                  )
-                ) : (
-                  <span className="size-3" />
-                )}
-              </button>
-              <button
-                type="button"
-                className="min-w-0 flex-1 truncate text-start text-[13px] text-[#F7F7F8]"
-                onClick={() => onSelectSection(section.id)}
-              >
-                {sectionLabel(section.type as WebsiteSectionType, locale)}
-              </button>
-            </div>
-            {open && blocks.length ? (
-              <ul className="ms-6 space-y-0.5 border-s border-white/[0.06] ps-2">
-                {blocks.map((block) => {
-                  const active =
-                    block.field != null && selectedField === block.field;
-                  return (
-                    <li key={block.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onSelectSection(section.id);
-                          if (block.field) {
-                            onSelectField(block.field, section.id);
-                          }
-                        }}
-                        className={cn(
-                          "w-full rounded px-2 py-1 text-start text-[12px] transition",
-                          active
-                            ? "bg-[#FF6B57]/15 text-[#F7F7F8]"
-                            : "text-[#77777F] hover:bg-white/[0.04] hover:text-[#B5B5BC]",
-                        )}
-                      >
-                        {block.label[locale]}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
   );
 }

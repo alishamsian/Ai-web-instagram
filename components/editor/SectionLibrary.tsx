@@ -118,12 +118,24 @@ export function SectionLibrary({
           ) : (
             items.map((item) => {
               const already = existingTypes.has(item.type);
+              const tone = item.preview?.thumbnailTone ?? "neutral";
+              const aspect = item.preview?.aspect ?? "16/9";
               return (
                 <div
                   key={item.type}
                   className="flex flex-col rounded-xl border border-white/[0.06] bg-[#111113] p-3.5 transition hover:border-white/12"
                 >
-                  <div className="mb-3 aspect-[16/9] rounded-lg bg-gradient-to-br from-white/[0.06] to-white/[0.02]" />
+                  <div
+                    className={cn(
+                      "editor-library-thumb mb-3 overflow-hidden rounded-lg",
+                      aspect === "1/1" && "aspect-square",
+                      aspect === "4/3" && "aspect-[4/3]",
+                      aspect === "16/9" && "aspect-video",
+                    )}
+                    data-tone={tone}
+                  >
+                    <LibraryThumbPreview type={item.type} tone={tone} />
+                  </div>
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[13px] font-medium text-[#F7F7F8]">
                       {item.label[locale]}
@@ -186,5 +198,64 @@ function Chip({
     >
       {label}
     </button>
+  );
+}
+
+function LibraryThumbPreview({
+  type,
+  tone,
+}: {
+  type: string;
+  tone: string;
+}) {
+  return (
+    <div className="relative flex h-full w-full flex-col justify-end p-2.5">
+      <div className="editor-library-thumb-glow" data-tone={tone} />
+      {type === "hero" ? (
+        <>
+          <div className="mb-auto flex gap-1.5">
+            <span className="h-1.5 w-8 rounded-full bg-white/25" />
+            <span className="h-1.5 w-4 rounded-full bg-white/15" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="h-2 w-3/5 max-w-[70%] rounded-sm bg-white/55" />
+            <div className="h-1.5 w-2/5 max-w-[45%] rounded-sm bg-white/30" />
+            <div className="mt-2 h-5 w-14 rounded-md bg-white/40" />
+          </div>
+        </>
+      ) : type === "products" || type === "featured" ? (
+        <div className="grid grid-cols-3 gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="aspect-[3/4] rounded-md bg-white/20" />
+          ))}
+        </div>
+      ) : type === "gallery" ? (
+        <div className="grid grid-cols-4 gap-1">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="aspect-square rounded bg-white/20" />
+          ))}
+        </div>
+      ) : type === "faq" ? (
+        <div className="space-y-1.5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-4 rounded-md bg-white/15" />
+          ))}
+        </div>
+      ) : type === "testimonials" ? (
+        <div className="flex gap-2">
+          <div className="size-7 shrink-0 rounded-full bg-white/25" />
+          <div className="flex-1 space-y-1.5 pt-0.5">
+            <div className="h-1.5 w-full rounded-sm bg-white/35" />
+            <div className="h-1.5 w-4/5 rounded-sm bg-white/20" />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <div className="h-2 w-1/2 rounded-sm bg-white/45" />
+          <div className="h-1.5 w-full rounded-sm bg-white/20" />
+          <div className="h-1.5 w-4/5 rounded-sm bg-white/15" />
+        </div>
+      )}
+    </div>
   );
 }

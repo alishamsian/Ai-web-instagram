@@ -9,7 +9,7 @@ export const CORE_TEMPLATE_RECIPES: TemplateRecipe[] = [
     baseTemplate: "store",
     recommended: true,
     sections: [
-      { type: "hero", variant: "overlay" },
+      { type: "hero", variant: "fan" },
       { type: "shop-by-concern" },
       { type: "featured-products" },
       { type: "routine" },
@@ -81,7 +81,7 @@ export const CORE_TEMPLATE_RECIPES: TemplateRecipe[] = [
     baseTemplate: "store",
     recommended: true,
     sections: [
-      { type: "hero", variant: "overlay" },
+      { type: "hero", variant: "fan" },
       { type: "shop-by-material" },
       { type: "featured-products" },
       { type: "collection-story" },
@@ -136,7 +136,7 @@ export const CORE_TEMPLATE_RECIPES: TemplateRecipe[] = [
     baseTemplate: "store",
     recommended: true,
     sections: [
-      { type: "hero", variant: "overlay" },
+      { type: "hero", variant: "fan" },
       { type: "shop-by-room" },
       { type: "room-inspiration" },
       { type: "featured-products" },

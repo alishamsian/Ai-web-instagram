@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { Locale } from "@/lib/config/env";
 import type { WebsiteConfig, SectionConfig } from "@/types/website";
 import type {
@@ -17,6 +17,8 @@ import {
   isSchemaFieldActive,
   RESPONSIVE_BREAKPOINTS,
 } from "@/lib/store/registry/element-schema";
+import type { EditorFieldPath } from "@/components/editor/EditContext";
+import { schemaFieldMatchesEditorPath } from "@/lib/editor";
 import { Input, Textarea } from "@/components/ui/input";
 import { MediaPicker } from "@/components/editor/MediaPicker";
 import { cn } from "@/lib/utils";
@@ -274,6 +276,7 @@ export function SchemaInspectorPanel({
   schema,
   groups,
   locale,
+  selectedField,
   onChange,
 }: {
   config: WebsiteConfig;
@@ -281,6 +284,7 @@ export function SchemaInspectorPanel({
   schema: ElementSchema;
   groups: ElementSchemaGroup[];
   locale: Locale;
+  selectedField?: EditorFieldPath;
   onChange: (next: WebsiteConfig) => void;
 }) {
   const fields = useMemo(() => flattenElementFields(schema), [schema]);
@@ -304,6 +308,14 @@ export function SchemaInspectorPanel({
     return map;
   }, [fields, groups, values]);
 
+  useEffect(() => {
+    if (!selectedField) return;
+    const node = document.querySelector(
+      `[data-editor-schema-field="${CSS.escape(selectedField)}"]`,
+    );
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedField, section.id]);
+
   return (
     <div className="space-y-4">
       {[...byGroup.entries()].map(([group, groupFields]) => {
@@ -311,42 +323,59 @@ export function SchemaInspectorPanel({
         return (
           <div
             key={group}
-            className="rounded-xl border border-black/8 bg-white"
+            className="rounded-xl border border-white/10 bg-[color:var(--ed-bg-soft)]"
           >
             <div className="px-3 py-2.5">
-              <p className="text-[11px] font-semibold tracking-wide text-ink uppercase">
+              <p className="text-[11px] font-semibold tracking-wide text-[color:var(--ed-fg)] uppercase">
                 {GROUP_LABELS[group][locale]}
               </p>
             </div>
-            <div className="space-y-3 border-t border-black/6 px-3 py-3">
-              {groupFields.map((field) => (
-                <label key={field.key} className="block space-y-1.5">
-                  <span className="text-[12px] font-medium text-ink">
-                    {labelOf(field, locale)}
-                  </span>
-                  {field.description ? (
-                    <span className="block text-[11px] text-muted-foreground">
-                      {field.description[locale]}
+            <div className="space-y-3 border-t border-white/[0.06] px-3 py-3">
+              {groupFields.map((field) => {
+                const active = schemaFieldMatchesEditorPath(
+                  field.path,
+                  field.key,
+                  selectedField,
+                );
+                return (
+                  <label
+                    key={field.key}
+                    data-editor-schema-field={
+                      active && selectedField ? selectedField : undefined
+                    }
+                    data-active={active || undefined}
+                    className={cn(
+                      "editor-schema-field block space-y-1.5 rounded-lg p-1.5 -m-1.5 transition",
+                      active && "editor-schema-field-active",
+                    )}
+                  >
+                    <span className="text-[12px] font-medium text-[color:var(--ed-fg)]">
+                      {labelOf(field, locale)}
                     </span>
-                  ) : null}
-                  <SchemaFieldControl
-                    field={field}
-                    value={values[field.key]}
-                    config={config}
-                    locale={locale}
-                    onChange={(nextValue) => {
-                      const result = applySchemaFieldUpdate({
-                        config,
-                        sectionId: section.id,
-                        field,
-                        value: nextValue,
-                      });
-                      if ("error" in result) return;
-                      onChange(result.config);
-                    }}
-                  />
-                </label>
-              ))}
+                    {field.description ? (
+                      <span className="block text-[11px] text-[color:var(--ed-muted)]">
+                        {field.description[locale]}
+                      </span>
+                    ) : null}
+                    <SchemaFieldControl
+                      field={field}
+                      value={values[field.key]}
+                      config={config}
+                      locale={locale}
+                      onChange={(nextValue) => {
+                        const result = applySchemaFieldUpdate({
+                          config,
+                          sectionId: section.id,
+                          field,
+                          value: nextValue,
+                        });
+                        if ("error" in result) return;
+                        onChange(result.config);
+                      }}
+                    />
+                  </label>
+                );
+              })}
             </div>
           </div>
         );

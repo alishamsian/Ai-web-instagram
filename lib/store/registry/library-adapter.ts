@@ -20,6 +20,10 @@ export type SectionLibraryItem = {
   label: { fa: string; en: string };
   description: { fa: string; en: string };
   recommended?: boolean;
+  preview?: {
+    thumbnailTone?: "warm" | "cool" | "dark" | "neutral";
+    aspect?: "16/9" | "4/3" | "1/1";
+  };
 };
 
 export type LibraryQuery = {
@@ -53,6 +57,7 @@ export function getSectionLibraryItems(
     label: def.label,
     description: def.description,
     recommended: recommended.has(def.type),
+    preview: def.preview,
   }));
 
   if (!vertical) return items;

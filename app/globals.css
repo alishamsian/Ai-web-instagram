@@ -2113,14 +2113,38 @@ html[lang="fa"] .auth-surface {
   backdrop-filter: blur(12px);
 }
 
-/* Editor inspector: light form surfaces inside dark chrome */
+/* Editor inspector: dark form surfaces matching editor chrome */
 .editor-inspector-light {
-  color: #111111;
+  color: var(--ed-fg, #f4f4f5);
 }
 .editor-inspector-light input,
 .editor-inspector-light textarea,
 .editor-inspector-light select {
-  background: #ffffff;
+  background: #0b0b0d;
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.editor-inspector-light .text-ink,
+.editor-inspector-light .text-foreground {
+  color: #f4f4f5 !important;
+}
+.editor-inspector-light .text-muted-foreground {
+  color: #8b8b93 !important;
+}
+.editor-inspector-light .bg-white,
+.editor-inspector-light .bg-muted,
+.editor-inspector-light .bg-\[\#FAFAF8\],
+.editor-inspector-light .bg-\[\#F7F7F5\] {
+  background-color: #16161a !important;
+}
+.editor-inspector-light .border-black\/8,
+.editor-inspector-light .border-black\/10,
+.editor-inspector-light .border-border {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.editor-inspector-light .bg-ink {
+  background-color: #f4f4f5 !important;
+  color: #0b0b0d !important;
 }
 
 .editor-sec-spacing-compact { --editor-sec-pad: 0.5rem; }

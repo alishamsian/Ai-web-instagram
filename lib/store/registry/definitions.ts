@@ -24,6 +24,7 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       en: "Primary headline and brand image",
     },
     variants: [
+      { id: "fan", label: { fa: "مرکزی", en: "Centered" } },
       { id: "overlay", label: { fa: "پوششی", en: "Overlay" } },
       { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
       { id: "split", label: { fa: "دو ستونه", en: "Split" } },
@@ -86,13 +87,14 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
           label: { fa: "استایل هیرو", en: "Hero style" },
           path: "content.hero.style",
           options: [
+            { value: "fan", label: { fa: "مرکزی", en: "Centered" } },
             { value: "overlay", label: { fa: "پوششی", en: "Overlay" } },
             { value: "split", label: { fa: "دو ستونه", en: "Split" } },
             { value: "minimal", label: { fa: "مینیمال", en: "Minimal" } },
             { value: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
             { value: "menu", label: { fa: "منو", en: "Menu" } },
           ],
-          defaultValue: "overlay",
+          defaultValue: "fan",
         },
         alignment: {
           key: "alignment",

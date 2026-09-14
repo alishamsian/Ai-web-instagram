@@ -55,8 +55,12 @@ import {
   commandMoveSection,
   applyEditorAction,
   proposeEditorActions,
+  loadEditorUiState,
+  saveEditorUiState,
   type HistoryEntry,
   type EditorViewportId,
+  type EditorSectionTab,
+  type EditorSiteGroup,
   EDITOR_HISTORY_LIMIT,
 } from "@/lib/editor";
 import {
@@ -66,6 +70,10 @@ import {
 const AUTOSAVE_MS = 900;
 
 type PhonePane = "canvas" | "sections" | "inspector";
+
+function flashTemplate(template: string, label: string) {
+  return template.replace("{label}", label);
+}
 
 export function EditorShell({
   website,
@@ -104,6 +112,9 @@ export function EditorShell({
   const [commandOpen, setCommandOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [sectionTab, setSectionTab] = useState<EditorSectionTab>("content");
+  const [siteGroup, setSiteGroup] = useState<EditorSiteGroup>("style");
   const [publishError, setPublishError] = useState<string | null>(null);
   const [savePhase, setSavePhase] = useState<"idle" | "saving" | "error">("idle");
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -116,6 +127,7 @@ export function EditorShell({
   const [canvasProduct, setCanvasProduct] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [pendingLabel, setPendingLabel] = useState("Edit");
+  const [uiHydrated, setUiHydrated] = useState(false);
 
   const skipHistory = useRef(false);
   const debounceRef = useRef<number | null>(null);
@@ -153,10 +165,52 @@ export function EditorShell({
     return () => window.clearInterval(id);
   }, []);
 
-  function flashMessage(message: string) {
+  function flashMessage(message: string, ms = 2000) {
     setFlash(message);
-    window.setTimeout(() => setFlash(null), 1800);
+    window.setTimeout(() => setFlash(null), ms);
   }
+
+  useEffect(() => {
+    const saved = loadEditorUiState(website.id);
+    if (saved) {
+      if (saved.viewport) setViewport(saved.viewport);
+      if (saved.selectedSectionId) {
+        const exists = config.sections.some(
+          (s) => s.id === saved.selectedSectionId,
+        );
+        if (exists) setSelectedSectionId(saved.selectedSectionId);
+      }
+      if (saved.focusMode != null) setFocusMode(saved.focusMode);
+      if (saved.leftNav === "pages" || saved.leftNav === "sections") {
+        setLeftNav(saved.leftNav);
+      }
+      if (saved.sectionTab) setSectionTab(saved.sectionTab);
+      if (saved.siteGroup) setSiteGroup(saved.siteGroup);
+    }
+    setUiHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [website.id]);
+
+  useEffect(() => {
+    if (!uiHydrated) return;
+    saveEditorUiState(website.id, {
+      viewport,
+      selectedSectionId: selectedSectionId ?? null,
+      focusMode,
+      leftNav,
+      sectionTab,
+      siteGroup,
+    });
+  }, [
+    uiHydrated,
+    website.id,
+    viewport,
+    selectedSectionId,
+    focusMode,
+    leftNav,
+    sectionTab,
+    siteGroup,
+  ]);
 
   function commitHistory(snapshot: WebsiteConfig, label = pendingLabel) {
     if (debounceRef.current) {
@@ -200,6 +254,9 @@ export function EditorShell({
     historyIndexRef.current = result.index;
     setHistoryIndex(result.index);
     setConfig(result.config);
+    const label =
+      historyRef.current[result.index]?.label ?? dict.editor.undo;
+    flashMessage(flashTemplate(dict.editor.undoFlash, label));
   }
 
   function redo() {
@@ -216,6 +273,9 @@ export function EditorShell({
     historyIndexRef.current = result.index;
     setHistoryIndex(result.index);
     setConfig(result.config);
+    const label =
+      historyRef.current[result.index]?.label ?? dict.editor.redo;
+    flashMessage(flashTemplate(dict.editor.redoFlash, label));
   }
 
   function restoreHistory(index: number) {
@@ -303,6 +363,7 @@ export function EditorShell({
     }
     if (!result) return;
     applyConfig(result.config, result.label);
+    flashMessage(result.label, 1600);
     if (result.selectedSectionId !== undefined) {
       setSelectedSectionId(result.selectedSectionId ?? undefined);
     }
@@ -323,6 +384,10 @@ export function EditorShell({
       if (!command) return;
 
       if (command === "escape") {
+        if (focusMode) {
+          setFocusMode(false);
+          return;
+        }
         setSelectedSectionId(undefined);
         setSelectedField(undefined);
         setLibraryOpen(false);
@@ -332,6 +397,12 @@ export function EditorShell({
         setQualityOpen(false);
         setPhonePane("canvas");
         setTabletInspectorOpen(false);
+        return;
+      }
+
+      if (command === "focusMode") {
+        event.preventDefault();
+        setFocusMode((v) => !v);
         return;
       }
 
@@ -363,10 +434,11 @@ export function EditorShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyIndex, history, config, dirty, selectedSectionId, locale, website.id]);
+  }, [historyIndex, history, config, dirty, selectedSectionId, locale, website.id, focusMode]);
 
   function selectField(path: EditorFieldPath, sectionId?: string) {
     setSelectedField(path);
+    setSectionTab("content");
     const type = fieldToSectionType(path);
     const matched =
       sectionId ??
@@ -374,7 +446,8 @@ export function EditorShell({
         ? config.sections.find((section) => section.type === type)?.id
         : undefined);
     if (matched) setSelectedSectionId(matched);
-    setLeftNav("layers");
+    setLeftNav("sections");
+    setFocusMode(false);
     setPhonePane("inspector");
     setTabletInspectorOpen(true);
   }
@@ -385,6 +458,7 @@ export function EditorShell({
     if (id) {
       setActivePage((page) => (page === "product" ? "home" : page));
       if (canvasProduct) setCanvasProduct(null);
+      setFocusMode(false);
       setPhonePane("inspector");
       setTabletInspectorOpen(true);
     }
@@ -578,9 +652,16 @@ export function EditorShell({
       },
       {
         id: "quality",
-        label: isFa ? "کیفیت وب‌سایت" : "Website quality",
+        label: dict.editor.quality,
         group: isFa ? "بازرسی" : "Audit",
         run: () => setQualityOpen(true),
+      },
+      {
+        id: "focus-mode",
+        label: focusMode ? dict.editor.focusModeExit : dict.editor.focusMode,
+        hint: "⌘\\",
+        group: isFa ? "نمایش" : "View",
+        run: () => setFocusMode((v) => !v),
       },
       {
         id: "viewport-mobile",
@@ -663,6 +744,10 @@ export function EditorShell({
     dict.editor.addSection,
     dict.editor.publish,
     dict.editor.unpublish,
+    dict.editor.quality,
+    dict.editor.focusMode,
+    dict.editor.focusModeExit,
+    focusMode,
     isPublished,
     locale,
     selectedSectionId,
@@ -773,9 +858,14 @@ export function EditorShell({
       websiteId={website.id}
       canRemoveBranding={canRemoveBranding}
       selectedSectionId={selectedSectionId}
+      selectedField={selectedField}
       activePage={activePage}
       productSlug={canvasProduct}
       compactChrome
+      sectionTab={sectionTab}
+      siteGroup={siteGroup}
+      onSectionTabChange={setSectionTab}
+      onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
       onRestored={handleRestored}
       onOpenSections={() => {
@@ -794,8 +884,13 @@ export function EditorShell({
       websiteId={website.id}
       canRemoveBranding={canRemoveBranding}
       selectedSectionId={selectedSectionId}
+      selectedField={selectedField}
       activePage={activePage}
       productSlug={canvasProduct}
+      sectionTab={sectionTab}
+      siteGroup={siteGroup}
+      onSectionTabChange={setSectionTab}
+      onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
       onRestored={handleRestored}
       onOpenSections={() => setLeftNav("sections")}
@@ -909,6 +1004,11 @@ export function EditorShell({
         previewLabel={dict.editor.preview}
         liveLabel={dict.editor.live}
         backLabel={dict.editor.back}
+        focusMode={focusMode}
+        focusLabel={
+          focusMode ? dict.editor.focusModeExit : dict.editor.focusMode
+        }
+        qualityLabel={dict.editor.quality}
         onUndo={undo}
         onRedo={redo}
         onRetrySave={() => void save()}
@@ -916,6 +1016,7 @@ export function EditorShell({
         onHistory={() => setHistoryOpen(true)}
         onQuality={() => setQualityOpen(true)}
         onCommandPalette={() => setCommandOpen(true)}
+        onToggleFocus={() => setFocusMode((v) => !v)}
         onPublish={() => {
           setPublishError(null);
           setPublishOpen(true);
@@ -930,7 +1031,12 @@ export function EditorShell({
 
       <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Tablet/desktop left sidebar */}
-        <aside className="editor-panel hidden w-[240px] shrink-0 flex-col border-e border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] md:flex lg:w-[280px]">
+        <aside
+          className={cn(
+            "editor-panel hidden w-[240px] shrink-0 flex-col border-e border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] lg:w-[280px]",
+            !focusMode && "md:flex",
+          )}
+        >
           {sidebar}
         </aside>
 
@@ -1004,12 +1110,17 @@ export function EditorShell({
         </main>
 
         {/* Desktop inspector */}
-        <aside className="editor-panel hidden w-[320px] shrink-0 flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] lg:flex xl:w-[340px]">
+        <aside
+          className={cn(
+            "editor-panel hidden w-[320px] shrink-0 flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] xl:w-[340px]",
+            !focusMode && "lg:flex",
+          )}
+        >
           {inspectorDesktop}
         </aside>
 
         {/* Tablet inspector overlay — clean end panel */}
-        {tabletInspectorOpen ? (
+        {tabletInspectorOpen && !focusMode ? (
           <>
             <button
               type="button"
