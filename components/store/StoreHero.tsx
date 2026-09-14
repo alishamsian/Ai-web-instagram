@@ -8,6 +8,11 @@ import { EditableText } from "@/components/editor/EditContext";
 import { StoreLinkButton, StoreKicker } from "@/components/store/primitives";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveEditorHref } from "@/lib/editor/links";
+
+function heroPrimaryHref(config: WebsiteConfig) {
+  return resolveEditorHref(config.content.hero.ctaHref, "#shop");
+}
 
 function heroVariant(config: WebsiteConfig) {
   const raw =
@@ -153,7 +158,7 @@ function StoreHeroFan({ config }: { config: WebsiteConfig }) {
             </p>
           ) : null}
           <div className="store-hero__actions store-hero-fan__actions">
-            <StoreLinkButton href="#shop" variant="primary">
+            <StoreLinkButton href={heroPrimaryHref(config)} variant="primary">
               <EditableText path="hero.cta" value={cta} as="span" />
             </StoreLinkButton>
             <StoreLinkButton href="#story" variant="outline">
@@ -256,7 +261,7 @@ function StoreHeroOverlay({ config }: { config: WebsiteConfig }) {
         ) : null}
         <div className="store-hero__actions">
           <StoreLinkButton
-            href="#shop"
+            href={heroPrimaryHref(config)}
             variant="primary"
             className="store-hero__cta-solid"
           >
@@ -308,7 +313,7 @@ export function StoreHero({ config }: { config: WebsiteConfig }) {
               </p>
             ) : null}
             <div className="store-hero__actions">
-              <StoreLinkButton href="#shop" variant="primary">
+              <StoreLinkButton href={heroPrimaryHref(config)} variant="primary">
                 <EditableText path="hero.cta" value={cta} as="span" />
               </StoreLinkButton>
               <StoreLinkButton href="#story" variant="ghost">
@@ -356,7 +361,7 @@ export function StoreHero({ config }: { config: WebsiteConfig }) {
             </p>
           ) : null}
           <div className="store-hero__actions">
-            <StoreLinkButton href="#shop" variant="primary">
+            <StoreLinkButton href={heroPrimaryHref(config)} variant="primary">
               <EditableText path="hero.cta" value={cta} as="span" />
             </StoreLinkButton>
           </div>
@@ -385,7 +390,7 @@ export function StoreHero({ config }: { config: WebsiteConfig }) {
             </p>
           ) : null}
           <div className="store-hero__actions">
-            <StoreLinkButton href="#shop" variant="primary">
+            <StoreLinkButton href={heroPrimaryHref(config)} variant="primary">
               <EditableText path="hero.cta" value={cta} as="span" />
             </StoreLinkButton>
             <StoreLinkButton href="#story" variant="ghost">

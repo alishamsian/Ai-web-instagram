@@ -11,7 +11,6 @@ import type {
   ResponsiveValue,
 } from "@/lib/store/registry/element-schema";
 import {
-  applySchemaFieldUpdate,
   flattenElementFields,
   getSchemaValue,
   isSchemaFieldActive,
@@ -21,7 +20,10 @@ import {
   schemaFieldMatchesEditorPath,
   matchesInspectorQuery,
   schemaGroupPriority,
+  commandSetSchemaValue,
+  commandAssignMedia,
 } from "@/lib/editor";
+import { normalizeEditorHref } from "@/lib/editor/links";
 import {
   resolveResponsiveValue,
   resetResponsiveOverride,
@@ -317,7 +319,18 @@ export function SchemaFieldControl({
         clearLabel={locale === "fa" ? "حذف" : "Clear"}
         emptyLabel={locale === "fa" ? "بدون رسانه" : "No media"}
         onPick={(id) => onChange(id)}
-        onClear={() => onChange(undefined)}
+        onClear={() => onChange(null)}
+      />
+    );
+  }
+
+  if (kind === "link") {
+    return (
+      <LinkFieldControl
+        value={typeof value === "string" ? value : ""}
+        locale={locale}
+        disabled={disabled}
+        onCommit={onChange}
       />
     );
   }
@@ -344,14 +357,90 @@ export function SchemaFieldControl({
     );
   }
 
-  // text | link | icon | default
+  // text | icon | default
   return (
     <Input
       disabled={disabled}
       className="editor-prop-control h-8 rounded-md"
-      value={typeof value === "string" ? value : ""}
+      value={
+        typeof value === "string" ? value : value == null ? "" : String(value)
+      }
       onChange={(event) => onChange(event.target.value)}
     />
+  );
+}
+
+function LinkFieldControl({
+  value,
+  locale,
+  disabled,
+  onCommit,
+}: {
+  value: string;
+  locale: Locale;
+  disabled?: boolean;
+  onCommit: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(value);
+    setError(null);
+  }, [value]);
+
+  function commit(raw: string) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setError(null);
+      onCommit("");
+      return;
+    }
+    const normalized = normalizeEditorHref(trimmed);
+    if (!normalized.ok) {
+      setError(
+        locale === "fa"
+          ? "لینک نامعتبر است (http، #، /، tel، mailto)"
+          : "Invalid link (http, #, /, tel, mailto)",
+      );
+      return;
+    }
+    setError(null);
+    setDraft(normalized.href);
+    onCommit(normalized.href);
+  }
+
+  return (
+    <div className="space-y-1">
+      <Input
+        disabled={disabled}
+        className="editor-prop-control h-8 rounded-md font-mono text-[12px]"
+        value={draft}
+        placeholder="https:// · #shop · /page · tel: · mailto:"
+        aria-invalid={Boolean(error) || undefined}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          if (error) setError(null);
+        }}
+        onBlur={() => commit(draft)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit(draft);
+            (event.target as HTMLInputElement).blur();
+          }
+        }}
+      />
+      {error ? (
+        <p className="text-[10.5px] text-red-300/90">{error}</p>
+      ) : (
+        <p className="text-[10px] text-[color:var(--ed-subtle)]">
+          {locale === "fa"
+            ? "لینک نسبی، http(s)، tel و mailto پشتیبانی می‌شود"
+            : "Supports relative, http(s), tel, and mailto"}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -537,13 +626,27 @@ export function SchemaInspectorPanel({
                         locale={locale}
                         viewport={viewport}
                         onChange={(nextValue) => {
-                          const result = applySchemaFieldUpdate({
+                          if (
+                            field.kind === "media" &&
+                            (field.path === "content.hero.imageId" ||
+                              field.path === "content.about.imageId")
+                          ) {
+                            const result = commandAssignMedia(
+                              config,
+                              field.path,
+                              typeof nextValue === "string" ? nextValue : null,
+                            );
+                            if (!result) return;
+                            onChange(result.config);
+                            return;
+                          }
+                          const result = commandSetSchemaValue({
                             config,
                             sectionId: section.id,
                             field,
                             value: nextValue,
                           });
-                          if ("error" in result) return;
+                          if (!result) return;
                           onChange(result.config);
                         }}
                       />

@@ -24,7 +24,12 @@ import {
   DESIGN_PRESETS,
   type DesignPresetId,
 } from "@/components/editor/editor-presets";
-import { commandApplyThemePreset } from "@/lib/editor/commands";
+import {
+  commandApplyThemePreset,
+  commandSetSectionVariant,
+  commandUpdateProduct,
+} from "@/lib/editor/commands";
+import { getSectionVariants } from "@/lib/store/registry/catalog";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { MediaPicker } from "@/components/editor/MediaPicker";
 import { SchemaInspectorPanel } from "@/components/editor/SchemaInspectorPanel";
@@ -858,6 +863,14 @@ function SectionInspector({
 
   return (
     <div className="space-y-3">
+      <SectionVariantPicker
+        sectionType={sectionType}
+        sectionId={sectionId}
+        currentVariant={section.variant}
+        locale={locale}
+        config={config}
+        onChange={onChange}
+      />
       {schemaDriven ? (
         <label className="editor-search-field">
           <Search size={13} />
@@ -1474,15 +1487,52 @@ function ProductPageInspector({
   }
 
   function patch(next: Partial<Product>) {
-    const items = [...products!.items];
-    items[index] = { ...product!, ...next };
-    onChange({
-      ...config,
-      content: {
-        ...config.content,
-        products: { ...products!, items },
-      },
+    const productId = product!.id || product!.slug;
+    if (!productId) {
+      const items = [...products!.items];
+      items[index] = { ...product!, ...next };
+      onChange({
+        ...config,
+        content: {
+          ...config.content,
+          products: { ...products!, items },
+        },
+      });
+      return;
+    }
+
+    if (next.imageIds) {
+      const result = commandUpdateProduct(config, productId, {
+        imageId: next.imageIds[0] ?? null,
+      });
+      if (!result) return;
+      const items = [...result.config.content.products!.items];
+      const idx = items.findIndex(
+        (item) => (item.id || item.slug) === productId,
+      );
+      if (idx < 0) return;
+      items[idx] = { ...items[idx]!, imageIds: next.imageIds };
+      onChange({
+        ...result.config,
+        content: {
+          ...result.config.content,
+          products: { ...result.config.content.products!, items },
+        },
+      });
+      return;
+    }
+
+    const result = commandUpdateProduct(config, productId, {
+      ...(next.name !== undefined ? { name: next.name } : {}),
+      ...(next.description !== undefined
+        ? { description: next.description }
+        : {}),
+      ...(next.price !== undefined ? { price: next.price } : {}),
+      ...(next.currency !== undefined ? { currency: next.currency } : {}),
+      ...(next.category !== undefined ? { category: next.category } : {}),
+      ...(next.hidden !== undefined ? { hidden: next.hidden } : {}),
     });
+    if (result) onChange(result.config);
   }
 
   return (
@@ -1554,6 +1604,62 @@ function ProductPageInspector({
           />
         </label>
       </InspectorGroup>
+    </div>
+  );
+}
+
+function SectionVariantPicker({
+  sectionType,
+  sectionId,
+  currentVariant,
+  locale,
+  config,
+  onChange,
+}: {
+  sectionType: WebsiteSectionType;
+  sectionId: string;
+  currentVariant?: string;
+  locale: Locale;
+  config: WebsiteConfig;
+  onChange: (next: WebsiteConfig) => void;
+}) {
+  const variants = getSectionVariants(sectionType);
+  if (variants.length < 2) return null;
+  const active = currentVariant ?? variants[0]?.id;
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-semibold tracking-wide text-[color:var(--ed-subtle)] uppercase">
+        {locale === "fa" ? "واریانت" : "Variant"}
+      </p>
+      <div className="flex flex-wrap gap-1" role="group" aria-label="Variant">
+        {variants.map((variant) => {
+          const selected = active === variant.id;
+          return (
+            <button
+              key={variant.id}
+              type="button"
+              aria-pressed={selected}
+              className={cn(
+                "min-h-8 rounded-md px-2.5 text-[11px] font-medium transition",
+                selected
+                  ? "bg-[color:var(--ed-select-soft)] text-[color:var(--ed-fg)]"
+                  : "text-[color:var(--ed-muted)] hover:bg-[color:var(--ed-bg-hover)] hover:text-[color:var(--ed-fg)]",
+              )}
+              onClick={() => {
+                const result = commandSetSectionVariant(
+                  config,
+                  sectionId,
+                  variant.id,
+                );
+                if (result) onChange(result.config);
+              }}
+            >
+              {variant.label[locale]}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -60,9 +60,15 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       actions: {
         primary: {
           key: "primary",
-          kind: "link",
-          label: { fa: "دکمه اصلی", en: "Primary CTA" },
+          kind: "text",
+          label: { fa: "متن دکمه", en: "CTA label" },
           path: "content.hero.cta",
+        },
+        primaryHref: {
+          key: "primaryHref",
+          kind: "link",
+          label: { fa: "لینک دکمه", en: "CTA link" },
+          path: "content.hero.ctaHref",
         },
         secondary: {
           key: "secondary",
@@ -346,6 +352,14 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
           path: "content.about.body",
         },
       },
+      media: {
+        image: {
+          key: "image",
+          kind: "media",
+          label: { fa: "تصویر", en: "Image" },
+          path: "content.about.imageId",
+        },
+      },
     },
     preview: { thumbnailTone: "warm", aspect: "16/9" },
   },
@@ -473,6 +487,58 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     description: { fa: "راه‌های ارتباط", en: "Ways to reach you" },
     verticals: ["*"],
     capabilities: withCaps(),
+    schema: {
+      content: {
+        title: {
+          key: "title",
+          kind: "text",
+          label: { fa: "عنوان", en: "Title" },
+          path: "content.contact.title",
+        },
+        body: {
+          key: "body",
+          kind: "textarea",
+          label: { fa: "توضیح", en: "Description" },
+          path: "content.contact.body",
+        },
+        phone: {
+          key: "phone",
+          kind: "text",
+          label: { fa: "تلفن", en: "Phone" },
+          path: "content.contact.info.phone",
+        },
+        email: {
+          key: "email",
+          kind: "text",
+          label: { fa: "ایمیل", en: "Email" },
+          path: "content.contact.info.email",
+        },
+        website: {
+          key: "website",
+          kind: "link",
+          label: { fa: "وب‌سایت", en: "Website" },
+          path: "content.contact.info.website",
+        },
+        instagram: {
+          key: "instagram",
+          kind: "text",
+          label: { fa: "اینستاگرام", en: "Instagram" },
+          path: "content.contact.info.instagram",
+        },
+        whatsapp: {
+          key: "whatsapp",
+          kind: "text",
+          label: { fa: "واتساپ", en: "WhatsApp" },
+          path: "content.contact.info.whatsapp",
+        },
+        address: {
+          key: "address",
+          kind: "textarea",
+          label: { fa: "آدرس", en: "Address" },
+          path: "content.contact.info.address",
+        },
+      },
+    },
     preview: { thumbnailTone: "warm", aspect: "16/9" },
   },
   {
@@ -486,6 +552,34 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     ],
     verticals: ["*"],
     capabilities: withCaps(),
+    schema: {
+      content: {
+        kicker: {
+          key: "kicker",
+          kind: "text",
+          label: { fa: "ابرو", en: "Kicker" },
+          path: "content.promo.kicker",
+        },
+        title: {
+          key: "title",
+          kind: "text",
+          label: { fa: "عنوان", en: "Title" },
+          path: "content.promo.title",
+        },
+        cta: {
+          key: "cta",
+          kind: "text",
+          label: { fa: "متن دکمه", en: "CTA label" },
+          path: "content.promo.cta",
+        },
+        ctaHref: {
+          key: "ctaHref",
+          kind: "link",
+          label: { fa: "لینک دکمه", en: "CTA link" },
+          path: "content.promo.ctaHref",
+        },
+      },
+    },
     preview: { thumbnailTone: "dark", aspect: "16/9" },
   },
   {

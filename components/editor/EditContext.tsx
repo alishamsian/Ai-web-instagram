@@ -13,6 +13,7 @@ import {
 } from "react";
 import type { WebsiteConfig } from "@/types/website";
 import { cn } from "@/lib/utils";
+import { commandSetContentPath } from "@/lib/editor/commands";
 
 export type WebsiteRenderMode = "editor" | "preview" | "published";
 
@@ -108,64 +109,8 @@ export function EditorEditProvider({
 }) {
   const onChangeText = useCallback(
     (path: EditorFieldPath, value: string) => {
-      const next = structuredClone(config);
-      switch (path) {
-        case "hero.headline":
-          next.content.hero.headline = value;
-          break;
-        case "hero.subheadline":
-          next.content.hero.subheadline = value;
-          break;
-        case "hero.cta":
-          next.content.hero.cta = value;
-          break;
-        case "about.title":
-          if (next.content.about) next.content.about.title = value;
-          break;
-        case "about.body":
-          if (next.content.about) next.content.about.body = value;
-          break;
-        case "products.title":
-          if (next.content.products) next.content.products.title = value;
-          break;
-        case "services.title":
-          if (next.content.services) next.content.services.title = value;
-          break;
-        case "gallery.title":
-          if (next.content.gallery) next.content.gallery.title = value;
-          break;
-        case "faq.title":
-          if (next.content.faq) next.content.faq.title = value;
-          break;
-        case "contact.title":
-          if (next.content.contact) next.content.contact.title = value;
-          break;
-        case "testimonials.title":
-          if (next.content.testimonials) next.content.testimonials.title = value;
-          break;
-        case "promo.kicker":
-          next.content.promo = {
-            kicker: value,
-            title: next.content.promo?.title ?? "",
-            cta: next.content.promo?.cta ?? "",
-          };
-          break;
-        case "promo.title":
-          next.content.promo = {
-            kicker: next.content.promo?.kicker ?? "",
-            title: value,
-            cta: next.content.promo?.cta ?? "",
-          };
-          break;
-        case "promo.cta":
-          next.content.promo = {
-            kicker: next.content.promo?.kicker ?? "",
-            title: next.content.promo?.title ?? "",
-            cta: value,
-          };
-          break;
-      }
-      onChange(next);
+      const result = commandSetContentPath(config, path, value);
+      if (result) onChange(result.config);
     },
     [config, onChange],
   );

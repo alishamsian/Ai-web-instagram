@@ -39,9 +39,19 @@ export {
   commandSetSchemaValue,
   commandSetSeoField,
   commandToggleSection,
+  commandAssignMedia,
+  commandSetSectionVariant,
+  commandUpdateProduct,
+  commandSetContactInfo,
   pinFooterLast,
   readContentPath,
 } from "@/lib/editor/commands";
+
+export {
+  normalizeEditorHref,
+  resolveEditorHref,
+  EDITOR_FIELD_CONTENT_PATH,
+} from "@/lib/editor/links";
 
 export {
   applyEditorAction,

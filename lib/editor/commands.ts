@@ -4,8 +4,12 @@ import type {
   WebsiteConfig,
   WebsiteSectionType,
 } from "@/types/website";
+import type { ContactInfo, Product } from "@/types/ai";
 import { cloneWebsiteConfig, type EditorCommandResult } from "@/lib/editor/types";
-import { hasSection } from "@/lib/store/registry/catalog";
+import {
+  getSectionVariants,
+  hasSection,
+} from "@/lib/store/registry/catalog";
 import {
   addOrShowSection,
   applyTemplate,
@@ -15,6 +19,10 @@ import {
   type ElementFieldSchema,
 } from "@/lib/store/registry/element-schema";
 import { applyDesignPreset, type DesignPresetId } from "@/components/editor/editor-presets";
+import {
+  EDITOR_FIELD_CONTENT_PATH,
+  normalizeEditorHref,
+} from "@/lib/editor/links";
 
 /** Keep footer sections pinned to the end after any reorder/move. */
 export function pinFooterLast(sections: SectionConfig[]): SectionConfig[] {
@@ -160,8 +168,22 @@ export function commandAddSection(
   options?: { afterSectionId?: string | null },
 ): EditorCommandResult | null {
   if (!hasSection(type)) return null;
+  const existed = config.sections.some((s) => s.type === type);
   const next = addOrShowSection(config, type, options);
   const added = next.sections.find((s) => s.type === type && s.visible);
+  if (!existed && added && !added.variant) {
+    const variant = defaultVariantForType(type);
+    if (variant) {
+      const withVariant = commandSetSectionVariant(next, added.id, variant);
+      if (withVariant) {
+        return {
+          ...withVariant,
+          label: `Add ${type}`,
+          selectedSectionId: added.id,
+        };
+      }
+    }
+  }
   return {
     config: next,
     label: `Add ${type}`,
@@ -284,15 +306,86 @@ export function commandSetContentPath(
     "content.hero.headline",
     "content.hero.subheadline",
     "content.hero.cta",
+    "content.hero.ctaHref",
+    "content.hero.style",
+    "content.hero.imageId",
     "content.about.title",
     "content.about.body",
+    "content.about.imageId",
     "content.products.title",
+    "content.services.title",
+    "content.gallery.title",
+    "content.faq.title",
+    "content.contact.title",
+    "content.contact.body",
+    "content.testimonials.title",
+    "content.promo.kicker",
+    "content.promo.title",
+    "content.promo.cta",
+    "content.promo.ctaHref",
     "brand.name",
     "brand.tagline",
     "seo.title",
     "seo.description",
   ]);
-  if (!allowed.has(path)) return null;
+  // Allow EditorFieldPath aliases
+  const resolved = EDITOR_FIELD_CONTENT_PATH[path] ?? path;
+  if (!allowed.has(resolved)) return null;
+
+  let writeValue: string = value;
+  if (resolved.endsWith("Href") || resolved.endsWith(".website")) {
+    const normalized = normalizeEditorHref(value);
+    if (value.trim() && !normalized.ok) return null;
+    writeValue = normalized.ok ? normalized.href : "";
+  }
+
+  const next = cloneWebsiteConfig(config) as unknown as Record<string, unknown>;
+  const parts = resolved.split(".");
+  let cursor: Record<string, unknown> = next;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i]!;
+    const child = cursor[key];
+    if (!child || typeof child !== "object" || Array.isArray(child)) {
+      cursor[key] = {};
+    } else {
+      cursor[key] = { ...(child as Record<string, unknown>) };
+    }
+    cursor = cursor[key] as Record<string, unknown>;
+  }
+  cursor[parts[parts.length - 1]!] = writeValue;
+  return {
+    config: next as unknown as WebsiteConfig,
+    label: `Edit ${resolved}`,
+  };
+}
+
+export function readContentPath(
+  config: WebsiteConfig,
+  path: string,
+): unknown {
+  const resolved = EDITOR_FIELD_CONTENT_PATH[path] ?? path;
+  const parts = resolved.split(".");
+  let cursor: unknown = config;
+  for (const part of parts) {
+    if (!cursor || typeof cursor !== "object") return undefined;
+    cursor = (cursor as Record<string, unknown>)[part];
+  }
+  return cursor;
+}
+
+const MEDIA_PATHS = new Set([
+  "content.hero.imageId",
+  "content.about.imageId",
+]);
+
+/** Assign or clear an imported media id on an allowlisted path. */
+export function commandAssignMedia(
+  config: WebsiteConfig,
+  path: string,
+  mediaId: string | null,
+): EditorCommandResult | null {
+  if (!MEDIA_PATHS.has(path)) return null;
+  if (mediaId != null && !config.media[mediaId]) return null;
 
   const next = cloneWebsiteConfig(config) as unknown as Record<string, unknown>;
   const parts = path.split(".");
@@ -307,22 +400,171 @@ export function commandSetContentPath(
     }
     cursor = cursor[key] as Record<string, unknown>;
   }
-  cursor[parts[parts.length - 1]!] = value;
+  const leaf = parts[parts.length - 1]!;
+  if (mediaId == null) {
+    delete cursor[leaf];
+  } else {
+    cursor[leaf] = mediaId;
+  }
   return {
     config: next as unknown as WebsiteConfig,
-    label: `Edit ${path}`,
+    label: mediaId ? `Assign media ${mediaId}` : `Clear media ${path}`,
   };
 }
 
-export function readContentPath(
+/** Change section visual variant using registered variants only. */
+export function commandSetSectionVariant(
   config: WebsiteConfig,
-  path: string,
-): unknown {
-  const parts = path.split(".");
-  let cursor: unknown = config;
-  for (const part of parts) {
-    if (!cursor || typeof cursor !== "object") return undefined;
-    cursor = (cursor as Record<string, unknown>)[part];
+  sectionId: string,
+  variantId: string,
+): EditorCommandResult | null {
+  const section = config.sections.find((s) => s.id === sectionId);
+  if (!section) return null;
+  const variants = getSectionVariants(section.type);
+  if (!variants.some((v) => v.id === variantId)) return null;
+
+  let next: WebsiteConfig = {
+    ...config,
+    sections: config.sections.map((s) =>
+      s.id === sectionId ? { ...s, variant: variantId } : s,
+    ),
+  };
+
+  // Keep hero.style in sync when variant matches a known hero style.
+  if (section.type === "hero") {
+    const styles = new Set([
+      "fan",
+      "overlay",
+      "editorial",
+      "split",
+      "minimal",
+      "menu",
+    ]);
+    if (styles.has(variantId)) {
+      const synced = commandSetContentPath(
+        next,
+        "content.hero.style",
+        variantId,
+      );
+      if (synced) next = synced.config;
+    }
   }
-  return cursor;
+
+  return {
+    config: next,
+    label: `Variant ${section.type}.${variantId}`,
+    selectedSectionId: sectionId,
+  };
+}
+
+export function commandUpdateProduct(
+  config: WebsiteConfig,
+  productId: string,
+  patch: Partial<
+    Pick<
+      Product,
+      "name" | "description" | "price" | "currency" | "category" | "hidden"
+    >
+  > & { imageId?: string | null },
+): EditorCommandResult | null {
+  const products = config.content.products;
+  if (!products) return null;
+  const index = products.items.findIndex(
+    (item) => (item.id || item.slug) === productId,
+  );
+  if (index < 0) return null;
+  const current = products.items[index]!;
+  if (patch.imageId != null && !config.media[patch.imageId]) return null;
+
+  const nextItem: Product = {
+    ...current,
+    ...("name" in patch && patch.name != null ? { name: patch.name } : {}),
+    ...("description" in patch && patch.description != null
+      ? { description: patch.description }
+      : {}),
+    ...("price" in patch ? { price: patch.price ?? null } : {}),
+    ...("currency" in patch ? { currency: patch.currency ?? null } : {}),
+    ...("category" in patch && patch.category != null
+      ? { category: patch.category }
+      : {}),
+    ...("hidden" in patch ? { hidden: patch.hidden } : {}),
+  };
+  if ("imageId" in patch) {
+    nextItem.imageIds = patch.imageId
+      ? [patch.imageId, ...current.imageIds.filter((id) => id !== patch.imageId)]
+      : current.imageIds.slice(1);
+  }
+
+  const items = [...products.items];
+  items[index] = nextItem;
+  return {
+    config: {
+      ...config,
+      content: {
+        ...config.content,
+        products: { ...products, items },
+      },
+    },
+    label: `Edit product ${productId}`,
+  };
+}
+
+const CONTACT_LINK_KEYS = new Set<keyof ContactInfo>([
+  "website",
+  "instagram",
+  "telegram",
+  "whatsapp",
+]);
+
+export function commandSetContactInfo(
+  config: WebsiteConfig,
+  key: keyof ContactInfo,
+  value: string | null,
+): EditorCommandResult | null {
+  if (!config.content.contact) return null;
+  let nextValue = value?.trim() || null;
+  if (nextValue && CONTACT_LINK_KEYS.has(key)) {
+    if (key === "whatsapp" || key === "instagram" || key === "telegram") {
+      // allow @handles and numbers without forcing full URL
+      if (key === "whatsapp" && /^[\d+\s()-]+$/.test(nextValue)) {
+        nextValue = nextValue.replace(/\s+/g, "");
+      } else if (!nextValue.startsWith("@") && !nextValue.includes("://")) {
+        const normalized = normalizeEditorHref(nextValue);
+        if (normalized.ok) nextValue = normalized.href;
+      }
+    } else {
+      const normalized = normalizeEditorHref(nextValue);
+      if (!normalized.ok) return null;
+      nextValue = normalized.href;
+    }
+  }
+  if (key === "email" && nextValue && !nextValue.includes("@")) return null;
+  if (key === "phone" && nextValue) {
+    nextValue = nextValue.trim();
+  }
+
+  return {
+    config: {
+      ...config,
+      content: {
+        ...config.content,
+        contact: {
+          ...config.content.contact,
+          info: {
+            ...config.content.contact.info,
+            [key]: nextValue,
+          },
+        },
+      },
+    },
+    label: `Edit contact.${key}`,
+  };
+}
+
+/** Default variant from registry when inserting a new section. */
+export function defaultVariantForType(
+  type: WebsiteSectionType,
+): string | undefined {
+  const variants = getSectionVariants(type);
+  return variants[0]?.id;
 }

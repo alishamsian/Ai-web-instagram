@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
+import { useEditorEdit } from "@/components/editor/EditContext";
+import type { MouseEvent } from "react";
 
 export type StoreButtonVariant =
   | "primary"
@@ -69,13 +71,21 @@ export const StoreLinkButton = forwardRef<
     block?: boolean;
   }
 >(function StoreLinkButton(
-  { className, variant = "primary", size = "md", block, ...props },
+  { className, variant = "primary", size = "md", block, onClick, ...props },
   ref,
 ) {
+  const edit = useEditorEdit();
+  function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (edit?.enabled && edit.mode === "editor") {
+      event.preventDefault();
+    }
+    onClick?.(event);
+  }
   return (
     <a
       ref={ref}
       className={buttonClass(variant, size, block, className)}
+      onClick={handleClick}
       {...props}
     />
   );

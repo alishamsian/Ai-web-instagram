@@ -94,6 +94,8 @@ export interface HeroConfig {
   headline: string;
   subheadline: string;
   cta: string;
+  /** Primary CTA destination — relative, http(s), tel:, mailto:. */
+  ctaHref?: string;
   imageId?: string;
 }
 
@@ -143,6 +145,7 @@ export interface PromoConfig {
   kicker: string;
   title: string;
   cta: string;
+  ctaHref?: string;
 }
 
 export interface TrustConfig {
