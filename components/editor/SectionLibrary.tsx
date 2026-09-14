@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import type { WebsiteSectionType } from "@/types/website";
@@ -29,6 +29,16 @@ export function SectionLibrary({
 }) {
   const [category, setCategory] = useState<SectionCategory | "all">("all");
   const [query, setQuery] = useState("");
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    if (!open) {
+      setBooting(true);
+      return;
+    }
+    const id = window.setTimeout(() => setBooting(false), 220);
+    return () => window.clearTimeout(id);
+  }, [open]);
 
   const library = useMemo(
     () => getSectionLibraryItems({ vertical }),
@@ -111,7 +121,19 @@ export function SectionLibrary({
         </div>
 
         <div className="grid gap-2 overflow-y-auto p-3 sm:grid-cols-2 sm:p-4">
-          {items.length === 0 ? (
+          {booting ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-white/[0.06] bg-[#111113] p-3.5"
+              >
+                <div className="editor-skeleton mb-3 aspect-video" />
+                <div className="editor-skeleton mb-2 h-3 w-2/3" />
+                <div className="editor-skeleton h-2 w-full" />
+                <div className="editor-skeleton mt-3 h-9 w-full" />
+              </div>
+            ))
+          ) : items.length === 0 ? (
             <p className="col-span-full py-8 text-center text-[12px] text-[#77777F]">
               {locale === "fa" ? "سکشن‌ی پیدا نشد" : "No sections found"}
             </p>

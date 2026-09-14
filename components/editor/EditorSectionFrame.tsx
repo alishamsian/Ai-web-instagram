@@ -16,7 +16,6 @@ import {
   Copy,
   Eye,
   EyeOff,
-  GripVertical,
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
@@ -123,9 +122,9 @@ export function EditorSectionFrame({
           className={cn(
             "editor-section-badge pointer-events-none absolute start-2 top-2 z-20 flex max-w-[min(70%,12rem)] items-center gap-1.5",
             "px-2 py-1 text-[10px] font-medium text-[#F7F7F8] sm:start-3 sm:top-3",
+            !selected && "opacity-80",
           )}
         >
-          <GripVertical size={11} className="shrink-0 opacity-50" />
           <span className="truncate">{label}</span>
           {hidden ? <EyeOff size={10} className="opacity-70" /> : null}
         </div>

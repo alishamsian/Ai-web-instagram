@@ -49,6 +49,8 @@ import {
   EyeOff,
   GripVertical,
   Palette,
+  Plus,
+  Search,
   Settings2,
   Type,
 } from "lucide-react";
@@ -74,6 +76,7 @@ export function EditorInspector({
   onChange,
   onRestored,
   onOpenSections,
+  onAddSection,
 }: {
   config: WebsiteConfig;
   dict: Dictionary;
@@ -93,6 +96,7 @@ export function EditorInspector({
   onChange: (next: WebsiteConfig) => void;
   onRestored: (next: WebsiteConfig) => void;
   onOpenSections?: () => void;
+  onAddSection?: () => void;
 }) {
   const selected = useMemo(
     () => config.sections.find((s) => s.id === selectedSectionId),
@@ -180,21 +184,55 @@ export function EditorInspector({
       title={config.brand.name || dict.editor.website}
       hint={dict.editor.inspectorHintSite}
     >
-      <div className="editor-inspector space-y-4">
-        <SiteIdentityCard config={config} dict={dict} locale={locale} />
-
-        <div className="editor-site-hint">
-          <p className="min-w-0 flex-1">{dict.editor.inspectorHintEmpty}</p>
-          {onOpenSections ? (
+      <div className="editor-inspector editor-inspector-compact space-y-3">
+        <div className="editor-empty-guide">
+          <p className="text-[13px] font-medium text-[color:var(--ed-fg)]">
+            {config.brand.name || dict.editor.website}
+          </p>
+          <p className="mt-1 text-[12px] leading-5 text-[color:var(--ed-muted)]">
+            {dict.editor.emptyClickSection}
+          </p>
+          <div className="editor-empty-actions">
+            {onOpenSections ? (
+              <button
+                type="button"
+                className="editor-empty-action"
+                onClick={onOpenSections}
+              >
+                <Search size={14} />
+                {dict.editor.pickSectionCta}
+              </button>
+            ) : null}
+            {onAddSection ? (
+              <button
+                type="button"
+                className="editor-empty-action"
+                onClick={onAddSection}
+              >
+                <Plus size={14} />
+                {dict.editor.emptyQuickAdd}
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={onOpenSections}
-              className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-medium"
+              className="editor-empty-action"
+              onClick={() => onSiteGroupChange("style")}
             >
-              {dict.editor.pickSectionCta}
+              <Palette size={14} />
+              {dict.editor.emptyQuickStyle}
             </button>
-          ) : null}
+            <button
+              type="button"
+              className="editor-empty-action"
+              onClick={() => onSiteGroupChange("site")}
+            >
+              <Settings2 size={14} />
+              {dict.editor.emptyQuickSeo}
+            </button>
+          </div>
         </div>
+
+        <SiteIdentityCard config={config} dict={dict} locale={locale} />
 
         <div className="editor-site-group" role="tablist" aria-label={dict.editor.website}>
           {(
@@ -219,7 +257,7 @@ export function EditorInspector({
           ))}
         </div>
 
-        <div className="space-y-5 pt-0.5">
+        <div className="space-y-3 pt-0.5">
           {siteGroup === "style" ? (
             <>
               <InspectorBlock title={dict.editor.designPresets}>
@@ -231,7 +269,7 @@ export function EditorInspector({
                   presetsOnly
                 />
               </InspectorBlock>
-              <InspectorBlock title={dict.editor.colors}>
+              <InspectorBlock title={dict.editor.colors} collapsed>
                 <ColorsPanel
                   config={config}
                   dict={dict}
@@ -239,7 +277,7 @@ export function EditorInspector({
                   onChange={onChange}
                 />
               </InspectorBlock>
-              <InspectorBlock title={dict.editor.typography}>
+              <InspectorBlock title={dict.editor.typography} collapsed>
                 <TypographyPanel
                   config={config}
                   dict={dict}
@@ -254,10 +292,10 @@ export function EditorInspector({
               <InspectorBlock title={dict.editor.brand}>
                 <BrandPanel config={config} dict={dict} onChange={onChange} />
               </InspectorBlock>
-              <InspectorBlock title={dict.editor.content}>
+              <InspectorBlock title={dict.editor.content} collapsed>
                 <ContentPanel config={config} dict={dict} onChange={onChange} />
               </InspectorBlock>
-              <InspectorBlock title={dict.editor.media}>
+              <InspectorBlock title={dict.editor.media} collapsed>
                 <MediaPanel config={config} dict={dict} onChange={onChange} />
               </InspectorBlock>
             </>
@@ -268,7 +306,7 @@ export function EditorInspector({
               <InspectorBlock title={dict.editor.seo}>
                 <SeoPanel config={config} dict={dict} onChange={onChange} />
               </InspectorBlock>
-              <InspectorBlock title={dict.editor.settings}>
+              <InspectorBlock title={dict.editor.settings} collapsed>
                 <SettingsPanel
                   config={config}
                   dict={dict}
@@ -276,7 +314,7 @@ export function EditorInspector({
                   canRemoveBranding={canRemoveBranding}
                 />
               </InspectorBlock>
-              <InspectorBlock title={dict.editor.template}>
+              <InspectorBlock title={dict.editor.template} collapsed>
                 <TemplatePanel
                   config={config}
                   dict={dict}
@@ -284,7 +322,7 @@ export function EditorInspector({
                   onChange={onChange}
                 />
               </InspectorBlock>
-              <InspectorBlock title={dict.editor.versions}>
+              <InspectorBlock title={dict.editor.versions} collapsed>
                 <VersionsPanel
                   websiteId={websiteId}
                   dict={dict}
@@ -302,16 +340,32 @@ export function EditorInspector({
 function InspectorBlock({
   title,
   children,
+  collapsed = false,
 }: {
   title: string;
   children: ReactNode;
+  collapsed?: boolean;
 }) {
+  const [open, setOpen] = useState(!collapsed);
   return (
-    <section className="space-y-3">
-      <h3 className="text-[10px] font-semibold tracking-[0.12em] text-[color:var(--ed-muted)] uppercase">
-        {title}
-      </h3>
-      {children}
+    <section className="border-b border-[color:var(--ed-border)] pb-2 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 py-2 text-start"
+      >
+        <h3 className="text-[10px] font-semibold tracking-[0.1em] text-[color:var(--ed-subtle)] uppercase">
+          {title}
+        </h3>
+        <ChevronDown
+          size={13}
+          className={cn(
+            "text-[color:var(--ed-subtle)] transition-transform duration-150",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open ? <div className="space-y-2.5 pb-2">{children}</div> : null}
     </section>
   );
 }
@@ -334,8 +388,8 @@ function InspectorShell({
   return (
     <div className="flex h-full flex-col">
       {!compactChrome ? (
-        <div className="border-b border-[color:var(--ed-border)] px-4 py-3.5">
-          <p className="text-[10px] font-medium tracking-[0.14em] text-[color:var(--ed-muted)] uppercase">
+        <div className="border-b border-[color:var(--ed-border)] px-3.5 py-3">
+          <p className="text-[10px] font-medium tracking-[0.12em] text-[color:var(--ed-subtle)] uppercase">
             {eyebrow}
           </p>
           {breadcrumb && breadcrumb.length > 1 ? (
@@ -401,7 +455,7 @@ function InspectorShell({
           </p>
         </div>
       )}
-      <div className="editor-inspector editor-inspector-light min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="editor-inspector editor-inspector-compact editor-inspector-light min-h-0 flex-1 overflow-y-auto p-3">
         {children}
       </div>
     </div>
@@ -1357,25 +1411,25 @@ function InspectorGroup({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-xl border border-black/8 bg-white">
+    <div className="border-b border-[color:var(--ed-border)] last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-start"
+        className="flex w-full items-center justify-between py-2 text-start"
       >
-        <span className="text-[11px] font-semibold tracking-wide text-ink uppercase">
+        <span className="text-[10px] font-semibold tracking-wide text-[color:var(--ed-subtle)] uppercase">
           {title}
         </span>
         <ChevronDown
-          size={14}
+          size={13}
           className={cn(
-            "text-muted-foreground transition",
+            "text-[color:var(--ed-subtle)] transition-transform duration-150",
             open && "rotate-180",
           )}
         />
       </button>
       {open ? (
-        <div className="space-y-3 border-t border-black/6 px-3 py-3">
+        <div className="space-y-2.5 pb-2.5">
           {children}
         </div>
       ) : null}
@@ -1391,8 +1445,8 @@ function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+    <label className="block space-y-1">
+      <span className="text-[10.5px] font-medium tracking-wide text-[color:var(--ed-muted)]">
         {label}
       </span>
       {children}

@@ -323,14 +323,14 @@ export function SchemaInspectorPanel({
         return (
           <div
             key={group}
-            className="rounded-xl border border-white/10 bg-[color:var(--ed-bg-soft)]"
+            className="border-b border-[color:var(--ed-border)] last:border-b-0"
           >
-            <div className="px-3 py-2.5">
-              <p className="text-[11px] font-semibold tracking-wide text-[color:var(--ed-fg)] uppercase">
+            <div className="px-0 py-2">
+              <p className="text-[10px] font-semibold tracking-wide text-[color:var(--ed-subtle)] uppercase">
                 {GROUP_LABELS[group][locale]}
               </p>
             </div>
-            <div className="space-y-3 border-t border-white/[0.06] px-3 py-3">
+            <div className="space-y-2.5 pb-3">
               {groupFields.map((field) => {
                 const active = schemaFieldMatchesEditorPath(
                   field.path,

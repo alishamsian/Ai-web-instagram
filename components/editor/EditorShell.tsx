@@ -57,10 +57,13 @@ import {
   proposeEditorActions,
   loadEditorUiState,
   saveEditorUiState,
+  panelWidthPx,
   type HistoryEntry,
   type EditorViewportId,
   type EditorSectionTab,
   type EditorSiteGroup,
+  type EditorZoomMode,
+  type EditorPanelWidth,
   EDITOR_HISTORY_LIMIT,
 } from "@/lib/editor";
 import {
@@ -115,11 +118,18 @@ export function EditorShell({
   const [focusMode, setFocusMode] = useState(false);
   const [sectionTab, setSectionTab] = useState<EditorSectionTab>("content");
   const [siteGroup, setSiteGroup] = useState<EditorSiteGroup>("style");
+  const [zoom, setZoom] = useState<EditorZoomMode>("fit");
+  const [panelWidth, setPanelWidth] = useState<EditorPanelWidth>("normal");
+  const [inspectorLight, setInspectorLight] = useState(false);
+  const [splitPreview, setSplitPreview] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [savePhase, setSavePhase] = useState<"idle" | "saving" | "error">("idle");
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [status, setStatus] = useState(website.status);
+  const [publishedAt, setPublishedAt] = useState<string | null>(
+    website.publishedAt,
+  );
   const [selectedField, setSelectedField] = useState<EditorFieldPath | undefined>();
   const [selectedSectionId, setSelectedSectionId] = useState<string | undefined>();
   const [hoveredSectionId, setHoveredSectionId] = useState<string | undefined>();
@@ -186,6 +196,10 @@ export function EditorShell({
       }
       if (saved.sectionTab) setSectionTab(saved.sectionTab);
       if (saved.siteGroup) setSiteGroup(saved.siteGroup);
+      if (saved.zoom) setZoom(saved.zoom);
+      if (saved.panelWidth) setPanelWidth(saved.panelWidth);
+      if (saved.inspectorLight != null) setInspectorLight(saved.inspectorLight);
+      if (saved.splitPreview != null) setSplitPreview(saved.splitPreview);
     }
     setUiHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,6 +214,10 @@ export function EditorShell({
       leftNav,
       sectionTab,
       siteGroup,
+      zoom,
+      panelWidth,
+      inspectorLight,
+      splitPreview,
     });
   }, [
     uiHydrated,
@@ -210,6 +228,10 @@ export function EditorShell({
     leftNav,
     sectionTab,
     siteGroup,
+    zoom,
+    panelWidth,
+    inspectorLight,
+    splitPreview,
   ]);
 
   function commitHistory(snapshot: WebsiteConfig, label = pendingLabel) {
@@ -494,6 +516,7 @@ export function EditorShell({
         return;
       }
       setStatus(nextPublished ? "published" : "unpublished");
+      if (nextPublished) setPublishedAt(new Date().toISOString());
       flashMessage(
         nextPublished ? dict.editor.published : dict.editor.unpublished,
       );
@@ -868,6 +891,7 @@ export function EditorShell({
       onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
       onRestored={handleRestored}
+      onAddSection={() => setLibraryOpen(true)}
       onOpenSections={() => {
         setPhonePane("sections");
         setLeftNav("sections");
@@ -893,6 +917,7 @@ export function EditorShell({
       onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
       onRestored={handleRestored}
+      onAddSection={() => setLibraryOpen(true)}
       onOpenSections={() => setLeftNav("sections")}
     />
   );
@@ -926,7 +951,10 @@ export function EditorShell({
   );
 
   return (
-    <div className="editor-shell relative flex h-dvh flex-col overflow-hidden">
+    <div
+      className="editor-shell relative flex h-dvh flex-col overflow-hidden"
+      data-inspector-light={inspectorLight ? "true" : undefined}
+    >
       {/* ── Phone header ── */}
       <header className="editor-mobile-header relative z-30 flex h-12 shrink-0 items-center gap-2 px-3 md:hidden">
         <Link
@@ -992,13 +1020,19 @@ export function EditorShell({
         websiteId={website.id}
         websiteSlug={website.slug}
         brandName={config.brand.name}
-        isPublished={isPublished}
+        status={status}
+        publishedAt={publishedAt}
         dirty={dirty}
         saveLabel={saveLabel}
         saveError={savePhase === "error"}
+        saving={savePhase === "saving"}
         canUndo={canUndo}
         canRedo={canRedo}
         viewport={viewport}
+        zoom={zoom}
+        splitPreview={splitPreview}
+        panelWidth={panelWidth}
+        inspectorLight={inspectorLight}
         publishing={publishing}
         publishLabel={isPublished ? dict.editor.unpublish : dict.editor.publish}
         previewLabel={dict.editor.preview}
@@ -1009,10 +1043,34 @@ export function EditorShell({
           focusMode ? dict.editor.focusModeExit : dict.editor.focusMode
         }
         qualityLabel={dict.editor.quality}
+        labels={{
+          statusDraft: dict.editor.statusDraft,
+          statusPublished: dict.editor.statusPublished,
+          statusUnpublished: dict.editor.statusUnpublished,
+          publishedAt: dict.editor.publishedAt,
+          neverPublished: dict.editor.neverPublished,
+          zoomFit: dict.editor.zoomFit,
+          zoom75: dict.editor.zoom75,
+          zoom100: dict.editor.zoom100,
+          splitPreview: dict.editor.splitPreview,
+          panelNarrow: dict.editor.panelNarrow,
+          panelNormal: dict.editor.panelNormal,
+          panelWide: dict.editor.panelWide,
+          inspectorLight: dict.editor.inspectorLight,
+          inspectorDark: dict.editor.inspectorDark,
+        }}
         onUndo={undo}
         onRedo={redo}
         onRetrySave={() => void save()}
         onViewportChange={setViewport}
+        onZoomChange={setZoom}
+        onToggleSplit={() => setSplitPreview((v) => !v)}
+        onPanelWidthCycle={() =>
+          setPanelWidth((w) =>
+            w === "narrow" ? "normal" : w === "normal" ? "wide" : "narrow",
+          )
+        }
+        onToggleInspectorLight={() => setInspectorLight((v) => !v)}
         onHistory={() => setHistoryOpen(true)}
         onQuality={() => setQualityOpen(true)}
         onCommandPalette={() => setCommandOpen(true)}
@@ -1033,9 +1091,10 @@ export function EditorShell({
         {/* Tablet/desktop left sidebar */}
         <aside
           className={cn(
-            "editor-panel hidden w-[240px] shrink-0 flex-col border-e border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] lg:w-[280px]",
+            "editor-panel hidden shrink-0 flex-col border-e border-[color:var(--ed-border)]",
             !focusMode && "md:flex",
           )}
+          style={{ width: panelWidthPx("left", panelWidth) }}
         >
           {sidebar}
         </aside>
@@ -1057,7 +1116,7 @@ export function EditorShell({
         {/* Phone: inspector pane (full screen, exclusive) */}
         <div
           className={cn(
-            "min-h-0 flex-1 flex-col bg-[color:var(--ed-bg)] md:hidden",
+            "editor-inspector-panel min-h-0 flex-1 flex-col bg-[color:var(--ed-bg)] md:hidden",
             phonePane === "inspector" ? "flex" : "hidden",
           )}
         >
@@ -1102,7 +1161,12 @@ export function EditorShell({
           <div className="relative min-h-0 flex-1 overflow-auto">
             <div className="editor-canvas-dotgrid pointer-events-none absolute inset-0" />
             <div className="relative min-h-full">
-              <EditorCanvasFrame viewport={viewport} brandName={config.brand.name}>
+              <EditorCanvasFrame
+                viewport={viewport}
+                brandName={config.brand.name}
+                zoom={zoom}
+                splitPreview={splitPreview}
+              >
                 {canvas}
               </EditorCanvasFrame>
             </div>
@@ -1112,9 +1176,10 @@ export function EditorShell({
         {/* Desktop inspector */}
         <aside
           className={cn(
-            "editor-panel hidden w-[320px] shrink-0 flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] xl:w-[340px]",
+            "editor-inspector-panel editor-panel hidden shrink-0 flex-col border-s border-[color:var(--ed-border)]",
             !focusMode && "lg:flex",
           )}
+          style={{ width: panelWidthPx("right", panelWidth) }}
         >
           {inspectorDesktop}
         </aside>
@@ -1128,7 +1193,10 @@ export function EditorShell({
               aria-label="Close"
               onClick={() => setTabletInspectorOpen(false)}
             />
-            <div className="editor-panel absolute inset-y-0 end-0 z-50 hidden w-[min(100%,360px)] flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg-elevated)] shadow-2xl md:flex lg:hidden">
+            <div
+              className="editor-inspector-panel editor-panel absolute inset-y-0 end-0 z-50 hidden flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg-elevated)] shadow-2xl md:flex lg:hidden"
+              style={{ width: Math.min(panelWidthPx("right", panelWidth), 380) }}
+            >
               <EditorPaneHeader
                 title={inspectorTitle}
                 onClose={() => setTabletInspectorOpen(false)}

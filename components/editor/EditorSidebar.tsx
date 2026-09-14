@@ -7,6 +7,7 @@ import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
 import type { EditorFieldPath } from "@/components/editor/EditContext";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { SECTION_LAYER_BLOCKS } from "@/components/editor/editor-selection";
+import { sectionTypeIcon } from "@/components/editor/section-icons";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -138,51 +139,59 @@ export function EditorSidebar({
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {activeTab === "pages" ? (
-          <ul className="space-y-0.5">
-            {EDITOR_PAGES.map((page) => (
-              <li key={page.id}>
-                <button
-                  type="button"
-                  onClick={() => onPageChange(page.id)}
-                  className={cn(
-                    "flex w-full items-center rounded-lg px-2.5 py-2 text-start text-[12.5px] transition",
-                    activePage === page.id
-                      ? "bg-white/[0.08] text-[color:var(--ed-fg)]"
-                      : "text-[color:var(--ed-muted)] hover:bg-white/[0.04] hover:text-[color:var(--ed-fg)]",
-                  )}
-                >
-                  {page.label[locale]}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <p className="editor-panel-label">{dict.editor.pages}</p>
+            <ul className="space-y-0.5 px-1">
+              {EDITOR_PAGES.map((page) => (
+                <li key={page.id}>
+                  <button
+                    type="button"
+                    onClick={() => onPageChange(page.id)}
+                    className={cn(
+                      "flex w-full items-center rounded-[var(--ed-radius)] px-2.5 py-1.5 text-start text-[12.5px] transition",
+                      activePage === page.id
+                        ? "bg-[color:var(--ed-bg-active)] text-[color:var(--ed-fg)]"
+                        : "text-[color:var(--ed-muted)] hover:bg-[color:var(--ed-bg-hover)] hover:text-[color:var(--ed-fg)]",
+                    )}
+                  >
+                    {page.label[locale]}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         ) : (
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={onAddSection}
-              className="editor-add-section"
-            >
-              <Plus size={14} />
-              {dict.editor.addSection}
-            </button>
+          <div className="space-y-2">
+            <div className="px-1">
+              <button
+                type="button"
+                onClick={onAddSection}
+                className="editor-add-section"
+              >
+                <Plus size={14} />
+                {dict.editor.addSection}
+              </button>
+            </div>
 
             {config.sections.length > 0 ? (
-              <label className="editor-search-field">
-                <Search size={13} />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={dict.editor.searchSections}
-                  className="min-w-0 flex-1 bg-transparent text-[12px] text-[color:var(--ed-fg)] outline-none placeholder:text-[color:var(--ed-subtle)]"
-                />
-              </label>
+              <>
+                <p className="editor-panel-label">{dict.editor.sections}</p>
+                <label className="editor-search-field mx-1">
+                  <Search size={13} />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={dict.editor.searchSections}
+                    className="min-w-0 flex-1 bg-transparent text-[12px] text-[color:var(--ed-fg)] outline-none placeholder:text-[color:var(--ed-subtle)]"
+                  />
+                </label>
+              </>
             ) : null}
 
             {config.sections.length === 0 ? (
-              <div className="rounded-xl border border-white/[0.06] px-3 py-8 text-center">
+              <div className="px-3 py-8 text-center">
                 <p className="text-[13px] text-[color:var(--ed-fg)]">
                   {dict.editor.emptySections}
                 </p>
@@ -199,7 +208,7 @@ export function EditorSidebar({
                 {dict.editor.noSectionsMatch}
               </p>
             ) : (
-              <ul className="space-y-0.5">
+              <ul className="space-y-0.5 px-0.5">
                 {filteredSections.map((section) => {
                   const index = config.sections.findIndex(
                     (s) => s.id === section.id,
@@ -255,14 +264,26 @@ export function EditorSidebar({
                         >
                           <span
                             className={cn(
+                              "inline-flex max-w-full items-center gap-1.5",
                               !section.visible &&
                                 "text-[color:var(--ed-subtle)] line-through",
                             )}
                           >
-                            {sectionLabel(
-                              section.type as WebsiteSectionType,
-                              locale,
-                            )}
+                            {(() => {
+                              const Icon = sectionTypeIcon(section.type);
+                              return (
+                                <Icon
+                                  size={12}
+                                  className="shrink-0 text-[color:var(--ed-subtle)]"
+                                />
+                              );
+                            })()}
+                            <span className="truncate">
+                              {sectionLabel(
+                                section.type as WebsiteSectionType,
+                                locale,
+                              )}
+                            </span>
                           </span>
                         </button>
                         <button

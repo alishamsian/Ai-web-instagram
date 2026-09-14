@@ -4,6 +4,8 @@ import type { EditorFieldPath } from "@/components/editor/EditContext";
 export type EditorSectionTab = "content" | "layout" | "style";
 export type EditorSiteGroup = "style" | "content" | "site";
 export type EditorLeftNav = "pages" | "sections" | "layers";
+export type EditorZoomMode = "fit" | "75" | "100";
+export type EditorPanelWidth = "narrow" | "normal" | "wide";
 
 export type EditorUiPersisted = {
   viewport?: EditorViewportId;
@@ -12,6 +14,10 @@ export type EditorUiPersisted = {
   leftNav?: EditorLeftNav;
   sectionTab?: EditorSectionTab;
   siteGroup?: EditorSiteGroup;
+  zoom?: EditorZoomMode;
+  panelWidth?: EditorPanelWidth;
+  inspectorLight?: boolean;
+  splitPreview?: boolean;
 };
 
 const PREFIX = "vitrin-editor-ui:";
@@ -45,6 +51,20 @@ export function saveEditorUiState(
   } catch {
     // quota / private mode — ignore
   }
+}
+
+export function panelWidthPx(
+  side: "left" | "right",
+  width: EditorPanelWidth,
+): number {
+  if (side === "left") {
+    if (width === "narrow") return 220;
+    if (width === "wide") return 300;
+    return 260;
+  }
+  if (width === "narrow") return 300;
+  if (width === "wide") return 380;
+  return 336;
 }
 
 /** Map canvas EditorFieldPath → schema path like content.hero.headline */
