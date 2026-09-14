@@ -1,7 +1,7 @@
 /**
- * Lightweight entity ID factory for editor commands.
- * Commands are deterministic when an explicit `id` is supplied in the input.
- * When omitted, `createEntityId` uses the active factory (default: time+counter).
+ * Lightweight entity ID helpers for editor commands and legacy normalization.
+ * Commands may still use the runtime factory for newly-created entities, while
+ * legacy normalization must use stable content-derived identities.
  */
 
 export type EntityIdFactory = (prefix: string) => string;
@@ -23,6 +23,19 @@ export function setEntityIdFactory(factory: EntityIdFactory | null) {
 
 export function createEntityId(prefix: string): string {
   return activeFactory(prefix);
+}
+
+/**
+ * Deterministic ID for legacy records that do not have an identity.
+ * The same prefix + seed always produces the same ID without runtime state.
+ */
+export function createLegacyEntityId(prefix: string, seed: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${prefix}-${(hash >>> 0).toString(36)}`;
 }
 
 /** Sequential factory for tests — createEntityId("faq") → faq-1, faq-2, … */
