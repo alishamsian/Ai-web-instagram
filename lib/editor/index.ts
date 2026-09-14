@@ -31,6 +31,7 @@ export {
   commandDuplicateSection,
   commandMoveSection,
   commandReorderSections,
+  commandReorderSectionRelative,
   commandSetBrandColor,
   commandSetBrandDesign,
   commandSetBrandTypography,
@@ -38,6 +39,7 @@ export {
   commandSetSchemaValue,
   commandSetSeoField,
   commandToggleSection,
+  pinFooterLast,
   readContentPath,
 } from "@/lib/editor/commands";
 

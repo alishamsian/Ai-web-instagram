@@ -146,11 +146,21 @@ export function EditorShell({
   const skipHistory = useRef(false);
   const debounceRef = useRef<number | null>(null);
   const autosaveRef = useRef<number | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
   const saveQueue = useRef(Promise.resolve());
   const configRef = useRef(config);
   const savedConfigRef = useRef(savedConfig);
+  const dirtyRef = useRef(false);
   const historyRef = useRef(history);
   const historyIndexRef = useRef(0);
+  const undoRef = useRef<() => void>(() => undefined);
+  const redoRef = useRef<() => void>(() => undefined);
+  const saveRef = useRef<(snapshot?: WebsiteConfig) => Promise<boolean>>(
+    async () => true,
+  );
+  const applyConfigRef = useRef<(next: WebsiteConfig, label?: string) => void>(
+    () => undefined,
+  );
 
   useEffect(() => {
     historyRef.current = history;
@@ -163,6 +173,10 @@ export function EditorShell({
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
   const isPublished = status === "published";
+
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
 
   useEffect(() => {
     const phone = window.matchMedia("(max-width: 767px)");
@@ -181,8 +195,27 @@ export function EditorShell({
 
   function flashMessage(message: string, ms = 2000) {
     setFlash(message);
-    window.setTimeout(() => setFlash(null), ms);
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => {
+      setFlash(null);
+      flashTimerRef.current = null;
+    }, ms);
   }
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current);
+    };
+  }, []);
+
+  // Drop stale selection if the section no longer exists (delete / undo / template).
+  useEffect(() => {
+    if (!selectedSectionId) return;
+    if (!config.sections.some((s) => s.id === selectedSectionId)) {
+      setSelectedSectionId(undefined);
+      setSelectedField(undefined);
+    }
+  }, [config.sections, selectedSectionId]);
 
   useEffect(() => {
     const saved = loadEditorUiState(website.id);
@@ -286,10 +319,7 @@ export function EditorShell({
   }
 
   function redo() {
-    if (debounceRef.current) {
-      window.clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
+    if (debounceRef.current) commitHistory(config, pendingLabel);
     const result = redoHistory({
       entries: historyRef.current,
       index: historyIndexRef.current,
@@ -305,6 +335,10 @@ export function EditorShell({
   }
 
   function restoreHistory(index: number) {
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
     const result = restoreHistoryIndex({ entries: history, index });
     if (!result.config) return;
     skipHistory.current = true;
@@ -315,23 +349,30 @@ export function EditorShell({
   }
 
   const save = useCallback(async (snapshot?: WebsiteConfig) => {
-    const payload = snapshot ?? configRef.current;
-    if (configsEqual(payload, savedConfigRef.current)) return true;
+    const immediate = snapshot ?? configRef.current;
+    if (configsEqual(immediate, savedConfigRef.current)) return true;
 
     setSavePhase("saving");
     const run = async () => {
+      // Prefer latest live config for autosave; keep explicit snapshot for publish paths.
+      const toSave =
+        snapshot !== undefined ? snapshot : configRef.current;
+      if (configsEqual(toSave, savedConfigRef.current)) {
+        setSavePhase("idle");
+        return true;
+      }
       try {
         const response = await fetch(`/api/websites/${website.id}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ config: payload }),
+          body: JSON.stringify({ config: toSave }),
         });
         if (!response.ok) {
           setSavePhase("error");
           flashMessage(dict.editor.saveFailed);
           return false;
         }
-        const cloned = cloneConfig(payload);
+        const cloned = cloneConfig(toSave);
         savedConfigRef.current = cloned;
         setSavedConfig(cloned);
         setSavedAt(Date.now());
@@ -354,10 +395,17 @@ export function EditorShell({
   }, [dict.editor.saveFailed, router, website.id]);
 
   useEffect(() => {
+    undoRef.current = undo;
+    redoRef.current = redo;
+    saveRef.current = save;
+    applyConfigRef.current = applyConfig;
+  });
+
+  useEffect(() => {
     if (!dirty) return;
     if (autosaveRef.current) window.clearTimeout(autosaveRef.current);
     autosaveRef.current = window.setTimeout(() => {
-      void save(configRef.current);
+      void saveRef.current();
     }, AUTOSAVE_MS);
     return () => {
       if (autosaveRef.current) window.clearTimeout(autosaveRef.current);
@@ -366,13 +414,32 @@ export function EditorShell({
 
   useEffect(() => {
     function onBeforeUnload(event: BeforeUnloadEvent) {
-      if (!dirty) return;
+      if (!dirtyRef.current) return;
       event.preventDefault();
       event.returnValue = "";
     }
+    function onPageHide() {
+      if (!dirtyRef.current) return;
+      const payload = configRef.current;
+      if (configsEqual(payload, savedConfigRef.current)) return;
+      try {
+        void fetch(`/api/websites/${website.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ config: payload }),
+          keepalive: true,
+        });
+      } catch {
+        // Best-effort flush; beforeunload already warns.
+      }
+    }
     window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [website.id]);
 
   function handleSectionAction(sectionId: string, action: SectionAction) {
     let result = null;
@@ -817,13 +884,13 @@ export function EditorShell({
 
   useEffect(() => {
     function onUndo() {
-      undo();
+      undoRef.current();
     }
     function onRedo() {
-      redo();
+      redoRef.current();
     }
     function onSave() {
-      void save();
+      void saveRef.current();
     }
     function onSection(event: Event) {
       const detail = (event as CustomEvent<{ id: string; action: SectionAction }>)
@@ -843,9 +910,12 @@ export function EditorShell({
         result = commandMoveSection(current, detail.id, "down");
       }
       if (!result) return;
-      applyConfig(result.config, result.label);
+      applyConfigRef.current(result.config, result.label);
       if (result.selectedSectionId !== undefined) {
         setSelectedSectionId(result.selectedSectionId ?? undefined);
+      }
+      if (detail.action === "delete") {
+        setSelectedField(undefined);
       }
     }
     function onAiRestyle(event: Event) {
@@ -861,7 +931,7 @@ export function EditorShell({
         const applied = applyEditorAction(next, action);
         if (applied.ok) next = applied.result.config;
       }
-      applyConfig(next, `AI restyle ${direction}`);
+      applyConfigRef.current(next, `AI restyle ${direction}`);
     }
     window.addEventListener("vitrin-editor-undo", onUndo);
     window.addEventListener("vitrin-editor-redo", onRedo);
@@ -875,7 +945,6 @@ export function EditorShell({
       window.removeEventListener("vitrin-editor-section", onSection);
       window.removeEventListener("vitrin-editor-ai-restyle", onAiRestyle);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canvas = (
@@ -1027,6 +1096,15 @@ export function EditorShell({
           href={`/${locale}/dashboard/website?id=${website.id}`}
           className="editor-icon-btn shrink-0"
           aria-label={dict.editor.back}
+          onClick={(event) => {
+            if (!dirtyRef.current) return;
+            const ok = window.confirm(
+              locale === "fa"
+                ? "تغییرات ذخیره‌نشده داری. خارج می‌شوی؟"
+                : "You have unsaved changes. Leave anyway?",
+            );
+            if (!ok) event.preventDefault();
+          }}
         >
           <ArrowLeft size={16} />
         </Link>

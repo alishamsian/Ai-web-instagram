@@ -1,4 +1,5 @@
 import type {
+  SectionConfig,
   TemplateType,
   WebsiteConfig,
   WebsiteSectionType,
@@ -14,6 +15,14 @@ import {
   type ElementFieldSchema,
 } from "@/lib/store/registry/element-schema";
 import { applyDesignPreset, type DesignPresetId } from "@/components/editor/editor-presets";
+
+/** Keep footer sections pinned to the end after any reorder/move. */
+export function pinFooterLast(sections: SectionConfig[]): SectionConfig[] {
+  const footers = sections.filter((s) => s.type === "footer");
+  if (footers.length === 0) return sections;
+  const rest = sections.filter((s) => s.type !== "footer");
+  return [...rest, ...footers];
+}
 
 export function commandToggleSection(
   config: WebsiteConfig,
@@ -57,6 +66,7 @@ export function commandDuplicateSection(
   const index = config.sections.findIndex((s) => s.id === sectionId);
   const section = config.sections[index];
   if (!section) return null;
+  if (section.type === "footer") return null;
   const copy = {
     ...cloneWebsiteConfig({ ...config, sections: [section] }).sections[0]!,
     id: `${section.type}-${Date.now().toString(36)}`,
@@ -64,7 +74,7 @@ export function commandDuplicateSection(
   const sections = [...config.sections];
   sections.splice(index + 1, 0, copy);
   return {
-    config: { ...config, sections },
+    config: { ...config, sections: pinFooterLast(sections) },
     label: `Duplicate ${section.type}`,
     selectedSectionId: copy.id,
   };
@@ -77,13 +87,19 @@ export function commandMoveSection(
 ): EditorCommandResult | null {
   const index = config.sections.findIndex((s) => s.id === sectionId);
   if (index < 0) return null;
+  const section = config.sections[index];
+  if (!section || section.type === "footer") return null;
   const target = direction === "up" ? index - 1 : index + 1;
   if (target < 0 || target >= config.sections.length) return null;
+  // Don't swap past/into the final footer slot in a way that leaves footer mid-page
+  if (config.sections[target]?.type === "footer" && direction === "down") {
+    return null;
+  }
   const sections = [...config.sections];
   const [item] = sections.splice(index, 1);
   sections.splice(target, 0, item!);
   return {
-    config: { ...config, sections },
+    config: { ...config, sections: pinFooterLast(sections) },
     label: `Move ${item!.type} ${direction}`,
   };
 }
@@ -102,11 +118,12 @@ export function commandReorderSections(
   ) {
     return null;
   }
+  if (config.sections[fromIndex]?.type === "footer") return null;
   const sections = [...config.sections];
   const [item] = sections.splice(fromIndex, 1);
   sections.splice(toIndex, 0, item!);
   return {
-    config: { ...config, sections },
+    config: { ...config, sections: pinFooterLast(sections) },
     label: `Reorder ${item!.type}`,
   };
 }
@@ -119,6 +136,8 @@ export function commandReorderSectionRelative(
   place: "before" | "after",
 ): EditorCommandResult | null {
   if (fromId === toId) return null;
+  const fromSection = config.sections.find((s) => s.id === fromId);
+  if (!fromSection || fromSection.type === "footer") return null;
   const sections = [...config.sections];
   const fromIndex = sections.findIndex((s) => s.id === fromId);
   if (fromIndex < 0) return null;
@@ -129,7 +148,7 @@ export function commandReorderSectionRelative(
   if (place === "after") insertAt += 1;
   sections.splice(insertAt, 0, item);
   return {
-    config: { ...config, sections },
+    config: { ...config, sections: pinFooterLast(sections) },
     label: `Reorder ${item.type}`,
     selectedSectionId: fromId,
   };

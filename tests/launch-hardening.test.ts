@@ -78,4 +78,48 @@ describe("launch hardening helpers", () => {
   it("allows mock services outside production by default", () => {
     expect(typeof allowMockServices()).toBe("boolean");
   });
+
+  it("rejects unknown design preset ids safely", async () => {
+    const { applyDesignPreset } = await import(
+      "@/components/editor/editor-presets"
+    );
+    const base = {
+      template: "store" as const,
+      brand: {
+        name: "X",
+        colors: {
+          primary: "#111111",
+          secondary: "#FFFFFF",
+          accent: "#222222",
+          background: "#FAFAFA",
+          foreground: "#111111",
+          muted: "#EEEEEE",
+        },
+        typography: {
+          heading: "sans" as const,
+          body: "sans" as const,
+          scale: "compact" as const,
+        },
+      },
+      content: {
+        hero: {
+          style: "minimal" as const,
+          headline: "H",
+          subheadline: "S",
+          cta: "C",
+        },
+      },
+      sections: [],
+      seo: { title: "", description: "", keywords: [] },
+      settings: {
+        language: "en" as const,
+        direction: "ltr" as const,
+        showBranding: true,
+        published: false,
+      },
+      media: {},
+    };
+    const next = applyDesignPreset(base, "not-real" as never);
+    expect(next).toEqual(base);
+  });
 });

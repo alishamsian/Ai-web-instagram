@@ -971,6 +971,11 @@
   outline: 2px solid var(--ed-accent);
   outline-offset: 2px;
 }
+.editor-section-toolbar-btn:focus-visible,
+.editor-section-drag-handle:focus-visible {
+  outline: 2px solid var(--ed-accent);
+  outline-offset: 1px;
+}
 
 .editor-canvas-empty {
   display: flex;

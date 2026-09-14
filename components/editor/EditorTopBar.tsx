@@ -180,6 +180,15 @@ export function EditorTopBar({
           className="editor-icon-btn"
           title={backLabel}
           aria-label={backLabel}
+          onClick={(event) => {
+            if (!dirty) return;
+            const ok = window.confirm(
+              locale === "fa"
+                ? "تغییرات ذخیره‌نشده داری. خارج می‌شوی؟"
+                : "You have unsaved changes. Leave anyway?",
+            );
+            if (!ok) event.preventDefault();
+          }}
         >
           <ArrowLeft size={15} />
         </Link>

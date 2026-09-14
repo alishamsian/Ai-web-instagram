@@ -81,6 +81,7 @@ export function EditorSectionFrame({
     function onEnd() {
       setDragging(false);
       setDropEdge(null);
+      canvasDragSectionId = null;
     }
     window.addEventListener("dragend", onEnd);
     return () => window.removeEventListener("dragend", onEnd);

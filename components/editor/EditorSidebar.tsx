@@ -8,6 +8,12 @@ import type { EditorFieldPath } from "@/components/editor/EditContext";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { SECTION_LAYER_BLOCKS } from "@/components/editor/editor-selection";
 import { sectionTypeIcon } from "@/components/editor/section-icons";
+import {
+  commandDeleteSection,
+  commandDuplicateSection,
+  commandReorderSections,
+  commandToggleSection,
+} from "@/lib/editor/commands";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -93,34 +99,33 @@ export function EditorSidebar({
   }, [selectedSectionId, selectedField]);
 
   function reorder(from: number, to: number) {
-    if (from === to || from < 0 || to < 0) return;
-    const sections = [...config.sections];
-    const [item] = sections.splice(from, 1);
-    if (!item) return;
-    sections.splice(to, 0, item);
-    onChange({ ...config, sections });
+    const result = commandReorderSections(config, from, to);
+    if (!result) return;
+    onChange(result.config);
   }
 
   function duplicateSection(sectionId: string) {
-    const index = config.sections.findIndex((s) => s.id === sectionId);
-    const section = config.sections[index];
-    if (!section) return;
-    const copy = {
-      ...section,
-      id: `${section.type}-${Date.now().toString(36)}`,
-    };
-    const sections = [...config.sections];
-    sections.splice(index + 1, 0, copy);
-    onChange({ ...config, sections });
-    onSelectSection(copy.id);
+    const result = commandDuplicateSection(config, sectionId);
+    if (!result) return;
+    onChange(result.config);
+    if (result.selectedSectionId) {
+      onSelectSection(result.selectedSectionId);
+    }
   }
 
   function deleteSection(sectionId: string) {
-    onChange({
-      ...config,
-      sections: config.sections.filter((s) => s.id !== sectionId),
-    });
-    if (selectedSectionId === sectionId) onSelectSection(undefined);
+    const result = commandDeleteSection(config, sectionId);
+    if (!result) return;
+    onChange(result.config);
+    if (result.selectedSectionId !== undefined) {
+      onSelectSection(result.selectedSectionId ?? undefined);
+    }
+  }
+
+  function toggleSection(sectionId: string) {
+    const result = commandToggleSection(config, sectionId);
+    if (!result) return;
+    onChange(result.config);
   }
 
   return (
@@ -289,14 +294,7 @@ export function EditorSidebar({
                         <button
                           type="button"
                           className="inline-flex size-7 items-center justify-center rounded-md text-[color:var(--ed-subtle)] opacity-0 transition hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)] group-hover:opacity-100"
-                          onClick={() => {
-                            const sections = [...config.sections];
-                            sections[index] = {
-                              ...section,
-                              visible: !section.visible,
-                            };
-                            onChange({ ...config, sections });
-                          }}
+                          onClick={() => toggleSection(section.id)}
                           aria-label={
                             section.visible
                               ? dict.editor.sectionVisible
@@ -319,28 +317,33 @@ export function EditorSidebar({
                               )
                             }
                             aria-label="More"
+                            aria-expanded={menuId === section.id}
                           >
                             <MoreHorizontal size={13} />
                           </button>
                           {menuId === section.id ? (
-                            <div className="editor-more-menu">
-                              <MenuItem
-                                icon={<Copy size={13} />}
-                                label={dict.editor.duplicate}
-                                onClick={() => {
-                                  duplicateSection(section.id);
-                                  setMenuId(null);
-                                }}
-                              />
-                              <MenuItem
-                                icon={<Trash2 size={13} />}
-                                label={dict.editor.delete}
-                                danger
-                                onClick={() => {
-                                  deleteSection(section.id);
-                                  setMenuId(null);
-                                }}
-                              />
+                            <div className="editor-more-menu" role="menu">
+                              {section.type !== "footer" ? (
+                                <MenuItem
+                                  icon={<Copy size={13} />}
+                                  label={dict.editor.duplicate}
+                                  onClick={() => {
+                                    duplicateSection(section.id);
+                                    setMenuId(null);
+                                  }}
+                                />
+                              ) : null}
+                              {section.type !== "footer" ? (
+                                <MenuItem
+                                  icon={<Trash2 size={13} />}
+                                  label={dict.editor.delete}
+                                  danger
+                                  onClick={() => {
+                                    deleteSection(section.id);
+                                    setMenuId(null);
+                                  }}
+                                />
+                              ) : null}
                             </div>
                           ) : null}
                         </div>

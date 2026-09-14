@@ -7,8 +7,13 @@ import {
   createHistoryEntry,
   commandToggleSection,
   commandDuplicateSection,
+  commandDeleteSection,
+  commandMoveSection,
   commandReorderSections,
+  commandReorderSectionRelative,
   commandAddSection,
+  commandApplyTemplate,
+  commandApplyThemePreset,
   commandSetContentPath,
   applyEditorAction,
   resolveResponsiveValue,
@@ -20,6 +25,7 @@ import {
   isProductProtectedAction,
   resolveEditorKeyCommand,
   viewportWidth,
+  pinFooterLast,
 } from "@/lib/editor";
 import {
   resetRegistryForTests,
@@ -36,6 +42,7 @@ import {
 } from "@/lib/store/recipes";
 import { ensureStoreSectionRenderersBound } from "@/components/store/bind-store-renderers";
 import { applyDesignPreset } from "@/components/editor/editor-presets";
+import { applyTemplate } from "@/components/editor/editor-utils";
 import { inferStoreMood } from "@/lib/store/theme";
 
 beforeEach(() => {
@@ -83,7 +90,7 @@ function baseConfig(): WebsiteConfig {
       },
     },
     sections: [
-      { id: "hero-1", type: "hero", visible: true },
+      { id: "hero-1", type: "hero", visible: true, settings: { spacing: "comfortable" } },
       { id: "products-1", type: "products", visible: true },
       { id: "footer-1", type: "footer", visible: true },
     ],
@@ -130,6 +137,39 @@ describe("editor history", () => {
     const redone = redoHistory({ entries, index });
     expect(redone.config?.content.hero.headline).toBe("New");
   });
+
+  it("keeps a single history entry per push and supports multi-step undo", () => {
+    let entries = [createHistoryEntry(baseConfig(), "Initial")];
+    let index = 0;
+
+    const a = commandApplyThemePreset(baseConfig(), "luxury");
+    const pushA = pushHistory({
+      entries,
+      index,
+      next: a.config,
+      label: a.label,
+    });
+    entries = pushA.entries;
+    index = pushA.index;
+
+    const b = commandSetContentPath(a.config, "content.hero.headline", "Lux");
+    expect(b).not.toBeNull();
+    const pushB = pushHistory({
+      entries,
+      index,
+      next: b!.config,
+      label: b!.label,
+    });
+    entries = pushB.entries;
+    index = pushB.index;
+    expect(entries).toHaveLength(3);
+
+    const u1 = undoHistory({ entries, index });
+    index = u1.index;
+    expect(u1.config?.content.hero.headline).toBe("Aura");
+    const u2 = undoHistory({ entries, index });
+    expect(u2.config?.settings.mood).not.toBe("luxury");
+  });
 });
 
 describe("editor commands", () => {
@@ -144,15 +184,61 @@ describe("editor commands", () => {
 
     const dup = commandDuplicateSection(config, "products-1");
     expect(dup?.config.sections).toHaveLength(4);
+    expect(dup?.selectedSectionId).toBeTruthy();
+    expect(dup?.config.sections.at(-1)?.type).toBe("footer");
 
     const reordered = commandReorderSections(config, 0, 2);
-    expect(reordered?.config.sections[2]?.type).toBe("hero");
+    expect(reordered?.config.sections.at(-1)?.type).toBe("footer");
   });
 
-  it("rejects unknown section types", () => {
+  it("protects footer from delete and duplicate", () => {
+    expect(commandDeleteSection(baseConfig(), "footer-1")).toBeNull();
+    expect(commandDuplicateSection(baseConfig(), "footer-1")).toBeNull();
+    expect(commandMoveSection(baseConfig(), "footer-1", "up")).toBeNull();
+  });
+
+  it("clears selection on delete and selects on duplicate/add", () => {
+    const deleted = commandDeleteSection(baseConfig(), "products-1");
+    expect(deleted?.selectedSectionId).toBeNull();
+
+    const dup = commandDuplicateSection(baseConfig(), "hero-1");
+    expect(dup?.selectedSectionId).toMatch(/^hero-/);
+    expect(dup?.config.sections.filter((s) => s.type === "hero")).toHaveLength(2);
+
+    const added = commandAddSection(baseConfig(), "about", {
+      afterSectionId: "hero-1",
+    });
+    expect(added?.selectedSectionId).toBeTruthy();
+    const ids = added!.config.sections.map((s) => s.id);
+    expect(ids.indexOf(added!.selectedSectionId!)).toBeGreaterThan(
+      ids.indexOf("hero-1"),
+    );
+    expect(added!.config.sections.at(-1)?.type).toBe("footer");
+  });
+
+  it("reorders relatively and keeps footer last", () => {
+    const relative = commandReorderSectionRelative(
+      baseConfig(),
+      "products-1",
+      "hero-1",
+      "before",
+    );
+    expect(relative?.config.sections[0]?.id).toBe("products-1");
+    expect(relative?.config.sections.at(-1)?.type).toBe("footer");
+    expect(relative?.selectedSectionId).toBe("products-1");
+
+    expect(
+      commandReorderSectionRelative(baseConfig(), "footer-1", "hero-1", "before"),
+    ).toBeNull();
+    expect(commandReorderSections(baseConfig(), 2, 0)).toBeNull();
+  });
+
+  it("rejects unknown section types and invalid ids", () => {
     expect(
       commandAddSection(baseConfig(), "not-a-section" as never),
     ).toBeNull();
+    expect(commandDeleteSection(baseConfig(), "missing")).toBeNull();
+    expect(commandToggleSection(baseConfig(), "missing")).toBeNull();
     expect(hasSection("hero")).toBe(true);
   });
 
@@ -169,18 +255,77 @@ describe("editor commands", () => {
   });
 });
 
+describe("templates + presets", () => {
+  it("applies template without losing section settings and keeps unique ids", () => {
+    const next = applyTemplate(baseConfig(), "portfolio");
+    const hero = next.sections.find((s) => s.type === "hero");
+    expect(hero?.settings?.spacing).toBe("comfortable");
+    expect(next.template).toBe("portfolio");
+    expect(next.content.hero.headline).toBe("Aura");
+    const ids = next.sections.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const cmd = commandApplyTemplate(baseConfig(), "creator");
+    expect(cmd.config.template).toBe("creator");
+    const pushed = pushHistory({
+      entries: [createHistoryEntry(baseConfig(), "Initial")],
+      index: 0,
+      next: cmd.config,
+      label: cmd.label,
+    });
+    const undone = undoHistory({
+      entries: pushed.entries,
+      index: pushed.index,
+    });
+    expect(undone.config?.template).toBe("store");
+  });
+
+  it("preserves content when applying design presets", () => {
+    const next = applyDesignPreset(baseConfig(), "luxury");
+    expect(next.content.hero.headline).toBe("Aura");
+    expect(next.content.products?.items[0]?.name).toBe("Serum");
+    expect(next.settings.mood).toBe("luxury");
+    expect(next.brand.design?.radius).toBe("sharp");
+
+    const viaCommand = commandApplyThemePreset(baseConfig(), "soft");
+    expect(viaCommand.config.brand.colors.background).not.toBe(
+      baseConfig().brand.colors.background,
+    );
+    expect(viaCommand.config.content.hero.cta).toBe("Shop");
+  });
+});
+
 describe("responsive model", () => {
   it("inherits and resets overrides", () => {
     const value = setResponsiveOverride(48, "mobile", 32);
-    expect(
-      resolveResponsiveValue(value, "mobile").value,
-    ).toBe(32);
+    expect(resolveResponsiveValue(value, "mobile").value).toBe(32);
     expect(resolveResponsiveValue(value, "mobile").inherited).toBe(false);
     expect(resolveResponsiveValue(value, "tablet").inherited).toBe(true);
     expect(resolveResponsiveValue(value, "desktop").value).toBe(48);
 
     const reset = resetResponsiveOverride(value, "mobile");
     expect(resolveResponsiveValue(reset, "mobile").inherited).toBe(true);
+  });
+
+  it("keeps tablet override separate from mobile", () => {
+    let value = setResponsiveOverride(20, "tablet", 18);
+    value = setResponsiveOverride(value, "mobile", 14);
+    expect(resolveResponsiveValue(value, "desktop").value).toBe(20);
+    expect(resolveResponsiveValue(value, "tablet").value).toBe(18);
+    expect(resolveResponsiveValue(value, "mobile").value).toBe(14);
+    const resetTablet = resetResponsiveOverride(value, "tablet");
+    expect(resolveResponsiveValue(resetTablet, "tablet").value).toBe(20);
+    expect(resolveResponsiveValue(resetTablet, "mobile").value).toBe(14);
+  });
+});
+
+describe("pinFooterLast", () => {
+  it("moves footers to the end", () => {
+    const pinned = pinFooterLast([
+      { id: "f", type: "footer", visible: true },
+      { id: "h", type: "hero", visible: true },
+    ]);
+    expect(pinned.map((s) => s.type)).toEqual(["hero", "footer"]);
   });
 });
 
@@ -253,6 +398,12 @@ describe("viewport + keyboard", () => {
         { typing: false, hasSelection: false },
       ),
     ).toBe("undo");
+    expect(
+      resolveEditorKeyCommand(
+        { key: "d", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false },
+        { typing: false, hasSelection: true },
+      ),
+    ).toBe("duplicateSection");
     expect(
       resolveEditorKeyCommand(
         { key: "k", metaKey: true, ctrlKey: false, shiftKey: false, altKey: false },

@@ -148,6 +148,8 @@ export function applyTemplate(
       id: prev?.id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`,
       type,
       visible: prev?.visible ?? true,
+      ...(prev?.variant ? { variant: prev.variant } : {}),
+      ...(prev?.settings ? { settings: { ...prev.settings } } : {}),
     };
   });
 
