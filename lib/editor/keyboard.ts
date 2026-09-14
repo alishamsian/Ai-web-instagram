@@ -6,6 +6,7 @@ export type EditorKeyCommand =
   | "commandPalette"
   | "escape"
   | "deleteSection"
+  | "duplicateSection"
   | "focusMode";
 
 export function resolveEditorKeyCommand(
@@ -28,7 +29,6 @@ export function resolveEditorKeyCommand(
     return "deleteSection";
   }
 
-  // ⌘\ or Ctrl+\ — focus mode
   if (meta && (key === "\\" || key === "Backslash")) {
     return "focusMode";
   }
@@ -40,6 +40,14 @@ export function resolveEditorKeyCommand(
   if (key === "z" && event.shiftKey) return "redo";
   if (key.toLowerCase() === "s") return "save";
   if (key.toLowerCase() === "p") return "preview";
+  if (
+    key.toLowerCase() === "d" &&
+    !event.shiftKey &&
+    !options.typing &&
+    options.hasSelection
+  ) {
+    return "duplicateSection";
+  }
 
   return null;
 }

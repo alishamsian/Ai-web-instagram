@@ -53,6 +53,7 @@ import {
   commandDeleteSection,
   commandDuplicateSection,
   commandMoveSection,
+  commandReorderSections,
   applyEditorAction,
   proposeEditorActions,
   loadEditorUiState,
@@ -389,6 +390,29 @@ export function EditorShell({
     if (result.selectedSectionId !== undefined) {
       setSelectedSectionId(result.selectedSectionId ?? undefined);
     }
+    if (action === "delete") {
+      setSelectedField(undefined);
+    }
+  }
+
+  function handleReorderSections(
+    fromId: string,
+    toId: string,
+    place: "before" | "after",
+  ) {
+    const fromIndex = config.sections.findIndex((s) => s.id === fromId);
+    const toIndex = config.sections.findIndex((s) => s.id === toId);
+    if (fromIndex < 0 || toIndex < 0 || fromId === toId) return;
+
+    let target = place === "before" ? toIndex : toIndex + 1;
+    if (fromIndex < target) target -= 1;
+    if (target === fromIndex) return;
+
+    const result = commandReorderSections(config, fromIndex, target);
+    if (!result) return;
+    applyConfig(result.config, result.label);
+    setSelectedSectionId(fromId);
+    flashMessage(result.label, 1200);
   }
 
   useEffect(() => {
@@ -406,6 +430,11 @@ export function EditorShell({
       if (!command) return;
 
       if (command === "escape") {
+        if (typing) {
+          event.preventDefault();
+          (document.activeElement as HTMLElement | null)?.blur?.();
+          return;
+        }
         if (focusMode) {
           setFocusMode(false);
           return;
@@ -431,6 +460,12 @@ export function EditorShell({
       if (command === "deleteSection" && selectedSectionId) {
         event.preventDefault();
         handleSectionAction(selectedSectionId, "delete");
+        return;
+      }
+
+      if (command === "duplicateSection" && selectedSectionId) {
+        event.preventDefault();
+        handleSectionAction(selectedSectionId, "duplicate");
         return;
       }
 
@@ -853,6 +888,7 @@ export function EditorShell({
       onSelectSection={(id) => selectSection(id)}
       onHoverSection={setHoveredSectionId}
       onSectionAction={handleSectionAction}
+      onReorderSections={handleReorderSections}
     >
       <WebsiteRenderer
         config={config}
@@ -1135,6 +1171,11 @@ export function EditorShell({
           )}
           onClick={(event) => {
             if ((event.target as HTMLElement).closest("[data-editor-section]")) {
+              return;
+            }
+            if (
+              (event.target as HTMLElement).closest("[data-editor-editable]")
+            ) {
               return;
             }
             if (

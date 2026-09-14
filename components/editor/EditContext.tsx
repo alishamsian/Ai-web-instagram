@@ -4,7 +4,12 @@ import {
   createContext,
   useContext,
   useCallback,
+  useEffect,
+  useRef,
+  useState,
   type ReactNode,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { WebsiteConfig } from "@/types/website";
 import { cn } from "@/lib/utils";
@@ -27,7 +32,14 @@ export type EditorFieldPath =
   | "promo.title"
   | "promo.cta";
 
-export type SectionAction = "duplicate" | "toggle" | "delete" | "move-up" | "move-down";
+export type SectionAction =
+  | "duplicate"
+  | "toggle"
+  | "delete"
+  | "move-up"
+  | "move-down";
+
+export type SectionDropPlace = "before" | "after";
 
 type EditorEditApi = {
   enabled: boolean;
@@ -40,6 +52,11 @@ type EditorEditApi = {
   onHoverSection: (sectionId: string | undefined) => void;
   onChangeText: (path: EditorFieldPath, value: string) => void;
   onSectionAction?: (sectionId: string, action: SectionAction) => void;
+  onReorderSections?: (
+    fromId: string,
+    toId: string,
+    place: SectionDropPlace,
+  ) => void;
   isSectionVisible?: (sectionId: string) => boolean;
 };
 
@@ -57,6 +74,7 @@ export function EditorEditProvider({
   onSelectSection,
   onHoverSection,
   onSectionAction,
+  onReorderSections,
   children,
 }: {
   enabled: boolean;
@@ -70,6 +88,11 @@ export function EditorEditProvider({
   onSelectSection: (sectionId: string | undefined) => void;
   onHoverSection: (sectionId: string | undefined) => void;
   onSectionAction?: (sectionId: string, action: SectionAction) => void;
+  onReorderSections?: (
+    fromId: string,
+    toId: string,
+    place: SectionDropPlace,
+  ) => void;
   children: ReactNode;
 }) {
   const onChangeText = useCallback(
@@ -138,7 +161,8 @@ export function EditorEditProvider({
 
   const isSectionVisible = useCallback(
     (sectionId: string) =>
-      config.sections.find((section) => section.id === sectionId)?.visible ?? true,
+      config.sections.find((section) => section.id === sectionId)?.visible ??
+      true,
     [config.sections],
   );
 
@@ -155,6 +179,7 @@ export function EditorEditProvider({
         onHoverSection,
         onChangeText,
         onSectionAction,
+        onReorderSections,
         isSectionVisible,
       }}
     >
@@ -167,6 +192,10 @@ export function useEditorEdit() {
   return useContext(EditorEditContext);
 }
 
+/**
+ * IDLE → SELECTED (click) → EDITING (double-click)
+ * Escape / blur exits editing. Single click never starts editing.
+ */
 export function EditableText({
   path,
   value,
@@ -181,39 +210,89 @@ export function EditableText({
   multiline?: boolean;
 }) {
   const edit = useEditorEdit();
+  const ref = useRef<HTMLElement | null>(null);
+  const [editing, setEditing] = useState(false);
+  const selected = Boolean(edit?.enabled && edit.selected === path);
+
+  useEffect(() => {
+    if (!selected && editing) setEditing(false);
+  }, [selected, editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const node = ref.current;
+    if (!node) return;
+    if (node.textContent !== value) {
+      node.textContent = value;
+    }
+    node.focus();
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    // Intentionally only when entering edit mode — not on every value change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
   if (!edit?.enabled || edit.mode !== "editor") {
     return <Tag className={className}>{value}</Tag>;
   }
 
+  function commit(text: string) {
+    if (text !== value) edit!.onChangeText(path, text);
+  }
+
+  function onClick(event: ReactMouseEvent) {
+    event.stopPropagation();
+    if (editing) return;
+    event.preventDefault();
+    edit!.onSelect(path);
+  }
+
+  function onDoubleClick(event: ReactMouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    edit!.onSelect(path);
+    setEditing(true);
+  }
+
+  function onKeyDown(event: ReactKeyboardEvent) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (ref.current) ref.current.textContent = value;
+      setEditing(false);
+      ref.current?.blur();
+      return;
+    }
+    if (!multiline && event.key === "Enter") {
+      event.preventDefault();
+      ref.current?.blur();
+    }
+  }
+
   return (
     <Tag
-      className={cn(
-        className,
-        "outline-none ring-offset-2 transition",
-        edit.selected === path && "ring-2 ring-[#FF6B57]/70",
-        "cursor-text hover:outline hover:outline-1 hover:outline-[#FF6B57]/40",
-      )}
-      contentEditable
+      ref={ref as never}
+      data-editor-editable={path}
+      data-selected={selected || undefined}
+      data-editing={editing || undefined}
+      className={cn("editor-editable", className)}
+      contentEditable={editing}
       suppressContentEditableWarning
-      onFocus={() => {
-        edit.onSelect(path);
-      }}
-      onDoubleClick={(event) => {
-        event.preventDefault();
-        edit.onSelect(path);
-      }}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
       onBlur={(event) => {
+        if (!editing) return;
         const text = event.currentTarget.textContent ?? "";
-        if (text !== value) edit.onChangeText(path, text);
+        commit(text);
+        setEditing(false);
       }}
-      onKeyDown={(event) => {
-        if (!multiline && event.key === "Enter") {
-          event.preventDefault();
-          event.currentTarget.blur();
-        }
-      }}
+      onKeyDown={onKeyDown}
     >
-      {value}
+      {editing ? null : value}
     </Tag>
   );
 }

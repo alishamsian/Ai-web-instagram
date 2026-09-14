@@ -28,6 +28,17 @@
   --ed-select-soft: rgba(107, 147, 240, 0.16);
   --ed-success: #34d399;
 
+  /* Phase 2 — interaction */
+  --ed-hover: rgba(107, 147, 240, 0.35);
+  --ed-selected: var(--ed-select);
+  --ed-focus: var(--ed-select);
+  --ed-drag: rgba(107, 147, 240, 0.55);
+  --ed-drop: #6b93f0;
+  --ed-disabled: rgba(255, 255, 255, 0.28);
+  --ed-pressed: rgba(255, 255, 255, 0.1);
+  --ed-edit: rgba(239, 99, 81, 0.55);
+  --ed-ix: 140ms ease;
+
   /* Geometry */
   --ed-radius: 6px;
   --ed-radius-sm: 4px;
@@ -365,28 +376,109 @@
 
 /* ── Selection chrome ── */
 .editor-section-selected {
-  outline: 1.5px solid var(--ed-select);
+  outline: 1.5px solid var(--ed-selected);
   outline-offset: -1.5px;
   box-shadow: 0 0 0 3px var(--ed-select-soft);
 }
 .editor-section-hover {
-  outline: 1px solid rgba(107, 147, 240, 0.4);
+  outline: 1px solid var(--ed-hover);
   outline-offset: -1px;
 }
+.editor-section-dragging {
+  opacity: 0.45;
+  outline: 1.5px dashed var(--ed-drag);
+  outline-offset: -1.5px;
+}
+.editor-section-drop-before::before,
+.editor-section-drop-after::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0.75rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ed-drop);
+  box-shadow: 0 0 0 3px rgba(107, 147, 240, 0.2);
+  z-index: 30;
+  pointer-events: none;
+}
+.editor-section-drop-before::before {
+  top: -1px;
+}
+.editor-section-drop-after::after {
+  bottom: -1px;
+}
+
 .editor-section-badge {
   border-radius: var(--ed-radius-sm);
-  background: rgba(12, 12, 14, 0.9);
+  background: rgba(12, 12, 14, 0.92);
   border: 1px solid rgba(107, 147, 240, 0.28);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(8px);
+  transition: opacity var(--ed-ix);
 }
 .editor-section-toolbar {
   border-radius: var(--ed-radius);
   border: 1px solid var(--ed-border-strong);
-  background: rgba(14, 14, 16, 0.94);
+  background: rgba(14, 14, 16, 0.96);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(10px);
   padding: 2px;
+  transition: opacity var(--ed-ix);
+}
+.editor-section-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: var(--ed-radius-sm);
+  color: #b5b5bc;
+  transition:
+    background-color var(--ed-ix),
+    color var(--ed-ix);
+}
+.editor-section-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f7f7f8;
+}
+.editor-section-toolbar-btn:focus-visible {
+  outline: 2px solid var(--ed-focus);
+  outline-offset: 1px;
+}
+.editor-section-drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.editor-section-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Editable text interaction states */
+.editor-editable {
+  position: relative;
+  border-radius: 2px;
+  cursor: default;
+  transition:
+    outline-color var(--ed-ix),
+    box-shadow var(--ed-ix),
+    background-color var(--ed-ix);
+  outline: 1px solid transparent;
+  outline-offset: 2px;
+}
+.editor-editable:hover:not([data-editing="true"]):not([data-selected="true"]) {
+  outline-color: var(--ed-hover);
+  background: rgba(107, 147, 240, 0.04);
+}
+.editor-editable[data-selected="true"]:not([data-editing="true"]) {
+  outline-color: var(--ed-selected);
+  box-shadow: 0 0 0 2px var(--ed-select-soft);
+  cursor: text;
+}
+.editor-editable[data-editing="true"] {
+  outline-color: var(--ed-edit);
+  box-shadow: 0 0 0 2px rgba(239, 99, 81, 0.18);
+  cursor: text;
+  background: rgba(239, 99, 81, 0.04);
 }
 
 .editor-mobile-header {
@@ -824,6 +916,7 @@
   .editor-section-selected,
   .editor-section-badge,
   .editor-section-toolbar,
+  .editor-editable,
   .editor-skeleton,
   .editor-save-pulse[data-saving="true"],
   .editor-frame-chrome,

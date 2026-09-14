@@ -104,6 +104,30 @@ export function commandReorderSections(
   };
 }
 
+/** Canvas drag: place `fromId` before/after `toId` using existing section order. */
+export function commandReorderSectionRelative(
+  config: WebsiteConfig,
+  fromId: string,
+  toId: string,
+  place: "before" | "after",
+): EditorCommandResult | null {
+  if (fromId === toId) return null;
+  const sections = [...config.sections];
+  const fromIndex = sections.findIndex((s) => s.id === fromId);
+  if (fromIndex < 0) return null;
+  const [item] = sections.splice(fromIndex, 1);
+  if (!item) return null;
+  let insertAt = sections.findIndex((s) => s.id === toId);
+  if (insertAt < 0) return null;
+  if (place === "after") insertAt += 1;
+  sections.splice(insertAt, 0, item);
+  return {
+    config: { ...config, sections },
+    label: `Reorder ${item.type}`,
+    selectedSectionId: fromId,
+  };
+}
+
 export function commandAddSection(
   config: WebsiteConfig,
   type: WebsiteSectionType,
