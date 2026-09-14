@@ -42,15 +42,11 @@ export function EditorSectionFrame({
   const edit = useEditorEdit();
   const enabled = Boolean(edit?.enabled && edit.mode === "editor");
   const selected = enabled && edit?.selectedSectionId === sectionId;
-  const hovered =
-    enabled && edit?.hoveredSectionId === sectionId && !selected;
+  const hovered = enabled && edit?.hoveredSectionId === sectionId && !selected;
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dropEdge, setDropEdge] = useState<"before" | "after" | null>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,14 +63,16 @@ export function EditorSectionFrame({
     function close() {
       setContextMenu(null);
     }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") close();
+    }
     window.addEventListener("click", close);
     window.addEventListener("scroll", close, true);
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") close();
-    });
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("click", close);
       window.removeEventListener("scroll", close, true);
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, [contextMenu]);
 
@@ -91,18 +89,12 @@ export function EditorSectionFrame({
     return <>{children}</>;
   }
 
-  const spacing = readSectionSetting<SectionSpacing>(
-    settings,
-    "spacing",
-    "comfortable",
-  );
+  const spacing = readSectionSetting<SectionSpacing>(settings, "spacing", "comfortable");
   const width = readSectionSetting<SectionWidth>(settings, "width", "full");
   const hidden = edit.isSectionVisible?.(sectionId) === false;
   const showChrome = selected || hovered || dragging || Boolean(dropEdge);
 
-  function runAction(
-    action: "move-up" | "move-down" | "duplicate" | "toggle" | "delete",
-  ) {
+  function runAction(action: "move-up" | "move-down" | "duplicate" | "toggle" | "delete") {
     edit?.onSectionAction?.(sectionId, action);
     setMenuOpen(false);
     setContextMenu(null);
@@ -134,9 +126,7 @@ export function EditorSectionFrame({
         if (!dragging) edit.onHoverSection(sectionId);
       }}
       onMouseLeave={() => {
-        if (edit.hoveredSectionId === sectionId) {
-          edit.onHoverSection(undefined);
-        }
+        if (edit.hoveredSectionId === sectionId) edit.onHoverSection(undefined);
       }}
       onDragOver={(event) => {
         if (!edit.onReorderSections) return;
@@ -153,8 +143,7 @@ export function EditorSectionFrame({
       }}
       onDrop={(event) => {
         event.preventDefault();
-        const fromId =
-          event.dataTransfer.getData(DRAG_MIME) || canvasDragSectionId;
+        const fromId = event.dataTransfer.getData(DRAG_MIME) || canvasDragSectionId;
         const place = edgeFromEvent(event);
         setDropEdge(null);
         setDragging(false);
@@ -216,17 +205,9 @@ export function EditorSectionFrame({
         </div>
       ) : null}
 
-      {/* Hover-only lightweight actions */}
       {hovered && !selected && edit.onSectionAction ? (
-        <div
-          data-editor-chrome
-          className="editor-section-toolbar absolute end-2 top-2 z-20 flex items-center gap-0.5 sm:end-3 sm:top-3"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <ChromeButton
-            label="Toggle visibility"
-            onClick={() => runAction("toggle")}
-          >
+        <div data-editor-chrome className="editor-section-toolbar absolute end-2 top-2 z-20 flex items-center gap-0.5 sm:end-3 sm:top-3" onClick={(event) => event.stopPropagation()}>
+          <ChromeButton label="Toggle visibility" onClick={() => runAction("toggle")}>
             {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
           </ChromeButton>
           <ChromeButton label="More" onClick={() => setMenuOpen((v) => !v)}>
@@ -245,41 +226,16 @@ export function EditorSectionFrame({
         </div>
       ) : null}
 
-      {/* Selected contextual toolbar */}
       {selected && edit.onSectionAction ? (
-        <div
-          data-editor-chrome
-          className="editor-section-toolbar absolute end-2 top-2 z-20 flex items-center gap-0.5 sm:end-3 sm:top-3"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <ChromeButton label="Move up" onClick={() => runAction("move-up")}>
-            <ArrowUp size={13} />
-          </ChromeButton>
-          <ChromeButton
-            label="Move down"
-            onClick={() => runAction("move-down")}
-          >
-            <ArrowDown size={13} />
-          </ChromeButton>
-          <ChromeButton
-            label="Duplicate"
-            onClick={() => runAction("duplicate")}
-          >
-            <Copy size={13} />
-          </ChromeButton>
-          <ChromeButton
-            label="Toggle visibility"
-            onClick={() => runAction("toggle")}
-          >
+        <div data-editor-chrome className="editor-section-toolbar absolute end-2 top-2 z-20 flex items-center gap-0.5 sm:end-3 sm:top-3" onClick={(event) => event.stopPropagation()}>
+          <ChromeButton label="Move up" onClick={() => runAction("move-up")}><ArrowUp size={13} /></ChromeButton>
+          <ChromeButton label="Move down" onClick={() => runAction("move-down")}><ArrowDown size={13} /></ChromeButton>
+          <ChromeButton label="Duplicate" onClick={() => runAction("duplicate")}><Copy size={13} /></ChromeButton>
+          <ChromeButton label="Toggle visibility" onClick={() => runAction("toggle")}>
             {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
           </ChromeButton>
           <div className="relative">
-            <ChromeButton
-              label="More"
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              <MoreHorizontal size={13} />
-            </ChromeButton>
+            <ChromeButton label="More" onClick={() => setMenuOpen((v) => !v)}><MoreHorizontal size={13} /></ChromeButton>
             {menuOpen ? (
               <SectionActionMenu
                 hidden={hidden}
@@ -293,36 +249,15 @@ export function EditorSectionFrame({
       ) : null}
 
       {contextMenu && edit.onSectionAction ? (
-        <div
-          data-editor-chrome
-          className="editor-context-menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button type="button" onClick={() => runAction("move-up")}>
-            <ArrowUp size={13} />
-            Move up
-          </button>
-          <button type="button" onClick={() => runAction("move-down")}>
-            <ArrowDown size={13} />
-            Move down
-          </button>
-          <button type="button" onClick={() => runAction("duplicate")}>
-            <Copy size={13} />
-            Duplicate
-          </button>
+        <div data-editor-chrome className="editor-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}>
+          <button type="button" onClick={() => runAction("move-up")}><ArrowUp size={13} />Move up</button>
+          <button type="button" onClick={() => runAction("move-down")}><ArrowDown size={13} />Move down</button>
+          <button type="button" onClick={() => runAction("duplicate")}><Copy size={13} />Duplicate</button>
           <button type="button" onClick={() => runAction("toggle")}>
             {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
             {hidden ? "Show" : "Hide"}
           </button>
-          <button
-            type="button"
-            data-danger="true"
-            onClick={() => runAction("delete")}
-          >
-            <Trash2 size={13} />
-            Delete
-          </button>
+          <button type="button" data-danger="true" onClick={() => runAction("delete")}><Trash2 size={13} />Delete</button>
         </div>
       ) : null}
 
@@ -331,14 +266,7 @@ export function EditorSectionFrame({
   );
 }
 
-function SectionActionMenu({
-  hidden,
-  onDuplicate,
-  onToggle,
-  onDelete,
-  onMoveUp,
-  onMoveDown,
-}: {
+function SectionActionMenu({ hidden, onDuplicate, onToggle, onDelete, onMoveUp, onMoveDown }: {
   hidden: boolean;
   onDuplicate: () => void;
   onToggle: () => void;
@@ -348,51 +276,22 @@ function SectionActionMenu({
 }) {
   return (
     <div className="editor-more-menu">
-      {onMoveUp ? (
-        <button type="button" onClick={onMoveUp}>
-          <ArrowUp size={13} />
-          Move up
-        </button>
-      ) : null}
-      {onMoveDown ? (
-        <button type="button" onClick={onMoveDown}>
-          <ArrowDown size={13} />
-          Move down
-        </button>
-      ) : null}
-      <button type="button" onClick={onDuplicate}>
-        <Copy size={13} />
-        Duplicate
-      </button>
-      <button type="button" onClick={onToggle}>
-        {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-        {hidden ? "Show" : "Hide"}
-      </button>
-      <button type="button" data-danger="true" onClick={onDelete}>
-        <Trash2 size={13} />
-        Delete
-      </button>
+      {onMoveUp ? <button type="button" onClick={onMoveUp}><ArrowUp size={13} />Move up</button> : null}
+      {onMoveDown ? <button type="button" onClick={onMoveDown}><ArrowDown size={13} />Move down</button> : null}
+      <button type="button" onClick={onDuplicate}><Copy size={13} />Duplicate</button>
+      <button type="button" onClick={onToggle}>{hidden ? <Eye size={13} /> : <EyeOff size={13} />}{hidden ? "Show" : "Hide"}</button>
+      <button type="button" data-danger="true" onClick={onDelete}><Trash2 size={13} />Delete</button>
     </div>
   );
 }
 
-function ChromeButton({
-  children,
-  label,
-  onClick,
-}: {
+function ChromeButton({ children, label, onClick }: {
   children: ReactNode;
   label: string;
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      onClick={onClick}
-      className="editor-section-toolbar-btn"
-    >
+    <button type="button" title={label} aria-label={label} onClick={onClick} className="editor-section-toolbar-btn">
       {children}
     </button>
   );
