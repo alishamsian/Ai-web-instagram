@@ -44,6 +44,10 @@ export function storeCssVars(tokens: StoreTokens): CSSProperties {
     ["--store-muted-fg" as string]: tokens.foregroundMuted,
     ["--store-surface-muted" as string]: tokens.backgroundSubtle,
     ["--store-surface-hover" as string]: tokens.surfaceElevated,
+    ["--store-focus" as string]: tokens.accent,
+    ["--store-on-media" as string]: "#ffffff",
+    ["--store-on-media-muted" as string]: "rgba(255, 255, 255, 0.78)",
+    ["--store-on-media-inverse" as string]: "#141414",
     ["--store-wrap" as string]: tokens.wrap || primitiveLayout.pageMax,
     ["--store-space-1" as string]: primitiveSpace[1],
     ["--store-space-2" as string]: primitiveSpace[2],
@@ -118,6 +122,11 @@ export function siteCssVars(tokens: DesignTokens): CSSProperties {
     ["--site-color-success-foreground" as string]: c.successForeground,
     ["--site-color-warning" as string]: c.warning,
     ["--site-color-warning-foreground" as string]: c.warningForeground,
+    ["--site-color-focus" as string]: c.focus,
+    ["--site-color-selection" as string]: c.selection,
+    ["--site-color-on-media" as string]: c.onMedia,
+    ["--site-color-on-media-muted" as string]: c.onMediaMuted,
+    ["--site-color-on-media-inverse" as string]: c.onMediaInverse,
 
     ["--site-font-display" as string]: f.display,
     ["--site-font-heading" as string]: f.heading,
@@ -177,9 +186,15 @@ export function websiteCssVars(
   store: StoreTokens,
   design: DesignTokens,
 ): CSSProperties {
+  const site = siteCssVars(design);
   return {
     ...storeCssVars(store),
-    ...siteCssVars(design),
+    ...site,
+    // Keep store overlay tokens aligned with site semantic on-media roles.
+    ["--store-on-media" as string]: design.colors.onMedia,
+    ["--store-on-media-muted" as string]: design.colors.onMediaMuted,
+    ["--store-on-media-inverse" as string]: design.colors.onMediaInverse,
+    ["--store-focus" as string]: design.colors.focus,
   };
 }
 

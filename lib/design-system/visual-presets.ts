@@ -250,17 +250,25 @@ export function validateVisualPresetCatalog(presets: readonly VisualPreset[] = V
   return { ok: errors.length === 0, errors };
 }
 
-/** Apply only the persisted visual identity; content remains untouched. */
+/** Apply visual identity only — content untouched.
+ * Preserves an explicitly selected themeMode.
+ * When themeMode is missing/invalid, seeds preset.theme.default for backward compat.
+ */
 export function applyVisualPreset(config: WebsiteConfig, presetId: VisualPresetId): WebsiteConfig {
   const preset = getVisualPreset(presetId);
   if (!preset) return config;
+  const existingMode = config.settings.themeMode;
+  const hasExplicitTheme =
+    existingMode === "light" ||
+    existingMode === "dark" ||
+    existingMode === "system";
+
   return {
     ...config,
     settings: {
       ...config.settings,
       mood: preset.id,
-      // Future dark-mode support can consume this without changing section data.
-      themeMode: preset.theme.default,
+      themeMode: hasExplicitTheme ? existingMode : preset.theme.default,
     },
   } as WebsiteConfig;
 }

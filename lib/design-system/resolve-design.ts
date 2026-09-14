@@ -178,6 +178,11 @@ function buildColors(
     successForeground: base.successForeground,
     warning: primitiveColor.warning,
     warningForeground: base.warningForeground,
+    focus: accent,
+    selection: mixApprox(accent, bg, scheme === "dark" ? 0.35 : 0.28),
+    onMedia: "#ffffff",
+    onMediaMuted: "rgba(255, 255, 255, 0.78)",
+    onMediaInverse: "#141414",
   };
 }
 
@@ -357,4 +362,9 @@ export const REQUIRED_COLOR_KEYS = [
   "successForeground",
   "warning",
   "warningForeground",
+  "focus",
+  "selection",
+  "onMedia",
+  "onMediaMuted",
+  "onMediaInverse",
 ] as const;

@@ -115,6 +115,9 @@ export {
   setResponsiveOverride,
   resetResponsiveOverride,
   resolveResponsiveColumns,
+  hasExplicitResponsiveOverride,
+  isValidBreakpointKey,
+  viewportToBreakpoint,
   type ViewportBucket,
 } from "@/lib/editor/responsive";
 

@@ -24,6 +24,17 @@ export type WebsiteColorTokens = SemanticColorTokens & {
   destructiveForeground: string;
   successForeground: string;
   warningForeground: string;
+  /** Focus ring for interactive controls. */
+  focus: string;
+  /** Text selection highlight. */
+  selection: string;
+  /**
+   * Paint for copy/controls on top of imagery (media overlays).
+   * Independent of light/dark scheme so contrast on photos stays predictable.
+   */
+  onMedia: string;
+  onMediaMuted: string;
+  onMediaInverse: string;
 };
 
 export type TypographyRoleToken = {

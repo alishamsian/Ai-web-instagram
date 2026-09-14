@@ -24,6 +24,16 @@ export const VARIANT_RESPONSIVE_STRATEGIES = [
   "masonry-2",
   "bento-priority-stack",
   "horizontal-scroll",
+  /** Collapse secondary chrome; keep primary content. */
+  "collapse",
+  /** Keep desktop composition; only tighten spacing. */
+  "preserve",
+  /** Denser packing / smaller cards. */
+  "compact",
+  /** Stretch media/content edge-to-edge. */
+  "full-width",
+  /** Drop column count intentionally. */
+  "reduce-columns",
 ] as const;
 
 export type VariantResponsiveStrategy =

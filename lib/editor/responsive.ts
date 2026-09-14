@@ -18,6 +18,9 @@ export function viewportToBreakpoint(
  * mobile → tablet → desktop → base
  * tablet → desktop → base
  * desktop → desktop → base
+ *
+ * Explicit breakpoint overrides always win over inherited values.
+ * Viewport switching is editor UI-only — never call this to mutate WebsiteConfig.
  */
 export function resolveResponsiveValue<T>(
   value: T | ResponsiveValue<T> | null | undefined,
@@ -79,6 +82,21 @@ export function resolveResponsiveValue<T>(
   return { value: undefined, source: "none", inherited: false };
 }
 
+/** True when the viewport has its own explicit key (not inherited). */
+export function hasExplicitResponsiveOverride(
+  value: unknown,
+  viewport: ViewportBucket,
+): boolean {
+  if (value == null || !isPlainResponsive(value)) {
+    return viewport === "desktop" && value != null && !isPlainResponsive(value);
+  }
+  const rv = value as ResponsiveValue<unknown>;
+  if (viewport === "desktop") {
+    return rv.desktop !== undefined || rv.base !== undefined;
+  }
+  return rv[viewport] !== undefined;
+}
+
 export function setResponsiveOverride<T>(
   current: T | ResponsiveValue<T> | null | undefined,
   viewport: ViewportBucket,
@@ -129,37 +147,43 @@ export function resetResponsiveOverride<T>(
 
 /**
  * Resolve columns (or similar) for published/CSS use — all breakpoints.
+ * Invalid / missing values fall back deterministically (SSR-safe).
  */
 export function resolveResponsiveColumns(
   value: unknown,
   fallback: number = 4,
 ): { mobile: number; tablet: number; desktop: number } {
-  const desktop =
-    resolveResponsiveValue<number>(
-      value as number | ResponsiveValue<number>,
-      "desktop",
-    ).value ?? fallback;
-  const tablet =
-    resolveResponsiveValue<number>(
-      value as number | ResponsiveValue<number>,
-      "tablet",
-    ).value ?? desktop;
-  const mobile =
-    resolveResponsiveValue<number>(
-      value as number | ResponsiveValue<number>,
-      "mobile",
-    ).value ?? Math.min(2, tablet);
+  const safeFallback = clampColumn(fallback, 4);
 
-  const clamp = (n: number) => {
-    if (n === 2 || n === 3 || n === 4 || n === 5) return n;
-    return fallback;
-  };
+  const desktopRaw = resolveResponsiveValue<number>(
+    value as number | ResponsiveValue<number>,
+    "desktop",
+  ).value;
+  const desktop = clampColumn(desktopRaw, safeFallback);
 
-  return {
-    mobile: clamp(Number(mobile)),
-    tablet: clamp(Number(tablet)),
-    desktop: clamp(Number(desktop)),
-  };
+  const tabletRaw = resolveResponsiveValue<number>(
+    value as number | ResponsiveValue<number>,
+    "tablet",
+  ).value;
+  const tablet = clampColumn(tabletRaw, desktop);
+
+  const mobileRaw = resolveResponsiveValue<number>(
+    value as number | ResponsiveValue<number>,
+    "mobile",
+  ).value;
+  const mobile = clampColumn(
+    mobileRaw,
+    Math.min(2, tablet) as 2 | 3 | 4 | 5 | number,
+  );
+
+  return { mobile, tablet, desktop };
+}
+
+function clampColumn(n: unknown, fallback: number): number {
+  const num = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(num)) return fallback;
+  if (num === 2 || num === 3 || num === 4 || num === 5) return num;
+  return fallback;
 }
 
 function isPlainResponsive(value: unknown): value is ResponsiveValue<unknown> {

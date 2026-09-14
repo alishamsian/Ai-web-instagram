@@ -220,8 +220,11 @@ export function validateSectionVariantCatalog(
       if (!variant.theme) {
         errors.push(`missing-theme:${composite}`);
       } else {
-        if (!variant.theme.light && !variant.theme.dark) {
-          errors.push(`theme-none:${composite}`);
+        if (!variant.theme.light) {
+          errors.push(`theme-no-light:${composite}`);
+        }
+        if (!variant.theme.dark) {
+          errors.push(`theme-no-dark:${composite}`);
         }
         if (!variant.theme.semanticTokens) {
           errors.push(`no-semantic-tokens:${composite}`);

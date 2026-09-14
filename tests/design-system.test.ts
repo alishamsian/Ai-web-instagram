@@ -221,10 +221,21 @@ describe("phase 1 — theme + design tokens", () => {
     expect(sharp.elevation.subtle).toBe("none");
   });
 
-  it("integrates visual preset design hints and themeMode", () => {
+  it("integrates visual preset design hints without forcing themeMode overwrite", () => {
     const withPreset = applyVisualPreset(baseConfig(), "studio-grid");
+    // baseConfig has no themeMode → seed preset default
     expect(withPreset.settings.themeMode).toBe("light");
     expect(withPreset.settings.mood).toBe("studio-grid");
+
+    const darkSite = applyVisualPreset(
+      baseConfig({
+        settings: { ...baseConfig().settings, themeMode: "dark" },
+      }),
+      "immersive-cinema",
+    );
+    expect(darkSite.settings.themeMode).toBe("dark");
+    expect(darkSite.settings.mood).toBe("immersive-cinema");
+
     const tokens = resolveDesignTokens(withPreset);
     expect(tokens.visualPresetId).toBe("studio-grid");
     expect(getVisualPreset("studio-grid")?.designHints?.spacingDensity).toBe(
