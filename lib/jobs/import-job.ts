@@ -22,6 +22,11 @@ import type { PlanId } from "@/lib/config/plans";
 import { clampImportPosts, IMPORT_POSTS_HARD_MAX, importStaleMs } from "@/lib/config/import";
 import { logError, logInfo, logWarn } from "@/lib/observability/log";
 import { publicError } from "@/lib/jobs/errors";
+import { recordProductEvent, recordSystemEvent } from "@/lib/admin/events";
+import { recordUsageEvent } from "@/lib/admin/usage";
+import { recordAiUsage } from "@/lib/admin/ai-telemetry";
+import { computeJobDurationMs } from "@/lib/admin/jobs";
+import { incrementDailyMetrics } from "@/lib/admin/metrics";
 
 export { IMPORT_STALE_MS } from "@/lib/config/import";
 export { publicError } from "@/lib/jobs/errors";
@@ -75,6 +80,7 @@ function jobToRow(job: ImportJob): Record<string, unknown> {
     posts_limit: job.postsLimit ?? null,
     started_at: job.startedAt,
     completed_at: job.completedAt ?? null,
+    duration_ms: job.durationMs ?? null,
     created_at: job.createdAt,
     updated_at: job.updatedAt,
   };
@@ -95,6 +101,7 @@ function patchToRow(patch: Partial<ImportJob>): Record<string, unknown> {
   if (patch.postsLimit !== undefined) row.posts_limit = patch.postsLimit;
   if (patch.startedAt !== undefined) row.started_at = patch.startedAt;
   if (patch.completedAt !== undefined) row.completed_at = patch.completedAt;
+  if (patch.durationMs !== undefined) row.duration_ms = patch.durationMs;
   if (patch.username !== undefined) row.username = patch.username;
   return row;
 }
@@ -436,6 +443,16 @@ export async function createImportJob(input: {
     postsLimit,
   });
 
+  void recordProductEvent({
+    eventName: "import_started",
+    userId: job.userId,
+    workspaceId: job.workspaceId,
+    resourceType: "import_job",
+    resourceId: job.id,
+    metadata: { username: job.username, postsLimit },
+  });
+  void incrementDailyMetrics({ increments: { imports: 1 } });
+
   // Caller must schedule processImportJob via next/server `after()` so work
   // survives after the HTTP response (void fire-and-forget gets cancelled).
   return job;
@@ -527,6 +544,15 @@ export async function processImportJob(
     const mediaPromise = withJobHeartbeat(jobId, () => persistImportMedia(imported));
     let analysis;
     try {
+      void recordAiUsage({
+        feature: "import_analyze",
+        status: "started",
+        workspaceId: job.workspaceId,
+        userId: job.userId,
+        provider: process.env.AI_API_KEY ? "openai" : "mock",
+        model: process.env.AI_MODEL ?? null,
+      });
+      const aiStarted = Date.now();
       analysis = await withJobHeartbeat(jobId, () =>
         getAIAnalyzer(job.username ?? "demo").analyzeImport({
           profile,
@@ -534,7 +560,24 @@ export async function processImportJob(
           locale,
         }),
       );
+      void recordAiUsage({
+        feature: "import_analyze",
+        status: "completed",
+        workspaceId: job.workspaceId,
+        userId: job.userId,
+        provider: process.env.AI_API_KEY ? "openai" : "mock",
+        model: process.env.AI_MODEL ?? null,
+        latencyMs: Date.now() - aiStarted,
+      });
     } catch (error) {
+      void recordAiUsage({
+        feature: "import_analyze",
+        status: "failed",
+        workspaceId: job.workspaceId,
+        userId: job.userId,
+        errorMessage:
+          error instanceof Error ? error.message.slice(0, 200) : "ai_error",
+      });
       logWarn("ai.failed_heuristic", {
         jobId,
         message: error instanceof Error ? error.message.slice(0, 120) : "ai_error",
@@ -657,8 +700,26 @@ export async function processImportJob(
       importId: imported.id,
       websiteId,
       completedAt: now(),
+      durationMs: computeJobDurationMs(job.startedAt, now()) ?? undefined,
     });
     logInfo("job.completed", { jobId, websiteId, importId: imported.id });
+    void recordProductEvent({
+      eventName: "import_completed",
+      userId: job.userId,
+      workspaceId: job.workspaceId,
+      websiteId,
+      resourceType: "import_job",
+      resourceId: jobId,
+    });
+    void recordUsageEvent({
+      feature: "instagram_imports",
+      workspaceId: job.workspaceId,
+      userId: job.userId,
+      websiteId,
+    });
+    void incrementDailyMetrics({
+      increments: { successful_imports: 1, websites_created: websiteId ? 1 : 0 },
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message.slice(0, 200) : "unknown";
@@ -689,7 +750,31 @@ export async function processImportJob(
       errorMessage: mapped.message,
       retryCount: (fresh?.retryCount ?? job.retryCount ?? 0) + 1,
       completedAt: now(),
+      durationMs: computeJobDurationMs(job.startedAt, now()) ?? undefined,
     });
+    void recordProductEvent({
+      eventName: "import_failed",
+      userId: job.userId,
+      workspaceId: job.workspaceId,
+      resourceType: "import_job",
+      resourceId: jobId,
+      metadata: { errorCode: mapped.code },
+    });
+    void incrementDailyMetrics({ increments: { failed_imports: 1 } });
+    if (
+      mapped.code === "PROVIDER_UNAVAILABLE" ||
+      mapped.code === "PROVIDER_TIMEOUT" ||
+      mapped.code === "DATABASE_ERROR"
+    ) {
+      void recordSystemEvent({
+        eventName: "import_job_failure",
+        severity: "warning",
+        source: "import-job",
+        errorCode: mapped.code,
+        message: mapped.message,
+        metadata: { jobId },
+      });
+    }
   }
 }
 

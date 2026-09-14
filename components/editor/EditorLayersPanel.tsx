@@ -45,6 +45,7 @@ export function EditorLayersPanel({
   onHoverSection,
   onChange,
   onAddSection,
+  compactChrome = false,
 }: {
   config: WebsiteConfig;
   dict: Dictionary;
@@ -57,6 +58,8 @@ export function EditorLayersPanel({
   onHoverSection?: (id: string | undefined) => void;
   onChange: (next: WebsiteConfig) => void;
   onAddSection: () => void;
+  /** When true, hide redundant add CTA (provided by left panel header). */
+  compactChrome?: boolean;
 }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -213,13 +216,15 @@ export function EditorLayersPanel({
   }
 
   return (
-    <div className="space-y-2 px-2 py-2">
-      <div className="px-0.5">
-        <button type="button" onClick={onAddSection} className="editor-add-section">
-          <Plus size={14} />
-          {dict.editor.addSection}
-        </button>
-      </div>
+    <div className={cn("editor-layers-panel", compactChrome && "editor-layers-panel--compact")}>
+      {!compactChrome ? (
+        <div className="px-0.5">
+          <button type="button" onClick={onAddSection} className="editor-add-section">
+            <Plus size={14} />
+            {dict.editor.addSection}
+          </button>
+        </div>
+      ) : null}
 
       {config.sections.length > 0 ? (
         <label className="editor-search-field mx-0.5">

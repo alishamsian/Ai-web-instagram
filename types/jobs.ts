@@ -36,6 +36,8 @@ export interface ImportJob {
   postsLimit?: number;
   startedAt: string;
   completedAt?: string;
+  /** Wall-clock duration once terminal (ms). */
+  durationMs?: number;
   createdAt: string;
   updatedAt: string;
 }

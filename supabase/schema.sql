@@ -388,3 +388,5 @@ create table if not exists workspace_notifications (
   meta jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+-- Admin foundation tables: see supabase/migrations/20260915030000_admin_foundation.sql

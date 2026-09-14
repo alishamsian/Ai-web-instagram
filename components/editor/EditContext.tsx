@@ -154,6 +154,10 @@ export function useEditorEdit() {
 /**
  * IDLE → SELECTED (click) → EDITING (double-click)
  * Escape / blur exits editing. Single click never starts editing.
+ *
+ * Hydration: editor chrome activates only after mount so SSR markup
+ * (plain text) always matches the client's first paint. Context can be
+ * unavailable or diverge during SSR/streaming; deferring avoids mismatch.
  */
 export function EditableText({
   path,
@@ -171,7 +175,15 @@ export function EditableText({
   const edit = useEditorEdit();
   const ref = useRef<HTMLElement | null>(null);
   const [editing, setEditing] = useState(false);
-  const selected = Boolean(edit?.enabled && edit.selected === path);
+  const [interactive, setInteractive] = useState(false);
+
+  useEffect(() => {
+    setInteractive(true);
+  }, []);
+
+  const isEditor =
+    interactive && Boolean(edit?.enabled && edit.mode === "editor");
+  const selected = Boolean(isEditor && edit?.selected === path);
 
   useEffect(() => {
     if (!selected && editing) setEditing(false);
@@ -195,7 +207,7 @@ export function EditableText({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
-  if (!edit?.enabled || edit.mode !== "editor") {
+  if (!isEditor) {
     return <Tag className={className}>{value}</Tag>;
   }
 

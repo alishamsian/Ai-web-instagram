@@ -138,7 +138,7 @@ export function EditorSectionFrame({
     "comfortable",
   );
   const width = readSectionSetting<SectionWidth>(settings, "width", "full");
-  const hidden = edit.isSectionVisible?.(sectionId) === false;
+  const hidden = edit?.isSectionVisible?.(sectionId) === false;
   const showChrome = shouldShowSectionChrome({
     selected: Boolean(selected),
     hovered: Boolean(hovered),
@@ -179,13 +179,15 @@ export function EditorSectionFrame({
         className,
       )}
       onMouseEnter={() => {
-        if (!dragging) edit.onHoverSection(sectionId);
+        if (!enabled || !edit || dragging) return;
+        edit.onHoverSection(sectionId);
       }}
       onMouseLeave={() => {
+        if (!edit) return;
         if (edit.hoveredSectionId === sectionId) edit.onHoverSection(undefined);
       }}
       onDragOver={(event) => {
-        if (!edit.onReorderSections) return;
+        if (!edit?.onReorderSections) return;
         if (!canvasDragSectionId || canvasDragSectionId === sectionId) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
@@ -206,9 +208,10 @@ export function EditorSectionFrame({
         setDragging(false);
         canvasDragSectionId = null;
         if (!fromId || fromId === sectionId) return;
-        edit.onReorderSections?.(fromId, sectionId, place);
+        edit?.onReorderSections?.(fromId, sectionId, place);
       }}
       onContextMenu={(event) => {
+        if (!edit) return;
         event.preventDefault();
         event.stopPropagation();
         edit.onSelectSection(sectionId);
@@ -216,6 +219,7 @@ export function EditorSectionFrame({
         setContextMenu({ x: event.clientX, y: event.clientY });
       }}
       onClick={(event) => {
+        if (!edit) return;
         const target = event.target as HTMLElement;
         if (target.closest("[data-editor-editable]")) return;
         if (target.closest("[contenteditable='true']")) return;

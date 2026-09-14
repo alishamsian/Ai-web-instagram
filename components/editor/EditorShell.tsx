@@ -1240,7 +1240,7 @@ export function EditorShell({
 
   const canvas = (
     <EditorEditProvider
-      enabled
+      enabled={true}
       mode="editor"
       selected={selectedField}
       selectedSectionId={selectedSectionId}
