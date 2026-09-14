@@ -5,6 +5,7 @@ import { slugify } from "@/lib/utils";
 import { polishWebsiteConfig } from "@/lib/website/polish";
 import { businessProfileFromInstagram } from "@/lib/business/from-instagram";
 import { generateWebsiteFromBusinessProfileSync } from "@/lib/business/generation/pipeline";
+import { heuristicAnalysisFromImport } from "@/lib/instagram/pipeline";
 // Side-effect seeds for Vertical / Recipe / Section registries
 import "@/lib/store/verticals/packs";
 import "@/lib/store/recipes/registry";
@@ -49,6 +50,24 @@ export function generateWebsiteConfig(input: {
   };
 
   return polishWebsiteConfig(withContact);
+}
+
+/**
+ * Canonical Phase 5 mapper: InstagramImport → existing WebsiteConfig.
+ * Analysis is optional — falls back to deterministic heuristic (AI stays optional).
+ */
+export function buildWebsiteConfigFromInstagram(input: {
+  imported: InstagramImport;
+  analysis?: WebsiteAIAnalysis | null;
+  locale: "fa" | "en";
+}): WebsiteConfig {
+  const analysis =
+    input.analysis ?? heuristicAnalysisFromImport(input.imported, input.locale);
+  return generateWebsiteConfig({
+    imported: input.imported,
+    analysis,
+    locale: input.locale,
+  });
 }
 
 export function websiteSlug(name: string, username: string) {

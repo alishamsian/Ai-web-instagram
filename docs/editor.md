@@ -1,5 +1,7 @@
 # Editor Architecture (P6)
 
+Related: [Instagram Import Foundation](./import.md)
+
 ## Source of truth
 
 ```text

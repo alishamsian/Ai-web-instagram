@@ -7,7 +7,8 @@ import {
   ensureWebsiteConfigMediaHosted,
   persistImportMedia,
 } from "@/lib/storage";
-import { generateWebsiteConfig, websiteSlug, allocateUniqueSlug } from "@/lib/website";
+import { buildWebsiteConfigFromInstagram, websiteSlug, allocateUniqueSlug } from "@/lib/website";
+import { heuristicAnalysisFromImport } from "@/lib/instagram/pipeline";
 import { readStore, writeStore } from "@/lib/database/store";
 import { getInstagramCollector as resolveCollector } from "@/lib/instagram/collector";
 import { isApifyConfigured, isSupabaseConfigured } from "@/lib/config/env";
@@ -405,22 +406,31 @@ export async function processImportJob(
       }
     });
 
-    // AI only needs captions; overlap it with media download/upload.
+    // AI is optional — heuristic fallback keeps the product working without AI keys.
     await updateJob(jobId, { status: "analyzing", stage: "understanding_brand" });
-    const [analysis] = await withJobHeartbeat(jobId, () =>
-      Promise.all([
+    const mediaPromise = withJobHeartbeat(jobId, () => persistImportMedia(imported));
+    let analysis;
+    try {
+      analysis = await withJobHeartbeat(jobId, () =>
         getAIAnalyzer(job.username ?? "demo").analyzeImport({
           profile,
           posts,
           locale,
         }),
-        persistImportMedia(imported),
-      ]),
-    );
+      );
+    } catch (error) {
+      console.warn("[import] AI analysis failed; using heuristic", jobId, error);
+      analysis = heuristicAnalysisFromImport(imported, locale);
+    }
+    await mediaPromise;
     imported.aiAnalysis = analysis;
 
     await updateJob(jobId, { status: "generating", stage: "creating_website" });
-    const config = generateWebsiteConfig({ imported, analysis, locale });
+    const config = buildWebsiteConfigFromInstagram({
+      imported,
+      analysis,
+      locale,
+    });
 
     const generatedWebsiteId = createId("web");
     const baseSlug = websiteSlug(analysis.businessName, imported.username);

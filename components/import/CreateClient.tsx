@@ -251,6 +251,22 @@ export function CreateClient({
               {dict.create.sites}
             </Link>
           </div>
+          {!url ? (
+            <ol className="mt-6 grid gap-2 text-start text-[12px] text-foreground-muted sm:grid-cols-3">
+              <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+                <span className="font-medium text-foreground-secondary">1.</span>{" "}
+                {locale === "fa" ? "ورود پیج اینستاگرام" : "Enter Instagram"}
+              </li>
+              <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+                <span className="font-medium text-foreground-secondary">2.</span>{" "}
+                {locale === "fa" ? "نرمال‌سازی محتوا" : "Normalize content"}
+              </li>
+              <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+                <span className="font-medium text-foreground-secondary">3.</span>{" "}
+                {locale === "fa" ? "باز شدن ادیتور" : "Open the editor"}
+              </li>
+            </ol>
+          ) : null}
         </motion.div>
 
         {error ? (

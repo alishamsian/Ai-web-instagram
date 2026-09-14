@@ -82,6 +82,17 @@ export interface InstagramCollector {
   scrapePosts(url: string, limit: number): Promise<InstagramPost[]>;
 }
 
+/**
+ * Product-facing pipeline statuses (UI / docs).
+ * Job statuses remain richer in types/jobs.ts.
+ */
+export type ImportPipelineStatus =
+  | "idle"
+  | "fetching"
+  | "normalizing"
+  | "ready"
+  | "failed";
+
 export class CollectorError extends Error {
   constructor(
     message: string,
