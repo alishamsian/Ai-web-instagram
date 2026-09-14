@@ -20,8 +20,11 @@ import { countWebsitesForWorkspace } from "@/lib/database/queries";
 import { planLimits } from "@/lib/config/plans";
 import type { PlanId } from "@/lib/config/plans";
 import { clampImportPosts, IMPORT_POSTS_HARD_MAX, importStaleMs } from "@/lib/config/import";
+import { logError, logInfo, logWarn } from "@/lib/observability/log";
+import { publicError } from "@/lib/jobs/errors";
 
 export { IMPORT_STALE_MS } from "@/lib/config/import";
+export { publicError } from "@/lib/jobs/errors";
 
 const STAGES: ImportJobStage[] = [
   "connecting",
@@ -50,47 +53,6 @@ function isActiveStatus(status: ImportJob["status"]) {
     status === "analyzing" ||
     status === "generating"
   );
-}
-
-function publicError(code?: string) {
-  switch (code) {
-    case "INVALID_URL":
-    case "UNSUPPORTED_URL":
-    case "INVALID_USERNAME":
-      return { code: "INVALID_URL", message: "Enter a valid Instagram profile URL." };
-    case "PRIVATE":
-      return {
-        code: "PRIVATE",
-        message: "This profile is private. Connect an account you own or use a public profile.",
-      };
-    case "NOT_FOUND":
-      return { code: "NOT_FOUND", message: "We couldn't find this Instagram profile." };
-    case "RATE_LIMITED":
-      return {
-        code: "RATE_LIMITED",
-        message: "Instagram data is temporarily unavailable. Please try again.",
-      };
-    case "PARTIAL":
-      return {
-        code: "PARTIAL",
-        message: "We imported what was available and can still build your website.",
-      };
-    case "AI_FAILED":
-      return {
-        code: "AI_FAILED",
-        message: "We imported your content, but AI analysis needs another attempt.",
-      };
-    case "MEDIA_PERSIST_FAILED":
-      return {
-        code: "MEDIA_PERSIST_FAILED",
-        message: "We couldn't save Instagram media to our storage. Please try again.",
-      };
-    default:
-      return {
-        code: "SCRAPE_FAILED",
-        message: "Something went wrong while importing your profile.",
-      };
-  }
 }
 
 function jobToRow(job: ImportJob): Record<string, unknown> {
@@ -210,6 +172,149 @@ async function withJobHeartbeat<T>(
   }
 }
 
+/**
+ * Concurrency-safe job start.
+ * Wins if: still queued, just claimed (scraping+connecting), or stale active.
+ * Losers return false so duplicate workers exit without double-processing.
+ */
+async function beginImportJob(jobId: string): Promise<boolean> {
+  const stamp = now();
+
+  if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
+    const db = getSupabaseAdmin();
+    const { data: current } = await db
+      .from("import_jobs")
+      .select("id, status, stage, updated_at, created_at, retry_count, posts_limit")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (!current) return false;
+    if (current.status === "completed" || current.status === "failed") {
+      return false;
+    }
+
+    const staleMs = importStaleMs(
+      typeof current.posts_limit === "number" ? current.posts_limit : undefined,
+    );
+    const updatedAt = Date.parse(
+      (current.updated_at as string) || (current.created_at as string),
+    );
+    const isStale =
+      Number.isFinite(updatedAt) && Date.now() - updatedAt >= staleMs;
+
+    // Path A: queued → take ownership
+    {
+      const { data } = await db
+        .from("import_jobs")
+        .update({
+          status: "scraping",
+          stage: "reading_content",
+          updated_at: stamp,
+        })
+        .eq("id", jobId)
+        .eq("status", "queued")
+        .select("id")
+        .maybeSingle();
+      if (data?.id) {
+        logInfo("job.begin", { jobId, path: "queued" });
+        return true;
+      }
+    }
+
+    // Path B: claim_next left status=scraping stage=connecting — exclusive continue
+    {
+      const { data } = await db
+        .from("import_jobs")
+        .update({
+          status: "scraping",
+          stage: "reading_content",
+          updated_at: stamp,
+        })
+        .eq("id", jobId)
+        .eq("status", "scraping")
+        .eq("stage", "connecting")
+        .select("id")
+        .maybeSingle();
+      if (data?.id) {
+        logInfo("job.begin", { jobId, path: "claimed" });
+        return true;
+      }
+    }
+
+    // Path C: stale active job — reclaim with retry bump
+    if (isStale && isActiveStatus(current.status as ImportJob["status"])) {
+      const nextRetry = (Number(current.retry_count) || 0) + 1;
+      if (nextRetry > 3) {
+        logWarn("job.begin_retry_exhausted", { jobId, retryCount: nextRetry });
+        return false;
+      }
+      const { data } = await db
+        .from("import_jobs")
+        .update({
+          status: "scraping",
+          stage: "reading_content",
+          retry_count: nextRetry,
+          error_code: null,
+          error_message: null,
+          completed_at: null,
+          updated_at: stamp,
+        })
+        .eq("id", jobId)
+        .eq("status", current.status)
+        .lt("updated_at", new Date(Date.now() - staleMs).toISOString())
+        .select("id")
+        .maybeSingle();
+      if (data?.id) {
+        logInfo("job.begin", { jobId, path: "stale", retryCount: nextRetry });
+        return true;
+      }
+    }
+
+    logInfo("job.begin_skip", { jobId, status: String(current.status) });
+    return false;
+  }
+
+  let began = false;
+  await writeStore((store) => {
+    const job = store.jobs.find((item) => item.id === jobId);
+    if (!job) return;
+    if (job.status === "completed" || job.status === "failed") return;
+
+    const staleMs = importStaleMs(job.postsLimit);
+    const updatedAt = Date.parse(job.updatedAt || job.createdAt);
+    const isStale =
+      Number.isFinite(updatedAt) && Date.now() - updatedAt >= staleMs;
+
+    if (job.status === "queued") {
+      job.status = "scraping";
+      job.stage = "reading_content";
+      job.updatedAt = stamp;
+      began = true;
+      return;
+    }
+
+    if (job.status === "scraping" && job.stage === "connecting") {
+      job.stage = "reading_content";
+      job.updatedAt = stamp;
+      began = true;
+      return;
+    }
+
+    if (isStale && isActiveStatus(job.status)) {
+      if (job.retryCount >= 3) return;
+      job.status = "scraping";
+      job.stage = "reading_content";
+      job.retryCount += 1;
+      job.errorCode = undefined;
+      job.errorMessage = undefined;
+      job.completedAt = undefined;
+      job.updatedAt = stamp;
+      began = true;
+    }
+  });
+  if (began) logInfo("job.begin", { jobId, path: "memory" });
+  return began;
+}
+
 export async function findCachedWebsite(workspaceId: string, username: string) {
   const store = await readStore();
   const key = username.toLowerCase();
@@ -324,6 +429,13 @@ export async function createImportJob(input: {
 
   await insertJob(job);
 
+  logInfo("job.created", {
+    jobId: job.id,
+    workspaceId: job.workspaceId,
+    username: job.username ?? undefined,
+    postsLimit,
+  });
+
   // Caller must schedule processImportJob via next/server `after()` so work
   // survives after the HTTP response (void fire-and-forget gets cancelled).
   return job;
@@ -339,18 +451,17 @@ export async function processImportJob(
   if (!job || !job.username) return;
   if (job.status === "completed" || job.status === "failed") return;
 
-  // Another worker already claimed this job recently.
-  if (
-    job.status !== "queued" &&
-    isActiveStatus(job.status) &&
-    Date.now() - Date.parse(job.updatedAt || job.createdAt) < 15_000
-  ) {
-    return;
-  }
+  const began = await beginImportJob(jobId);
+  if (!began) return;
+
+  logInfo("job.start", {
+    jobId,
+    workspaceId: job.workspaceId,
+    username: job.username,
+    collector: job.collector,
+  });
 
   try {
-    await updateJob(jobId, { status: "scraping", stage: "connecting" });
-
     const collector = resolveCollector(job.username);
     const postsLimit =
       typeof postsLimitOverride === "number" && postsLimitOverride > 0
@@ -360,13 +471,18 @@ export async function processImportJob(
           : clampImportPosts(undefined);
 
     // Profile + posts in parallel — Apify runs dominate wall time.
-    await updateJob(jobId, { status: "scraping", stage: "reading_content" });
+    logInfo("provider.start", { jobId, postsLimit });
     const [profile, posts] = await withJobHeartbeat(jobId, () =>
       Promise.all([
         collector.scrapeProfile(job.sourceUrl),
         collector.scrapePosts(job.sourceUrl, postsLimit),
       ]),
     );
+    logInfo("provider.end", {
+      jobId,
+      posts: posts.length,
+      private: profile.isPrivate,
+    });
 
     if (profile.isPrivate) {
       throw new CollectorError("This profile is private.", "PRIVATE");
@@ -419,7 +535,10 @@ export async function processImportJob(
         }),
       );
     } catch (error) {
-      console.warn("[import] AI analysis failed; using heuristic", jobId, error);
+      logWarn("ai.failed_heuristic", {
+        jobId,
+        message: error instanceof Error ? error.message.slice(0, 120) : "ai_error",
+      });
       analysis = heuristicAnalysisFromImport(imported, locale);
     }
     await mediaPromise;
@@ -438,7 +557,8 @@ export async function processImportJob(
       (item) =>
         item.workspaceId === job.workspaceId &&
         (item.slug === baseSlug ||
-          item.slug.toLowerCase() === imported.username.toLowerCase()),
+          item.slug.toLowerCase() === imported.username.toLowerCase() ||
+          item.importId === imported.id),
     );
     const slug = await allocateUniqueSlug({
       base: baseSlug,
@@ -470,20 +590,40 @@ export async function processImportJob(
           (item.slug === baseSlug ||
             item.slug === slug ||
             item.slug.toLowerCase() === imported.username.toLowerCase() ||
-            item.id === existingForWorkspace?.id),
+            item.id === existingForWorkspace?.id ||
+            item.importId === imported.id),
       );
       if (existingSite >= 0) {
-        websiteId = draft.websites[existingSite].id;
+        const prev = draft.websites[existingSite]!;
+        websiteId = prev.id;
+        const nextVersion = prev.version + 1;
+        const updatedAt = now();
+        // Re-import refreshes content but must not unpublish a live site.
         draft.websites[existingSite] = {
-          ...draft.websites[existingSite],
+          ...prev,
           importId: imported.id,
           slug,
           config,
-          status: "draft",
-          version: draft.websites[existingSite].version + 1,
-          updatedAt: now(),
+          status: prev.status,
+          publishedAt: prev.publishedAt,
+          version: nextVersion,
+          updatedAt,
         };
+        draft.versions.push({
+          id: createId("ver"),
+          websiteId,
+          version: nextVersion,
+          config,
+          createdAt: updatedAt,
+        });
+        logInfo("website.updated", {
+          jobId,
+          websiteId,
+          version: nextVersion,
+          status: prev.status,
+        });
       } else {
+        const createdAt = now();
         draft.websites.unshift({
           id: generatedWebsiteId,
           workspaceId: job.workspaceId,
@@ -492,9 +632,21 @@ export async function processImportJob(
           config,
           status: "draft",
           version: 1,
-          createdAt: now(),
-          updatedAt: now(),
+          createdAt,
+          updatedAt: createdAt,
           publishedAt: null,
+        });
+        draft.versions.push({
+          id: createId("ver"),
+          websiteId: generatedWebsiteId,
+          version: 1,
+          config,
+          createdAt,
+        });
+        logInfo("website.created", {
+          jobId,
+          websiteId: generatedWebsiteId,
+          version: 1,
         });
       }
     });
@@ -506,29 +658,39 @@ export async function processImportJob(
       websiteId,
       completedAt: now(),
     });
+    logInfo("job.completed", { jobId, websiteId, importId: imported.id });
   } catch (error) {
-    console.error("[import] processImportJob failed", jobId, error);
+    const message =
+      error instanceof Error ? error.message.slice(0, 200) : "unknown";
+    logError("job.failed", { jobId, message });
     const code =
       error instanceof InstagramUrlError
         ? error.code
         : error instanceof CollectorError
           ? error.code
-          : error instanceof Error && error.message.includes("MEDIA_PERSIST")
-            ? "MEDIA_PERSIST_FAILED"
-          : error instanceof Error && error.message.includes("AI")
-            ? "AI_FAILED"
-            : error instanceof Error &&
-                /duplicate|unique|23505/i.test(error.message)
-              ? "SCRAPE_FAILED"
-            : "SCRAPE_FAILED";
+          : error instanceof Error &&
+              /APIFY_API_TOKEN is required/i.test(error.message)
+            ? "PROVIDER_UNAVAILABLE"
+            : error instanceof Error && /timeout|timed out|AbortError/i.test(error.message)
+              ? "PROVIDER_TIMEOUT"
+              : error instanceof Error && error.message.includes("MEDIA_PERSIST")
+                ? "MEDIA_PERSIST_FAILED"
+                : error instanceof Error && error.message.includes("AI")
+                  ? "AI_FAILED"
+                  : error instanceof Error &&
+                      /duplicate|unique|23505/i.test(error.message)
+                    ? "DATABASE_ERROR"
+                    : "UNKNOWN";
     const mapped = publicError(code);
+    const fresh = (await readStore()).jobs.find((item) => item.id === jobId);
     await updateJob(jobId, {
       status: "failed",
       errorCode: mapped.code,
       errorMessage: mapped.message,
+      retryCount: (fresh?.retryCount ?? job.retryCount ?? 0) + 1,
       completedAt: now(),
     });
   }
 }
 
-export { publicError, STAGES };
+export { STAGES };

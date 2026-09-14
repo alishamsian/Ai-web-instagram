@@ -21,12 +21,13 @@ export async function allocateUniqueSlug(params: {
       const db = getSupabaseAdmin();
       const { data } = await db
         .from("websites")
-        .select("id, workspace_id")
+        .select("id")
         .eq("slug", candidate)
         .maybeSingle();
       if (!data) return false;
+      // Only the same website may reuse its slug — other sites in the
+      // workspace still collide (global unique(slug)).
       if (params.websiteId && data.id === params.websiteId) return false;
-      if (data.workspace_id === params.workspaceId) return false;
       return true;
     }
 
@@ -34,7 +35,6 @@ export async function allocateUniqueSlug(params: {
     return store.websites.some((site) => {
       if (site.slug !== candidate) return false;
       if (params.websiteId && site.id === params.websiteId) return false;
-      if (site.workspaceId === params.workspaceId) return false;
       return true;
     });
   };

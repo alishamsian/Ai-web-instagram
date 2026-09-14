@@ -5,6 +5,11 @@ import { ApifyCollector } from "@/lib/instagram/apify";
 import { MockInstagramCollector } from "@/lib/instagram/mock";
 import { isDemoUsername } from "@/lib/instagram/url";
 
+/**
+ * Resolve the Instagram collector.
+ * Demo usernames always use Mock. Real profiles require Apify in production —
+ * never silently substitute Mock for a production import (even with ALLOW_MOCK).
+ */
 export function getInstagramCollector(username?: string): InstagramCollector {
   if (username && isDemoUsername(username)) {
     return new MockInstagramCollector();
@@ -12,12 +17,13 @@ export function getInstagramCollector(username?: string): InstagramCollector {
   if (isApifyConfigured()) {
     return new ApifyCollector();
   }
-  if (!allowMockServices()) {
-    throw new Error(
-      "APIFY_API_TOKEN is required in production. Set ALLOW_MOCK=true to override.",
-    );
+  // Dev-only convenience: missing Apify → mock. Production always fails closed.
+  if (allowMockServices() && process.env.NODE_ENV !== "production") {
+    return new MockInstagramCollector();
   }
-  return new MockInstagramCollector();
+  throw new Error(
+    "APIFY_API_TOKEN is required for Instagram imports. Demo usernames work without Apify.",
+  );
 }
 
 export { MockInstagramCollector } from "./mock";

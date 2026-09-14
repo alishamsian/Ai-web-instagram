@@ -48,9 +48,9 @@ async function customDomainSlug(hostHeader: string | null): Promise<string | nul
   if (isApexOrLocal(host)) return null;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // Server/edge only — never use a publishable key that cannot read domains under RLS.
   const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) return null;
 
   try {

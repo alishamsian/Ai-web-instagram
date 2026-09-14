@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { writeStore } from "@/lib/database/store";
+import { logInfo } from "@/lib/observability/log";
 
 export async function POST(
   request: Request,
@@ -46,5 +47,9 @@ export async function POST(
   }
 
   if (!updated) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  logInfo(published ? "website.publish" : "website.unpublish", {
+    websiteId: id,
+    workspaceId: session.workspace.id,
+  });
   return NextResponse.json(updated);
 }

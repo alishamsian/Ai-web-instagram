@@ -150,6 +150,7 @@ export function EditorShell({
   const saveQueue = useRef(Promise.resolve());
   const configRef = useRef(config);
   const savedConfigRef = useRef(savedConfig);
+  const versionRef = useRef(website.version);
   const dirtyRef = useRef(false);
   const historyRef = useRef(history);
   const historyIndexRef = useRef(0);
@@ -365,12 +366,23 @@ export function EditorShell({
         const response = await fetch(`/api/websites/${website.id}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ config: toSave }),
+          body: JSON.stringify({
+            config: toSave,
+            expectedVersion: versionRef.current,
+          }),
         });
         if (!response.ok) {
           setSavePhase("error");
           flashMessage(dict.editor.saveFailed);
           return false;
+        }
+        const payload = (await response.json().catch(() => null)) as {
+          version?: number;
+        } | null;
+        if (typeof payload?.version === "number") {
+          versionRef.current = payload.version;
+        } else {
+          versionRef.current += 1;
         }
         const cloned = cloneConfig(toSave);
         savedConfigRef.current = cloned;
@@ -426,7 +438,10 @@ export function EditorShell({
         void fetch(`/api/websites/${website.id}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ config: payload }),
+          body: JSON.stringify({
+            config: payload,
+            expectedVersion: versionRef.current,
+          }),
           keepalive: true,
         });
       } catch {

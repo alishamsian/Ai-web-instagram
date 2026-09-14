@@ -37,6 +37,7 @@ export async function PATCH(
   const body = (await request.json()) as {
     config?: WebsiteConfig;
     slug?: string;
+    expectedVersion?: number;
   };
 
   if (!body.config && body.slug == null) {
@@ -45,6 +46,7 @@ export async function PATCH(
 
   let updated = null as Awaited<ReturnType<typeof readStore>>["websites"][number] | null;
   let slugError: string | null = null;
+  let versionConflict = false;
 
   let nextSlug: string | undefined;
   if (typeof body.slug === "string" && body.slug.trim()) {
@@ -61,6 +63,14 @@ export async function PATCH(
       (item) => item.id === id && item.workspaceId === session.workspace.id,
     );
     if (!website) return;
+
+    if (
+      typeof body.expectedVersion === "number" &&
+      body.expectedVersion !== website.version
+    ) {
+      versionConflict = true;
+      return;
+    }
 
     if (nextSlug) {
       const clash = store.websites.some(
@@ -98,6 +108,12 @@ export async function PATCH(
 
   if (slugError) {
     return NextResponse.json({ error: slugError }, { status: 409 });
+  }
+  if (versionConflict) {
+    return NextResponse.json(
+      { error: "VERSION_CONFLICT", message: "Site was updated elsewhere. Reload and try again." },
+      { status: 409 },
+    );
   }
   if (!updated) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   return NextResponse.json(updated);

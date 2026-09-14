@@ -54,14 +54,12 @@ export function requirePersistence() {
   }
 }
 
-/** Shared secret for durable job worker HTTP triggers. */
+/**
+ * Shared secret for durable job worker HTTP triggers.
+ * Never fall back to Supabase keys — those must not double as job auth.
+ */
 export function getJobWorkerSecret() {
-  return (
-    process.env.JOB_WORKER_SECRET ||
-    process.env.CRON_SECRET ||
-    process.env.SUPABASE_SECRET_KEY ||
-    ""
-  );
+  return process.env.JOB_WORKER_SECRET || process.env.CRON_SECRET || "";
 }
 
 export function assertJobWorkerAuthorized(request: Request) {
