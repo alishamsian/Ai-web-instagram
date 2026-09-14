@@ -81,6 +81,7 @@ export {
 
 export {
   createEntityId,
+  createLegacyEntityId,
   setEntityIdFactory,
   createSequentialIdFactory,
   type EntityIdFactory,
