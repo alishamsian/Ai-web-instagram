@@ -15,14 +15,21 @@ function heroPrimaryHref(config: WebsiteConfig) {
 }
 
 function heroVariant(config: WebsiteConfig) {
+  const registered = new Set([
+    "fan",
+    "overlay",
+    "editorial",
+    "split",
+    "minimal",
+  ]);
   const raw =
     config.sections.find((s) => s.type === "hero")?.variant ||
     config.content.hero.style ||
     "fan";
-  // Existing storefronts used "overlay" as the default campaign hero —
-  // show the centered fan composition instead (Hero10 language).
-  if (raw === "overlay") return "fan";
-  return raw;
+  // Legacy "menu" maps to editorial; unknown → fan.
+  if (raw === "menu") return "editorial";
+  if (registered.has(raw)) return raw;
+  return "fan";
 }
 
 function collectFanMedia(config: WebsiteConfig) {
@@ -370,7 +377,7 @@ export function StoreHero({ config }: { config: WebsiteConfig }) {
     );
   }
 
-  if (variant === "editorial" || variant === "menu") {
+  if (variant === "editorial") {
     return (
       <section className="store-hero store-hero--editorial" id="top" data-variant="editorial">
         <div className="store-wrap store-hero__plain">

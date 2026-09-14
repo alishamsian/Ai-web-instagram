@@ -4,13 +4,22 @@ import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import type {
   ColorConfig,
-  HeroConfig,
   TypographyConfig,
   WebsiteConfig,
 } from "@/types/website";
 import { Input, Textarea } from "@/components/ui/input";
 import { COLOR_PRESETS } from "@/components/editor/editor-utils";
 import { cn } from "@/lib/utils";
+import {
+  applyCommandResult,
+  commandSetBrandColor,
+  commandSetBrandColors,
+  commandSetBrandDesign,
+  commandSetBrandTypography,
+  commandSetContentPath,
+  commandSetSectionVariant,
+} from "@/lib/editor";
+import { getSectionVariants } from "@/lib/store/registry/catalog";
 
 function Field({
   label,
@@ -74,10 +83,14 @@ export function BrandPanel({
         <Input
           value={config.brand.name}
           onChange={(event) =>
-            onChange({
-              ...config,
-              brand: { ...config.brand, name: event.target.value },
-            })
+            applyCommandResult(
+              commandSetContentPath(
+                config,
+                "brand.name",
+                event.target.value,
+              ),
+              onChange,
+            )
           }
         />
       </Field>
@@ -86,10 +99,14 @@ export function BrandPanel({
           className="min-h-24 rounded-xl"
           value={config.brand.tagline ?? ""}
           onChange={(event) =>
-            onChange({
-              ...config,
-              brand: { ...config.brand, tagline: event.target.value },
-            })
+            applyCommandResult(
+              commandSetContentPath(
+                config,
+                "brand.tagline",
+                event.target.value,
+              ),
+              onChange,
+            )
           }
         />
       </Field>
@@ -118,13 +135,7 @@ export function ColorsPanel({
   ];
 
   function setColor(key: keyof ColorConfig, value: string) {
-    onChange({
-      ...config,
-      brand: {
-        ...config.brand,
-        colors: { ...config.brand.colors, [key]: value },
-      },
-    });
+    onChange(commandSetBrandColor(config, key, value).config);
   }
 
   return (
@@ -140,10 +151,7 @@ export function ColorsPanel({
               type="button"
               title={preset.label[locale]}
               onClick={() =>
-                onChange({
-                  ...config,
-                  brand: { ...config.brand, colors: preset.colors },
-                })
+                onChange(commandSetBrandColors(config, preset.colors).config)
               }
               className="group flex flex-col items-center gap-1.5"
             >
@@ -209,13 +217,7 @@ export function TypographyPanel({
         <Segmented<TypographyConfig["heading"]>
           value={config.brand.typography.heading}
           onChange={(heading) =>
-            onChange({
-              ...config,
-              brand: {
-                ...config.brand,
-                typography: { ...config.brand.typography, heading },
-              },
-            })
+            onChange(commandSetBrandTypography(config, { heading }).config)
           }
           options={[
             { id: "serif", label: dict.editor.fontSerif },
@@ -231,13 +233,7 @@ export function TypographyPanel({
         <Segmented<TypographyConfig["body"]>
           value={config.brand.typography.body}
           onChange={(body) =>
-            onChange({
-              ...config,
-              brand: {
-                ...config.brand,
-                typography: { ...config.brand.typography, body },
-              },
-            })
+            onChange(commandSetBrandTypography(config, { body }).config)
           }
           options={[
             { id: "sans", label: dict.editor.fontSans },
@@ -252,13 +248,7 @@ export function TypographyPanel({
         <Segmented<TypographyConfig["scale"]>
           value={config.brand.typography.scale}
           onChange={(scale) =>
-            onChange({
-              ...config,
-              brand: {
-                ...config.brand,
-                typography: { ...config.brand.typography, scale },
-              },
-            })
+            onChange(commandSetBrandTypography(config, { scale }).config)
           }
           options={[
             { id: "editorial", label: dict.editor.scaleEditorial },
@@ -274,37 +264,44 @@ export function TypographyPanel({
 export function LayoutPanel({
   config,
   dict,
+  locale,
   onChange,
 }: {
   config: WebsiteConfig;
   dict: Dictionary;
+  locale: Locale;
   onChange: (next: WebsiteConfig) => void;
 }) {
+  const heroSection = config.sections.find((s) => s.type === "hero");
+  const variants = getSectionVariants("hero");
+  const current =
+    heroSection?.variant ?? config.content.hero.style ?? variants[0]?.id ?? "fan";
+
   return (
     <div className="space-y-5">
       <div className="space-y-2">
         <p className="text-[11px] font-medium text-muted-foreground">
           {dict.editor.heroStyle}
         </p>
-        <Segmented<HeroConfig["style"]>
-          value={config.content.hero.style}
-          onChange={(style) =>
-            onChange({
-              ...config,
-              content: {
-                ...config.content,
-                hero: { ...config.content.hero, style },
-              },
-            })
-          }
-          options={[
-            { id: "fan", label: dict.editor.styleFan },
-            { id: "overlay", label: dict.editor.styleOverlay },
-            { id: "split", label: dict.editor.styleSplit },
-            { id: "minimal", label: dict.editor.styleMinimal },
-            { id: "editorial", label: dict.editor.styleEditorial },
-            { id: "menu", label: dict.editor.styleMenu },
-          ]}
+        <Segmented
+          value={current}
+          onChange={(style) => {
+            if (!heroSection) {
+              applyCommandResult(
+                commandSetContentPath(config, "content.hero.style", style),
+                onChange,
+              );
+              return;
+            }
+            applyCommandResult(
+              commandSetSectionVariant(config, heroSection.id, style),
+              onChange,
+            );
+          }}
+          options={variants.map((v) => ({
+            id: v.id,
+            label: v.label[locale] ?? v.id,
+          }))}
         />
       </div>
       <p className="rounded-xl bg-muted px-3 py-2.5 text-[12px] leading-5 text-muted-foreground">
@@ -331,13 +328,7 @@ export function DesignSystemPanel({
   } as const;
 
   function patch(next: Partial<typeof design>) {
-    onChange({
-      ...config,
-      brand: {
-        ...config.brand,
-        design: { ...(config.brand.design ?? {}), ...next },
-      },
-    });
+    onChange(commandSetBrandDesign(config, next).config);
   }
 
   return (

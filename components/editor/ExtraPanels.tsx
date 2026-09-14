@@ -7,7 +7,17 @@ import type { TemplateType, WebsiteConfig } from "@/types/website";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "@/components/editor/MediaPicker";
-import { commandApplyTemplate } from "@/lib/editor/commands";
+import {
+  commandApplyTemplate,
+  applyCommandResult,
+  commandSetGalleryImages,
+  commandToggleGalleryImage,
+  commandSetSeoField,
+  commandSetSeoKeywords,
+  commandAssignMedia,
+  commandSetBrandLogo,
+  commandUpdateSiteSettings,
+} from "@/lib/editor";
 import { templates, templateOrder } from "@/lib/website/templates";
 import { cn } from "@/lib/utils";
 
@@ -84,19 +94,11 @@ export function MediaPanel({
               ([, m]) => m.url === config.brand.logo,
             )?.[0]
           }
-          onPick={(id) => {
-            const media = config.media[id];
-            if (!media) return;
-            onChange({
-              ...config,
-              brand: { ...config.brand, logo: media.url },
-            });
-          }}
+          onPick={(id) =>
+            applyCommandResult(commandSetBrandLogo(config, id), onChange)
+          }
           onClear={() =>
-            onChange({
-              ...config,
-              brand: { ...config.brand, logo: undefined },
-            })
+            applyCommandResult(commandSetBrandLogo(config, null), onChange)
           }
           clearLabel={dict.editor.clearMedia}
           emptyLabel={dict.editor.noMedia}
@@ -111,22 +113,16 @@ export function MediaPanel({
           config={config}
           value={config.content.hero.imageId}
           onPick={(id) =>
-            onChange({
-              ...config,
-              content: {
-                ...config.content,
-                hero: { ...config.content.hero, imageId: id },
-              },
-            })
+            applyCommandResult(
+              commandAssignMedia(config, "content.hero.imageId", id),
+              onChange,
+            )
           }
           onClear={() =>
-            onChange({
-              ...config,
-              content: {
-                ...config.content,
-                hero: { ...config.content.hero, imageId: undefined },
-              },
-            })
+            applyCommandResult(
+              commandAssignMedia(config, "content.hero.imageId", null),
+              onChange,
+            )
           }
           clearLabel={dict.editor.clearMedia}
           emptyLabel={dict.editor.noMedia}
@@ -142,22 +138,16 @@ export function MediaPanel({
             config={config}
             value={config.content.about.imageId}
             onPick={(id) =>
-              onChange({
-                ...config,
-                content: {
-                  ...config.content,
-                  about: { ...config.content.about!, imageId: id },
-                },
-              })
+              applyCommandResult(
+                commandAssignMedia(config, "content.about.imageId", id),
+                onChange,
+              )
             }
             onClear={() =>
-              onChange({
-                ...config,
-                content: {
-                  ...config.content,
-                  about: { ...config.content.about!, imageId: undefined },
-                },
-              })
+              applyCommandResult(
+                commandAssignMedia(config, "content.about.imageId", null),
+                onChange,
+              )
             }
             clearLabel={dict.editor.clearMedia}
             emptyLabel={dict.editor.noMedia}
@@ -175,18 +165,14 @@ export function MediaPanel({
             multi
             values={config.content.gallery.imageIds}
             onPick={(id) => {
-              const ids = config.content.gallery!.imageIds;
-              const next = ids.includes(id)
-                ? ids.filter((x) => x !== id)
-                : [...ids, id];
-              onChange({
-                ...config,
-                content: {
-                  ...config.content,
-                  gallery: { ...config.content.gallery!, imageIds: next },
-                },
-              });
+              applyCommandResult(
+                commandToggleGalleryImage(config, id),
+                onChange,
+              );
             }}
+            onClear={() =>
+              applyCommandResult(commandSetGalleryImages(config, []), onChange)
+            }
             clearLabel={dict.editor.clearMedia}
             emptyLabel={dict.editor.noMedia}
           />
@@ -231,10 +217,10 @@ export function SeoPanel({
         <Input
           value={title}
           onChange={(event) =>
-            onChange({
-              ...config,
-              seo: { ...config.seo, title: event.target.value },
-            })
+            applyCommandResult(
+              commandSetSeoField(config, "title", event.target.value),
+              onChange,
+            )
           }
         />
         <p
@@ -251,10 +237,10 @@ export function SeoPanel({
           className="min-h-28 rounded-xl"
           value={description}
           onChange={(event) =>
-            onChange({
-              ...config,
-              seo: { ...config.seo, description: event.target.value },
-            })
+            applyCommandResult(
+              commandSetSeoField(config, "description", event.target.value),
+              onChange,
+            )
           }
         />
         <p
@@ -270,16 +256,13 @@ export function SeoPanel({
         <Input
           value={config.seo.keywords.join(", ")}
           onChange={(event) =>
-            onChange({
-              ...config,
-              seo: {
-                ...config.seo,
-                keywords: event.target.value
-                  .split(",")
-                  .map((k) => k.trim())
-                  .filter(Boolean),
-              },
-            })
+            applyCommandResult(
+              commandSetSeoKeywords(
+                config,
+                event.target.value.split(",").map((k) => k.trim()),
+              ),
+              onChange,
+            )
           }
         />
       </Field>
@@ -312,14 +295,9 @@ export function SettingsPanel({
         <Segmented<"fa" | "en">
           value={config.settings.language}
           onChange={(language) =>
-            onChange({
-              ...config,
-              settings: {
-                ...config.settings,
-                language,
-                direction: language === "fa" ? "rtl" : "ltr",
-              },
-            })
+            onChange(
+              commandUpdateSiteSettings(config, { language }).config,
+            )
           }
           options={[
             { id: "fa", label: "فارسی" },
@@ -340,10 +318,7 @@ export function SettingsPanel({
         <Segmented<"rtl" | "ltr">
           value={config.settings.direction}
           onChange={(direction) =>
-            onChange({
-              ...config,
-              settings: { ...config.settings, direction },
-            })
+            onChange(commandUpdateSiteSettings(config, { direction }).config)
           }
           options={[
             { id: "rtl", label: "RTL" },
@@ -369,15 +344,13 @@ export function SettingsPanel({
           disabled={!canRemoveBranding && config.settings.showBranding}
           onChange={(event) => {
             if (!canRemoveBranding && !event.target.checked) return;
-            onChange({
-              ...config,
-              settings: {
-                ...config.settings,
+            onChange(
+              commandUpdateSiteSettings(config, {
                 showBranding: canRemoveBranding
                   ? event.target.checked
                   : true,
-              },
-            });
+              }).config,
+            );
           }}
         />
       </label>

@@ -98,7 +98,6 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
             { value: "split", label: { fa: "دو ستونه", en: "Split" } },
             { value: "minimal", label: { fa: "مینیمال", en: "Minimal" } },
             { value: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
-            { value: "menu", label: { fa: "منو", en: "Menu" } },
           ],
           defaultValue: "fan",
         },

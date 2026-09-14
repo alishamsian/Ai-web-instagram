@@ -28,7 +28,13 @@ import {
   commandApplyThemePreset,
   commandSetSectionVariant,
   commandUpdateProduct,
-} from "@/lib/editor/commands";
+  commandReorderProduct,
+  commandSetContentPath,
+  commandAssignMedia,
+  commandToggleSection,
+  commandPatchSectionSettings,
+  applyCommandResult,
+} from "@/lib/editor";
 import { getSectionVariants } from "@/lib/store/registry/catalog";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { MediaPicker } from "@/components/editor/MediaPicker";
@@ -738,14 +744,9 @@ function patchSectionSettings(
   sectionId: string,
   patch: Record<string, unknown>,
 ): WebsiteConfig {
-  return {
-    ...config,
-    sections: config.sections.map((s) =>
-      s.id === sectionId
-        ? { ...s, settings: { ...(s.settings ?? {}), ...patch } }
-        : s,
-    ),
-  };
+  return (
+    commandPatchSectionSettings(config, sectionId, patch)?.config ?? config
+  );
 }
 
 function SmartLayoutControls({
@@ -775,6 +776,9 @@ function SmartLayoutControls({
   return (
     <InspectorGroup title={dict.editor.smartLayout} defaultOpen>
       <Field label={dict.editor.spacing}>
+        <p className="mb-1.5 text-[10px] text-[color:var(--ed-subtle)]">
+          Affects editor framing chrome only — not the published site.
+        </p>
         <Segmented
           value={spacing}
           options={[
@@ -788,6 +792,9 @@ function SmartLayoutControls({
         />
       </Field>
       <Field label={dict.editor.width}>
+        <p className="mb-1.5 text-[10px] text-[color:var(--ed-subtle)]">
+          Affects editor framing chrome only — not the published site.
+        </p>
         <Segmented
           value={width}
           options={[
@@ -917,16 +924,14 @@ function SectionInspector({
               <Input
                 value={config.content.hero.headline}
                 onChange={(event) =>
-                  onChange({
-                    ...config,
-                    content: {
-                      ...config.content,
-                      hero: {
-                        ...config.content.hero,
-                        headline: event.target.value,
-                      },
-                    },
-                  })
+                  applyCommandResult(
+                    commandSetContentPath(
+                      config,
+                      "content.hero.headline",
+                      event.target.value,
+                    ),
+                    onChange,
+                  )
                 }
               />
             </Field>
@@ -935,16 +940,14 @@ function SectionInspector({
                 className="min-h-24 rounded-xl"
                 value={config.content.hero.subheadline}
                 onChange={(event) =>
-                  onChange({
-                    ...config,
-                    content: {
-                      ...config.content,
-                      hero: {
-                        ...config.content.hero,
-                        subheadline: event.target.value,
-                      },
-                    },
-                  })
+                  applyCommandResult(
+                    commandSetContentPath(
+                      config,
+                      "content.hero.subheadline",
+                      event.target.value,
+                    ),
+                    onChange,
+                  )
                 }
               />
             </Field>
@@ -952,16 +955,14 @@ function SectionInspector({
               <Input
                 value={config.content.hero.cta}
                 onChange={(event) =>
-                  onChange({
-                    ...config,
-                    content: {
-                      ...config.content,
-                      hero: {
-                        ...config.content.hero,
-                        cta: event.target.value,
-                      },
-                    },
-                  })
+                  applyCommandResult(
+                    commandSetContentPath(
+                      config,
+                      "content.hero.cta",
+                      event.target.value,
+                    ),
+                    onChange,
+                  )
                 }
               />
             </Field>
@@ -975,22 +976,20 @@ function SectionInspector({
                 clearLabel={dict.editor.clearMedia}
                 emptyLabel={dict.editor.noMedia}
                 onPick={(imageId) =>
-                  onChange({
-                    ...config,
-                    content: {
-                      ...config.content,
-                      hero: { ...config.content.hero, imageId },
-                    },
-                  })
+                  applyCommandResult(
+                    commandAssignMedia(
+                      config,
+                      "content.hero.imageId",
+                      imageId,
+                    ),
+                    onChange,
+                  )
                 }
                 onClear={() =>
-                  onChange({
-                    ...config,
-                    content: {
-                      ...config.content,
-                      hero: { ...config.content.hero, imageId: undefined },
-                    },
-                  })
+                  applyCommandResult(
+                    commandAssignMedia(config, "content.hero.imageId", null),
+                    onChange,
+                  )
                 }
               />
             </Field>
@@ -1002,28 +1001,21 @@ function SectionInspector({
         <InspectorGroup title={dict.editor.layout} defaultOpen>
           <Field label={dict.editor.heroStyle}>
             <Segmented
-              value={config.content.hero.style}
-              options={(
-                [
-                  ["fan", dict.editor.styleFan],
-                  ["overlay", dict.editor.styleOverlay],
-                  ["split", dict.editor.styleSplit],
-                  ["minimal", dict.editor.styleMinimal],
-                  ["editorial", dict.editor.styleEditorial],
-                  ["menu", dict.editor.styleMenu],
-                ] as const
-              ).map(([id, label]) => ({ id, label }))}
+              value={
+                section?.variant ??
+                config.content.hero.style ??
+                getSectionVariants("hero")[0]?.id ??
+                "fan"
+              }
+              options={getSectionVariants("hero").map((v) => ({
+                id: v.id,
+                label: v.label[locale] ?? v.id,
+              }))}
               onChange={(style) =>
-                onChange({
-                  ...config,
-                  content: {
-                    ...config.content,
-                    hero: { ...config.content.hero, style },
-                  },
-                  sections: config.sections.map((s) =>
-                    s.id === sectionId ? { ...s, variant: style } : s,
-                  ),
-                })
+                applyCommandResult(
+                  commandSetSectionVariant(config, sectionId, style),
+                  onChange,
+                )
               }
             />
           </Field>
@@ -1036,16 +1028,14 @@ function SectionInspector({
             <Input
               value={config.content.about.title}
               onChange={(event) =>
-                onChange({
-                  ...config,
-                  content: {
-                    ...config.content,
-                    about: {
-                      ...config.content.about!,
-                      title: event.target.value,
-                    },
-                  },
-                })
+                applyCommandResult(
+                  commandSetContentPath(
+                    config,
+                    "content.about.title",
+                    event.target.value,
+                  ),
+                  onChange,
+                )
               }
             />
           </Field>
@@ -1054,16 +1044,14 @@ function SectionInspector({
               className="min-h-28 rounded-xl"
               value={config.content.about.body}
               onChange={(event) =>
-                onChange({
-                  ...config,
-                  content: {
-                    ...config.content,
-                    about: {
-                      ...config.content.about!,
-                      body: event.target.value,
-                    },
-                  },
-                })
+                applyCommandResult(
+                  commandSetContentPath(
+                    config,
+                    "content.about.body",
+                    event.target.value,
+                  ),
+                  onChange,
+                )
               }
             />
           </Field>
@@ -1100,16 +1088,14 @@ function SectionInspector({
             <Input
               value={config.content.gallery.title}
               onChange={(event) =>
-                onChange({
-                  ...config,
-                  content: {
-                    ...config.content,
-                    gallery: {
-                      ...config.content.gallery!,
-                      title: event.target.value,
-                    },
-                  },
-                })
+                applyCommandResult(
+                  commandSetContentPath(
+                    config,
+                    "content.gallery.title",
+                    event.target.value,
+                  ),
+                  onChange,
+                )
               }
             />
           </Field>
@@ -1122,16 +1108,14 @@ function SectionInspector({
             <Input
               value={config.content.faq.title}
               onChange={(event) =>
-                onChange({
-                  ...config,
-                  content: {
-                    ...config.content,
-                    faq: {
-                      ...config.content.faq!,
-                      title: event.target.value,
-                    },
-                  },
-                })
+                applyCommandResult(
+                  commandSetContentPath(
+                    config,
+                    "content.faq.title",
+                    event.target.value,
+                  ),
+                  onChange,
+                )
               }
             />
           </Field>
@@ -1144,16 +1128,14 @@ function SectionInspector({
             <Input
               value={config.content.contact.title}
               onChange={(event) =>
-                onChange({
-                  ...config,
-                  content: {
-                    ...config.content,
-                    contact: {
-                      ...config.content.contact!,
-                      title: event.target.value,
-                    },
-                  },
-                })
+                applyCommandResult(
+                  commandSetContentPath(
+                    config,
+                    "content.contact.title",
+                    event.target.value,
+                  ),
+                  onChange,
+                )
               }
             />
           </Field>
@@ -1186,16 +1168,13 @@ function SectionInspector({
             <input
               type="checkbox"
               checked={section.visible}
-              onChange={(event) =>
-                onChange({
-                  ...config,
-                  sections: config.sections.map((s) =>
-                    s.id === sectionId
-                      ? { ...s, visible: event.target.checked }
-                      : s,
-                  ),
-                })
-              }
+              onChange={(event) => {
+                if (event.target.checked === section.visible) return;
+                applyCommandResult(
+                  commandToggleSection(config, sectionId),
+                  onChange,
+                );
+              }}
             />
           </label>
         </InspectorGroup>
@@ -1253,14 +1232,10 @@ function ProductsSectionInspector({
     item.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
 
-  function updateItems(items: Product[]) {
-    onChange({
-      ...config,
-      content: {
-        ...config.content,
-        products: { ...products!, items },
-      },
-    });
+  function applyProductCommand(
+    result: ReturnType<typeof commandUpdateProduct>,
+  ) {
+    if (result) onChange(result.config);
   }
 
   if (mode === "layout") {
@@ -1338,13 +1313,14 @@ function ProductsSectionInspector({
             <Input
               value={products.title}
               onChange={(event) =>
-                onChange({
-                  ...config,
-                  content: {
-                    ...config.content,
-                    products: { ...products, title: event.target.value },
-                  },
-                })
+                applyCommandResult(
+                  commandSetContentPath(
+                    config,
+                    "content.products.title",
+                    event.target.value,
+                  ),
+                  onChange,
+                )
               }
             />
           </Field>
@@ -1379,10 +1355,10 @@ function ProductsSectionInspector({
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => {
                     if (dragIndex == null || dragIndex === realIndex) return;
-                    const items = [...products.items];
-                    const [moved] = items.splice(dragIndex, 1);
-                    items.splice(realIndex, 0, moved!);
-                    updateItems(items);
+                    applyCommandResult(
+                      commandReorderProduct(config, dragIndex, realIndex),
+                      onChange,
+                    );
                     setDragIndex(null);
                   }}
                   onDragEnd={() => setDragIndex(null)}
@@ -1432,12 +1408,13 @@ function ProductsSectionInspector({
                           : dict.editor.hideProduct
                       }
                       onClick={() => {
-                        const items = [...products.items];
-                        items[realIndex] = {
-                          ...item,
-                          hidden: !item.hidden,
-                        };
-                        updateItems(items);
+                        const productId = item.id || item.slug;
+                        if (!productId) return;
+                        applyProductCommand(
+                          commandUpdateProduct(config, productId, {
+                            hidden: !item.hidden,
+                          }),
+                        );
                       }}
                     >
                       {item.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -1488,40 +1465,7 @@ function ProductPageInspector({
 
   function patch(next: Partial<Product>) {
     const productId = product!.id || product!.slug;
-    if (!productId) {
-      const items = [...products!.items];
-      items[index] = { ...product!, ...next };
-      onChange({
-        ...config,
-        content: {
-          ...config.content,
-          products: { ...products!, items },
-        },
-      });
-      return;
-    }
-
-    if (next.imageIds) {
-      const result = commandUpdateProduct(config, productId, {
-        imageId: next.imageIds[0] ?? null,
-      });
-      if (!result) return;
-      const items = [...result.config.content.products!.items];
-      const idx = items.findIndex(
-        (item) => (item.id || item.slug) === productId,
-      );
-      if (idx < 0) return;
-      items[idx] = { ...items[idx]!, imageIds: next.imageIds };
-      onChange({
-        ...result.config,
-        content: {
-          ...result.config.content,
-          products: { ...result.config.content.products!, items },
-        },
-      });
-      return;
-    }
-
+    if (!productId) return;
     const result = commandUpdateProduct(config, productId, {
       ...(next.name !== undefined ? { name: next.name } : {}),
       ...(next.description !== undefined
@@ -1531,6 +1475,7 @@ function ProductPageInspector({
       ...(next.currency !== undefined ? { currency: next.currency } : {}),
       ...(next.category !== undefined ? { category: next.category } : {}),
       ...(next.hidden !== undefined ? { hidden: next.hidden } : {}),
+      ...(next.imageIds !== undefined ? { imageIds: next.imageIds } : {}),
     });
     if (result) onChange(result.config);
   }

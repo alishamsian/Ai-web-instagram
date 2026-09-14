@@ -4,7 +4,7 @@ import type {
   WebsiteConfig,
   WebsiteSectionType,
 } from "@/types/website";
-import type { ContactInfo, Product } from "@/types/ai";
+import type { ContactInfo } from "@/types/ai";
 import { cloneWebsiteConfig, type EditorCommandResult } from "@/lib/editor/types";
 import {
   getSectionVariants,
@@ -247,7 +247,7 @@ export function commandSetBrandTypography(
 
 export function commandSetBrandDesign(
   config: WebsiteConfig,
-  patch: NonNullable<WebsiteConfig["brand"]["design"]>,
+  patch: Partial<NonNullable<WebsiteConfig["brand"]["design"]>>,
 ): EditorCommandResult {
   return {
     config: {
@@ -431,15 +431,11 @@ export function commandSetSectionVariant(
   };
 
   // Keep hero.style in sync when variant matches a known hero style.
+  // Source of truth: registry variants for hero (fan/overlay/editorial/split/minimal).
   if (section.type === "hero") {
-    const styles = new Set([
-      "fan",
-      "overlay",
-      "editorial",
-      "split",
-      "minimal",
-      "menu",
-    ]);
+    const styles = new Set(
+      getSectionVariants("hero").map((variant) => variant.id),
+    );
     if (styles.has(variantId)) {
       const synced = commandSetContentPath(
         next,
@@ -454,58 +450,6 @@ export function commandSetSectionVariant(
     config: next,
     label: `Variant ${section.type}.${variantId}`,
     selectedSectionId: sectionId,
-  };
-}
-
-export function commandUpdateProduct(
-  config: WebsiteConfig,
-  productId: string,
-  patch: Partial<
-    Pick<
-      Product,
-      "name" | "description" | "price" | "currency" | "category" | "hidden"
-    >
-  > & { imageId?: string | null },
-): EditorCommandResult | null {
-  const products = config.content.products;
-  if (!products) return null;
-  const index = products.items.findIndex(
-    (item) => (item.id || item.slug) === productId,
-  );
-  if (index < 0) return null;
-  const current = products.items[index]!;
-  if (patch.imageId != null && !config.media[patch.imageId]) return null;
-
-  const nextItem: Product = {
-    ...current,
-    ...("name" in patch && patch.name != null ? { name: patch.name } : {}),
-    ...("description" in patch && patch.description != null
-      ? { description: patch.description }
-      : {}),
-    ...("price" in patch ? { price: patch.price ?? null } : {}),
-    ...("currency" in patch ? { currency: patch.currency ?? null } : {}),
-    ...("category" in patch && patch.category != null
-      ? { category: patch.category }
-      : {}),
-    ...("hidden" in patch ? { hidden: patch.hidden } : {}),
-  };
-  if ("imageId" in patch) {
-    nextItem.imageIds = patch.imageId
-      ? [patch.imageId, ...current.imageIds.filter((id) => id !== patch.imageId)]
-      : current.imageIds.slice(1);
-  }
-
-  const items = [...products.items];
-  items[index] = nextItem;
-  return {
-    config: {
-      ...config,
-      content: {
-        ...config.content,
-        products: { ...products, items },
-      },
-    },
-    label: `Edit product ${productId}`,
   };
 }
 
@@ -558,6 +502,88 @@ export function commandSetContactInfo(
       },
     },
     label: `Edit contact.${key}`,
+  };
+}
+
+/** Patch allowlisted section settings (productSource, columns, chrome layout, etc.). */
+export function commandPatchSectionSettings(
+  config: WebsiteConfig,
+  sectionId: string,
+  patch: Record<string, unknown>,
+): EditorCommandResult | null {
+  const section = config.sections.find((s) => s.id === sectionId);
+  if (!section) return null;
+  return {
+    config: {
+      ...config,
+      sections: config.sections.map((s) =>
+        s.id === sectionId
+          ? { ...s, settings: { ...(s.settings ?? {}), ...patch } }
+          : s,
+      ),
+    },
+    label: `Update ${section.type} settings`,
+    selectedSectionId: sectionId,
+  };
+}
+
+/** Assign brand logo from an imported media asset (stores resolved URL). */
+export function commandSetBrandLogo(
+  config: WebsiteConfig,
+  mediaId: string | null,
+): EditorCommandResult | null {
+  if (mediaId != null && !config.media[mediaId]) return null;
+  return {
+    config: {
+      ...config,
+      brand: {
+        ...config.brand,
+        logo: mediaId ? config.media[mediaId]!.url : undefined,
+      },
+    },
+    label: mediaId ? `Set brand logo` : "Clear brand logo",
+  };
+}
+
+export function commandSetBrandColors(
+  config: WebsiteConfig,
+  colors: WebsiteConfig["brand"]["colors"],
+): EditorCommandResult {
+  return {
+    config: {
+      ...config,
+      brand: { ...config.brand, colors: { ...colors } },
+    },
+    label: "Change brand colors",
+  };
+}
+
+export function commandSetSeoKeywords(
+  config: WebsiteConfig,
+  keywords: string[],
+): EditorCommandResult {
+  return {
+    config: {
+      ...config,
+      seo: {
+        ...config.seo,
+        keywords: keywords.map((k) => k.trim()).filter(Boolean).slice(0, 40),
+      },
+    },
+    label: "Edit SEO keywords",
+  };
+}
+
+export function commandUpdateSiteSettings(
+  config: WebsiteConfig,
+  patch: Partial<WebsiteConfig["settings"]>,
+): EditorCommandResult {
+  const next = { ...config.settings, ...patch };
+  if (patch.language === "fa") next.direction = patch.direction ?? "rtl";
+  if (patch.language === "en") next.direction = patch.direction ?? "ltr";
+  return {
+    config: { ...config, settings: next },
+    label: "Update site settings",
   };
 }
 
