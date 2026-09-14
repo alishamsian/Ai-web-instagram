@@ -1,13 +1,17 @@
 /**
  * Soft identity / legacy normalization for WebsiteConfig content collections.
- * Pure — does not persist. Safe to run on editor load.
+ * Pure and idempotent — safe to run repeatedly on editor/preview/published data.
  */
 
 import type { WebsiteConfig } from "@/types/website";
-import { createEntityId } from "@/lib/editor/ids";
+import { createLegacyEntityId } from "@/lib/editor/ids";
 import { getSectionVariants } from "@/lib/store/registry/catalog";
 
-/** Assign stable ids to collection items that lack them (backwards compatible). */
+function identitySeed(...parts: string[]): string {
+  return parts.map((part) => part.trim()).join("|");
+}
+
+/** Assign stable, content-derived ids to legacy collection items that lack them. */
 export function normalizeCollectionIdentities(
   config: WebsiteConfig,
 ): WebsiteConfig {
@@ -16,10 +20,20 @@ export function normalizeCollectionIdentities(
 
   if (content.products) {
     let productsTouched = false;
-    const items = content.products.items.map((item) => {
+    const items = content.products.items.map((item, index) => {
       if (item.id || item.slug) return item;
       productsTouched = true;
-      const id = createEntityId("product");
+      const id = createLegacyEntityId(
+        "product",
+        identitySeed(
+          config.template,
+          "product",
+          String(index),
+          item.name ?? "",
+          item.description ?? "",
+          item.category ?? "",
+        ),
+      );
       return { ...item, id, slug: id };
     });
     if (productsTouched) {
@@ -30,10 +44,22 @@ export function normalizeCollectionIdentities(
 
   if (content.services) {
     let touched = false;
-    const items = content.services.items.map((item) => {
+    const items = content.services.items.map((item, index) => {
       if (item.id) return item;
       touched = true;
-      return { ...item, id: createEntityId("service") };
+      return {
+        ...item,
+        id: createLegacyEntityId(
+          "service",
+          identitySeed(
+            config.template,
+            "service",
+            String(index),
+            item.name ?? "",
+            item.description ?? "",
+          ),
+        ),
+      };
     });
     if (touched) {
       content.services = { ...content.services, items };
@@ -43,10 +69,22 @@ export function normalizeCollectionIdentities(
 
   if (content.faq) {
     let touched = false;
-    const items = content.faq.items.map((item) => {
+    const items = content.faq.items.map((item, index) => {
       if (item.id) return item;
       touched = true;
-      return { ...item, id: createEntityId("faq") };
+      return {
+        ...item,
+        id: createLegacyEntityId(
+          "faq",
+          identitySeed(
+            config.template,
+            "faq",
+            String(index),
+            item.question ?? "",
+            item.answer ?? "",
+          ),
+        ),
+      };
     });
     if (touched) {
       content.faq = { ...content.faq, items };
@@ -56,10 +94,22 @@ export function normalizeCollectionIdentities(
 
   if (content.testimonials) {
     let touched = false;
-    const items = content.testimonials.items.map((item) => {
+    const items = content.testimonials.items.map((item, index) => {
       if (item.id) return item;
       touched = true;
-      return { ...item, id: createEntityId("testimonial") };
+      return {
+        ...item,
+        id: createLegacyEntityId(
+          "testimonial",
+          identitySeed(
+            config.template,
+            "testimonial",
+            String(index),
+            item.quote ?? "",
+            item.author ?? "",
+          ),
+        ),
+      };
     });
     if (touched) {
       content.testimonials = { ...content.testimonials, items };
