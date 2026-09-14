@@ -9,6 +9,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { validatePasswordStrength } from "@/lib/auth/password";
 import { normalizePlanId } from "@/lib/admin/entitlements";
+import { softDeleteColumnsSupported } from "@/lib/database/supabase-store";
 import type { Session, User, Workspace } from "@/types/user";
 
 
@@ -28,20 +29,22 @@ async function loadWorkspaceForUserUncached(
 
     // Read-only on the hot path. Create profile/workspace only when missing —
     // never upsert on every page render (that + Auth refresh was rate-limiting us).
+    const softDeleteReady = await softDeleteColumnsSupported();
+    let workspaceQuery = db
+      .from("workspaces")
+      .select("*")
+      .eq("owner_id", userId)
+      .order("created_at")
+      .limit(1);
+    if (softDeleteReady) workspaceQuery = workspaceQuery.is("deleted_at", null);
+
     const [{ data: profile }, { data: workspace }] = await Promise.all([
       db
         .from("profiles")
         .select("id, email, name, avatar_url, created_at")
         .eq("id", userId)
         .maybeSingle(),
-      db
-        .from("workspaces")
-        .select("*")
-        .eq("owner_id", userId)
-        .is("deleted_at", null)
-        .order("created_at")
-        .limit(1)
-        .maybeSingle(),
+      workspaceQuery.maybeSingle(),
     ]);
 
     let workspaceRow = workspace;

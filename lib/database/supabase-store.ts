@@ -363,6 +363,7 @@ function ids(list: { id: string }[]) {
 
 /** Cached probe — live DB may lag behind repo migrations. */
 let importJobsPostsLimitReady: boolean | null = null;
+let softDeleteColumnsReady: boolean | null = null;
 
 export async function importJobsSupportsPostsLimit() {
   if (importJobsPostsLimitReady !== null) return importJobsPostsLimitReady;
@@ -375,6 +376,24 @@ export async function importJobsSupportsPostsLimit() {
     );
   }
   return importJobsPostsLimitReady;
+}
+
+/** True when websites.deleted_at exists (admin foundation migration applied). */
+export async function softDeleteColumnsSupported() {
+  if (softDeleteColumnsReady !== null) return softDeleteColumnsReady;
+  const db = getSupabaseAdmin();
+  const { error } = await db.from("websites").select("deleted_at").limit(1);
+  softDeleteColumnsReady = !error;
+  if (!softDeleteColumnsReady) {
+    console.warn(
+      "[supabase] websites.deleted_at is missing. Run supabase/migrations/20260915030000_admin_foundation.sql",
+    );
+  }
+  return softDeleteColumnsReady;
+}
+
+export function resetSoftDeleteSchemaCache() {
+  softDeleteColumnsReady = null;
 }
 
 /**

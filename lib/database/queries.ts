@@ -3,6 +3,7 @@ import {
   isSupabaseSchemaReady,
   mapWebsiteRow,
   mapDomainRow,
+  softDeleteColumnsSupported,
   type WebsiteRow,
   type DomainRow,
 } from "@/lib/database/supabase-store";
@@ -16,14 +17,14 @@ export async function getWebsiteById(
 ): Promise<WebsiteRecord | null> {
   if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
     const db = getSupabaseAdmin();
-    const { data, error } = await db
-      .from("websites")
-      .select("*")
-      .eq("id", id)
-      .is("deleted_at", null)
-      .maybeSingle();
+    const softDeleteReady = await softDeleteColumnsSupported();
+    let query = db.from("websites").select("*").eq("id", id);
+    if (softDeleteReady) query = query.is("deleted_at", null);
+    const { data, error } = await query.maybeSingle();
     if (error || !data) return null;
-    return mapWebsiteRow(data as WebsiteRow);
+    const site = mapWebsiteRow(data as WebsiteRow);
+    if (isSoftDeleted(site)) return null;
+    return site;
   }
   const store = await readStore();
   const site = store.websites.find((w) => w.id === id);
@@ -45,15 +46,18 @@ export async function getPublishedWebsiteBySlug(
 ): Promise<WebsiteRecord | null> {
   if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
     const db = getSupabaseAdmin();
-    const { data, error } = await db
+    const softDeleteReady = await softDeleteColumnsSupported();
+    let query = db
       .from("websites")
       .select("*")
       .eq("slug", slug)
-      .eq("status", "published")
-      .is("deleted_at", null)
-      .maybeSingle();
+      .eq("status", "published");
+    if (softDeleteReady) query = query.is("deleted_at", null);
+    const { data, error } = await query.maybeSingle();
     if (error || !data) return null;
-    return mapWebsiteRow(data as WebsiteRow);
+    const site = mapWebsiteRow(data as WebsiteRow);
+    if (isSoftDeleted(site)) return null;
+    return site;
   }
   const store = await readStore();
   return (
@@ -154,9 +158,13 @@ export async function getPublishedSlugByCustomHost(
   const normalized = host.split(":")[0].toLowerCase();
   if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
     const db = getSupabaseAdmin();
+    const softDeleteReady = await softDeleteColumnsSupported();
+    const select = softDeleteReady
+      ? "host, website_id, websites!inner(slug, status, deleted_at)"
+      : "host, website_id, websites!inner(slug, status)";
     const { data, error } = await db
       .from("domains")
-      .select("host, website_id, websites!inner(slug, status, deleted_at)")
+      .select(select)
       .eq("host", normalized)
       .maybeSingle();
     if (error || !data) return null;
@@ -165,7 +173,8 @@ export async function getPublishedSlugByCustomHost(
       status: string;
       deleted_at?: string | null;
     };
-    if (website.status !== "published" || website.deleted_at) return null;
+    if (website.status !== "published") return null;
+    if (softDeleteReady && website.deleted_at) return null;
     return website.slug;
   }
   const store = await readStore();
@@ -183,11 +192,13 @@ export async function getPublishedSlugByCustomHost(
 export async function countWebsitesForWorkspace(workspaceId: string) {
   if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
     const db = getSupabaseAdmin();
-    const { count, error } = await db
+    const softDeleteReady = await softDeleteColumnsSupported();
+    let query = db
       .from("websites")
       .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId)
-      .is("deleted_at", null);
+      .eq("workspace_id", workspaceId);
+    if (softDeleteReady) query = query.is("deleted_at", null);
+    const { count, error } = await query;
     if (error) return 0;
     return count ?? 0;
   }
@@ -202,13 +213,15 @@ export async function listPublishedWebsiteSlugs(): Promise<
 > {
   if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
     const db = getSupabaseAdmin();
-    const { data, error } = await db
+    const softDeleteReady = await softDeleteColumnsSupported();
+    let query = db
       .from("websites")
       .select("slug, updated_at")
       .eq("status", "published")
-      .is("deleted_at", null)
       .order("updated_at", { ascending: false })
       .limit(5000);
+    if (softDeleteReady) query = query.is("deleted_at", null);
+    const { data, error } = await query;
     if (error || !data) return [];
     return data.map((row) => ({
       slug: row.slug as string,

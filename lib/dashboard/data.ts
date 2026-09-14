@@ -5,6 +5,7 @@ import {
   mapImport,
   mapJob,
   mapWebsiteRow,
+  softDeleteColumnsSupported,
   type ImportRow,
   type JobRow,
   type WebsiteRow,
@@ -51,13 +52,16 @@ async function fetchWorkspaceDashboardData(
 ): Promise<WorkspaceDashboardData> {
   if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
     const db = getSupabaseAdmin();
+    const softDeleteReady = await softDeleteColumnsSupported();
+    let websitesQuery = db
+      .from("websites")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("updated_at", { ascending: false });
+    if (softDeleteReady) websitesQuery = websitesQuery.is("deleted_at", null);
+
     const [websitesRes, importsRes, jobsRes] = await Promise.all([
-      db
-        .from("websites")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .is("deleted_at", null)
-        .order("updated_at", { ascending: false }),
+      websitesQuery,
       db
         .from("instagram_imports")
         .select("*")
@@ -134,12 +138,14 @@ export const getWorkspaceWebsites = cache(
       return unstable_cache(
         async () => {
           const db = getSupabaseAdmin();
-          const { data } = await db
+          const softDeleteReady = await softDeleteColumnsSupported();
+          let query = db
             .from("websites")
             .select("*")
             .eq("workspace_id", workspaceId)
-            .is("deleted_at", null)
             .order("updated_at", { ascending: false });
+          if (softDeleteReady) query = query.is("deleted_at", null);
+          const { data } = await query;
           return (data ?? []).map((row) => mapWebsiteRow(row as WebsiteRow));
         },
         [`workspace-websites-${workspaceId}`],
