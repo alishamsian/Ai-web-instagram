@@ -4,6 +4,14 @@ import type {
   ElementFieldSchema,
   ElementSchema,
 } from "@/lib/store/registry/element-schema";
+import type {
+  VariantAvailability,
+  VariantCapabilityFlags,
+  VariantMotionIntent,
+  VariantResponsiveContract,
+  VariantThemeContract,
+  VariantVisualSignature,
+} from "@/lib/store/registry/variant-contract";
 
 /** Registry is source of truth for section taxonomy (Editor library consumes this). */
 export type SectionCategory =
@@ -37,10 +45,28 @@ export type SectionFieldSchema = ElementFieldSchema;
 /** Section customization contract — owned by Registry definitions. */
 export type SectionSchema = ElementSchema;
 
+/**
+ * Section variant — composition/personality for a section type.
+ * id is stable and serializable; labels are never used as identity.
+ */
 export type SectionVariant = {
   id: string;
   label: { fa: string; en: string };
   description?: { fa: string; en: string };
+  /** Mark the deterministic default for this section type. */
+  default?: boolean;
+  /** Legacy ids that normalize to this canonical id. */
+  aliases?: string[];
+  /** Renderer lookup key — defaults to `${sectionType}.${id}`. */
+  rendererKey?: string;
+  signature?: VariantVisualSignature;
+  responsive?: VariantResponsiveContract;
+  theme?: VariantThemeContract;
+  capabilities?: VariantCapabilityFlags;
+  motion?: VariantMotionIntent;
+  status?: VariantAvailability;
+  /** Visual presets that may recommend this variant (ids only). */
+  recommendedForPresets?: string[];
 };
 
 export type SectionPreview = {

@@ -55,7 +55,17 @@ export type VisualPreset = {
     media: string;
     cta: string;
   };
+  /**
+   * Aspirational section-kind hints (may include future Phase 3 ids).
+   * Not used for mutation; kept for design direction.
+   */
   recommendedSections: Partial<Record<VisualSectionKind, string>>;
+  /**
+   * Canonical registry-backed recommendations only.
+   * Keys are WebsiteSectionType; values are registered variant ids.
+   * Never applied automatically by applyVisualPreset.
+   */
+  recommendedVariants?: Partial<Record<string, string>>;
   responsive: ResponsiveStrategy;
   theme: {
     default: ThemeMode;
@@ -72,6 +82,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "تیپوگرافی بزرگ، فضای سفید و تصویر ثانویه", en: "Oversized type, generous whitespace and secondary imagery" },
     signature: { composition: "asymmetric-editorial", typography: "large-serif", spacing: "spacious", media: "secondary-bleed", cta: "quiet-outline" },
     recommendedSections: { navbar: "wordmark", hero: "editorial", content: "story", products: "editorial", gallery: "lookbook", trust: "numbers", conversion: "minimal-cta" },
+    recommendedVariants: { hero: "editorial", products: "editorial", gallery: "lookbook", about: "editorial", cta: "banner" },
     responsive: { mobile: "stack-copy-first", tablet: "asymmetric", desktop: "asymmetric" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -89,6 +100,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "تصویر تمام‌قد، لایه‌بندی کنترل‌شده و CTA شناور", en: "Full-bleed imagery, restrained layers and floating action" },
     signature: { composition: "full-bleed", typography: "high-contrast-sans", spacing: "heroic", media: "cover-focus", cta: "floating-solid" },
     recommendedSections: { navbar: "transparent-overlay", hero: "immersive", content: "image-led", products: "rail", gallery: "masonry", trust: "overlay-stats", conversion: "floating" },
+    recommendedVariants: { hero: "overlay", "featured-products": "rail", products: "classic", gallery: "lookbook", cta: "promo" },
     responsive: { mobile: "crop-safe-stack", tablet: "full-bleed", desktop: "full-height" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -106,6 +118,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "شبکه دقیق، فاصله‌های منظم و کنترل سریع", en: "Precise grid, measured spacing and fast scanning" },
     signature: { composition: "strict-grid", typography: "neutral-sans", spacing: "compact", media: "uniform-ratio", cta: "utility" },
     recommendedSections: { navbar: "compact", hero: "split", content: "two-column", products: "grid", gallery: "grid", trust: "inline", conversion: "bar" },
+    recommendedVariants: { hero: "split", products: "classic", gallery: "grid", about: "story", cta: "banner" },
     responsive: { mobile: "2-column", tablet: "3-column", desktop: "4-column" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -123,6 +136,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "کنتراست ظریف، تایپ سریف و محصول قهرمان", en: "Subtle contrast, refined serif type and hero products" },
     signature: { composition: "gallery-stage", typography: "refined-serif", spacing: "very-spacious", media: "large-product", cta: "understated" },
     recommendedSections: { navbar: "centered", hero: "product-focus", content: "editorial", products: "luxury", gallery: "gallery-stage", trust: "quiet-proof", conversion: "private" },
+    recommendedVariants: { hero: "editorial", products: "editorial", gallery: "lookbook", about: "editorial", cta: "banner" },
     responsive: { mobile: "single-column", tablet: "balanced", desktop: "wide-stage" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -140,6 +154,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "تیتر سنگین، رنگ تاکیدی و مسیر خرید سریع", en: "Heavy type, strong accent and frictionless shopping" },
     signature: { composition: "modular-commerce", typography: "display-sans", spacing: "dense", media: "product-first", cta: "high-contrast" },
     recommendedSections: { navbar: "commerce", hero: "statement", content: "feature-split", products: "compact-commerce", gallery: "product-grid", trust: "badges", conversion: "purchase" },
+    recommendedVariants: { hero: "fan", products: "compact", bestsellers: "compact", gallery: "grid", cta: "promo" },
     responsive: { mobile: "commerce-stack", tablet: "dense-grid", desktop: "wide-grid" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -157,6 +172,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "تصاویر گرم، ریتم ارگانیک و محتوای انسانی", en: "Warm imagery, organic rhythm and human storytelling" },
     signature: { composition: "offset-flow", typography: "soft-serif", spacing: "comfortable", media: "mixed-ratio", cta: "warm-pill" },
     recommendedSections: { navbar: "soft", hero: "split", content: "story", products: "editorial", gallery: "offset", trust: "quotes", conversion: "warm" },
+    recommendedVariants: { hero: "fan", products: "classic", about: "story", gallery: "lookbook", cta: "banner" },
     responsive: { mobile: "stack-with-offset", tablet: "offset-grid", desktop: "asymmetric-flow" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -174,6 +190,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "بلوک‌های متنوع با یک نقطه تمرکز واضح", en: "Variable blocks with one unmistakable focal point" },
     signature: { composition: "bento", typography: "mixed-scale", spacing: "tight-rhythm", media: "mixed-crop", cta: "block-action" },
     recommendedSections: { navbar: "minimal", hero: "bento", content: "bento-story", products: "bento-products", gallery: "collage", trust: "metric-cards", conversion: "featured-block" },
+    recommendedVariants: { hero: "minimal", products: "classic", gallery: "grid", about: "story", cta: "banner" },
     responsive: { mobile: "priority-stack", tablet: "bento-2", desktop: "bento-12" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
     designHints: {
@@ -191,6 +208,7 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     description: { fa: "تصویرمحور، تک‌رنگ و مناسب پورتفولیو", en: "Image-led, monochrome and portfolio-ready" },
     signature: { composition: "gallery-first", typography: "mono-sans", spacing: "measured", media: "edge-to-edge", cta: "text-link" },
     recommendedSections: { navbar: "portfolio", hero: "gallery-hero", content: "captioned", products: "case-grid", gallery: "masonry", trust: "clients", conversion: "contact-link" },
+    recommendedVariants: { hero: "overlay", products: "editorial", gallery: "lookbook", about: "editorial", cta: "banner" },
     responsive: { mobile: "single-flow", tablet: "masonry-2", desktop: "masonry-3" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
     designHints: {

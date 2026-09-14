@@ -6,6 +6,7 @@
 import type { WebsiteConfig } from "@/types/website";
 import { createLegacyEntityId } from "@/lib/editor/ids";
 import { getSectionVariants } from "@/lib/store/registry/catalog";
+import { normalizeSectionVariants } from "@/lib/store/registry/variant-api";
 
 function identitySeed(...parts: string[]): string {
   return parts.map((part) => part.trim()).join("|");
@@ -155,5 +156,7 @@ export function normalizeLegacyHeroVariant(
 
 /** Run all soft content normalizations (identity + legacy variants). */
 export function normalizeEditorConfig(config: WebsiteConfig): WebsiteConfig {
-  return normalizeLegacyHeroVariant(normalizeCollectionIdentities(config));
+  return normalizeSectionVariants(
+    normalizeLegacyHeroVariant(normalizeCollectionIdentities(config)),
+  );
 }

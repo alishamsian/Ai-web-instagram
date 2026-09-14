@@ -11,6 +11,11 @@ import {
   hasSection,
 } from "@/lib/store/registry/catalog";
 import {
+  getDefaultVariant,
+  isVariantSupported,
+  resolveSectionVariant,
+} from "@/lib/store/registry/variant-api";
+import {
   addOrShowSection,
   applyTemplate,
 } from "@/components/editor/editor-utils";
@@ -166,16 +171,22 @@ export function commandReorderSectionRelative(
 export function commandAddSection(
   config: WebsiteConfig,
   type: WebsiteSectionType,
-  options?: { afterSectionId?: string | null },
+  options?: { afterSectionId?: string | null; variant?: string },
 ): EditorCommandResult | null {
   if (!hasSection(type)) return null;
+  const requested = options?.variant;
+  if (requested && !isVariantSupported(type, requested)) return null;
+
   const existed = config.sections.some((s) => s.type === type);
   const next = addOrShowSection(config, type, options);
   const added = next.sections.find((s) => s.type === type && s.visible);
-  if (!existed && added && !added.variant) {
-    const variant = defaultVariantForType(type);
-    if (variant) {
-      const withVariant = commandSetSectionVariant(next, added.id, variant);
+  if (!existed && added) {
+    const resolved = resolveSectionVariant(
+      type,
+      requested ?? added.variant ?? defaultVariantForType(type),
+    );
+    if (resolved.id && added.variant !== resolved.id) {
+      const withVariant = commandSetSectionVariant(next, added.id, resolved.id);
       if (withVariant) {
         return {
           ...withVariant,
@@ -421,13 +432,16 @@ export function commandSetSectionVariant(
 ): EditorCommandResult | null {
   const section = config.sections.find((s) => s.id === sectionId);
   if (!section) return null;
-  const variants = getSectionVariants(section.type);
-  if (!variants.some((v) => v.id === variantId)) return null;
+  if (!isVariantSupported(section.type, variantId)) return null;
+
+  const resolved = resolveSectionVariant(section.type, variantId);
+  if (!resolved.id) return null;
+  const canonicalId = resolved.id;
 
   let next: WebsiteConfig = {
     ...config,
     sections: config.sections.map((s) =>
-      s.id === sectionId ? { ...s, variant: variantId } : s,
+      s.id === sectionId ? { ...s, variant: canonicalId } : s,
     ),
   };
 
@@ -437,11 +451,11 @@ export function commandSetSectionVariant(
     const styles = new Set(
       getSectionVariants("hero").map((variant) => variant.id),
     );
-    if (styles.has(variantId)) {
+    if (styles.has(canonicalId)) {
       const synced = commandSetContentPath(
         next,
         "content.hero.style",
-        variantId,
+        canonicalId,
       );
       if (synced) next = synced.config;
     }
@@ -449,7 +463,7 @@ export function commandSetSectionVariant(
 
   return {
     config: next,
-    label: `Variant ${section.type}.${variantId}`,
+    label: `Variant ${section.type}.${canonicalId}`,
     selectedSectionId: sectionId,
   };
 }
@@ -592,6 +606,5 @@ export function commandUpdateSiteSettings(
 export function defaultVariantForType(
   type: WebsiteSectionType,
 ): string | undefined {
-  const variants = getSectionVariants(type);
-  return variants[0]?.id;
+  return getDefaultVariant(type)?.id;
 }

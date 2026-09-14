@@ -252,7 +252,9 @@ describe("pass 2.1 — variant registry/schema parity", () => {
       (o) => o.value,
     );
     expect(schemaIds).toEqual(registryIds);
-    expect(commandSetSectionVariant(baseConfig(), "hero-1", "menu")).toBeNull();
+    expect(commandSetSectionVariant(baseConfig(), "hero-1", "menu")?.config.sections[0]?.variant).toBe(
+      "editorial",
+    );
     expect(
       commandSetSectionVariant(baseConfig(), "hero-1", "split")?.config.content
         .hero.style,

@@ -10,7 +10,10 @@ export {
   registerSections,
   registerSectionRenderer,
   registerSectionRenderers,
+  registerVariantRenderer,
+  getVariantRenderer,
   getSectionRenderer,
+  resolveSectionRenderer,
   hasSectionRenderer,
   resetRegistryForTests,
   ALL_SECTION_DEFINITIONS,
@@ -26,6 +29,31 @@ export {
 export * from "@/lib/store/registry/element-schema";
 export type * from "@/lib/store/registry/types";
 export type * from "@/lib/store/registry/render-contract";
+export type * from "@/lib/store/registry/variant-contract";
+export {
+  VARIANT_RESPONSIVE_STRATEGIES,
+  VARIANT_SIGNATURE_KEYS,
+  isVariantResponsiveStrategy,
+} from "@/lib/store/registry/variant-contract";
+export {
+  getVariant,
+  getVariantsForSection,
+  getDefaultVariant,
+  isVariantSupported,
+  resolveSectionVariant,
+  getVariantRendererKey,
+  getRecommendedVariants,
+  areVariantsVisuallyDistinct,
+  validateSectionVariantCatalog,
+  normalizeSectionVariants,
+  normalizeSectionVariant,
+  signature,
+} from "@/lib/store/registry/variant-api";
+export type {
+  VariantResolveSource,
+  ResolvedSectionVariant,
+  VariantCatalogValidation,
+} from "@/lib/store/registry/variant-api";
 export {
   resolveStoreSections,
   resolveStoreBodySections,

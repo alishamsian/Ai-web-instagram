@@ -11,6 +11,8 @@ import { validateSectionDefinition } from "@/lib/store/registry/element-schema";
 
 const registry = new Map<string, SectionDefinition>();
 const renderers = new Map<string, StoreSectionRenderer>();
+/** Optional per-variant renderers keyed by rendererKey (`type.id` by default). */
+const variantRenderers = new Map<string, StoreSectionRenderer>();
 
 function seed(defs: SectionDefinition[]) {
   for (const def of defs) {
@@ -53,9 +55,51 @@ export function registerSectionRenderers(
   }
 }
 
+/**
+ * Bind a renderer to a variant rendererKey without loading every variant eagerly.
+ * Unregistered keys fall back to the section-type renderer.
+ */
+export function registerVariantRenderer(
+  rendererKey: string,
+  renderer: StoreSectionRenderer,
+) {
+  variantRenderers.set(rendererKey, renderer);
+}
+
+export function getVariantRenderer(
+  rendererKey: string,
+): StoreSectionRenderer | undefined {
+  return variantRenderers.get(rendererKey);
+}
+
 export function getSectionRenderer(
   type: RegistrySectionType,
 ): StoreSectionRenderer | undefined {
+  return renderers.get(type);
+}
+
+/**
+ * Resolve renderer for a section + optional variant.
+ * Prefer variant-specific binding, then section-type fallback.
+ * Never throws for unknown variants.
+ */
+export function resolveSectionRenderer(
+  type: RegistrySectionType,
+  variantId?: string | null,
+): StoreSectionRenderer | undefined {
+  if (variantId) {
+    const variants = getSectionVariants(type);
+    const exact = variants.find((v) => v.id === variantId);
+    const aliased = exact
+      ? exact
+      : variants.find((v) => v.aliases?.includes(variantId));
+    const canonical = aliased ?? variants.find((v) => v.default) ?? variants[0];
+    if (canonical) {
+      const key = canonical.rendererKey ?? `${type}.${canonical.id}`;
+      const variantRenderer = variantRenderers.get(key);
+      if (variantRenderer) return variantRenderer;
+    }
+  }
   return renderers.get(type);
 }
 
@@ -117,5 +161,6 @@ export function resetRegistryForTests(
 ) {
   registry.clear();
   renderers.clear();
+  variantRenderers.clear();
   seed(defs);
 }

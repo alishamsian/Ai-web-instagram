@@ -4,6 +4,11 @@ import type {
   SectionVariant,
 } from "@/lib/store/registry/types";
 import { DEFAULT_CAPABILITIES } from "@/lib/store/registry/types";
+import type {
+  VariantResponsiveContract,
+  VariantThemeContract,
+  VariantVisualSignature,
+} from "@/lib/store/registry/variant-contract";
 
 function withCaps(
   partial?: Partial<SectionCapabilities>,
@@ -16,18 +21,290 @@ function variantsToSelectOptions(variants: SectionVariant[]) {
   return variants.map((v) => ({ value: v.id, label: v.label }));
 }
 
+const THEME_BOTH: VariantThemeContract = {
+  light: true,
+  dark: true,
+  semanticTokens: true,
+};
+
+function v(
+  id: string,
+  label: { fa: string; en: string },
+  meta: {
+    signature: VariantVisualSignature;
+    responsive: VariantResponsiveContract;
+    description?: { fa: string; en: string };
+    default?: boolean;
+    aliases?: string[];
+    recommendedForPresets?: string[];
+    capabilities?: SectionVariant["capabilities"];
+    motion?: SectionVariant["motion"];
+  },
+): SectionVariant {
+  return {
+    id,
+    label,
+    description: meta.description,
+    default: meta.default,
+    aliases: meta.aliases,
+    signature: meta.signature,
+    responsive: meta.responsive,
+    theme: THEME_BOTH,
+    capabilities: {
+      supportsRTL: true,
+      supportsDark: true,
+      ...meta.capabilities,
+    },
+    motion: meta.motion ?? "subtle",
+    status: "stable",
+    recommendedForPresets: meta.recommendedForPresets,
+    rendererKey: undefined, // resolved as `${type}.${id}`
+  };
+}
+
 const HERO_VARIANTS: SectionVariant[] = [
-  { id: "fan", label: { fa: "مرکزی", en: "Centered" } },
-  { id: "overlay", label: { fa: "پوششی", en: "Overlay" } },
-  { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
-  { id: "split", label: { fa: "دو ستونه", en: "Split" } },
-  { id: "minimal", label: { fa: "مینیمال", en: "Minimal" } },
+  v(
+    "fan",
+    { fa: "مرکزی", en: "Centered" },
+    {
+      default: true,
+      description: {
+        fa: "تیتر مرکزی با رسانهٔ مکمل",
+        en: "Centered headline with supporting media",
+      },
+      signature: {
+        composition: "centered-fan",
+        alignment: "center",
+        typography: "display-large",
+        density: "comfortable",
+        media: "multi-tile",
+        cta: "primary-center",
+        hierarchy: "headline-first",
+      },
+      responsive: {
+        mobile: "stack-copy-first",
+        tablet: "centered-collapse",
+        desktop: "asymmetric",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsDescription: true,
+        supportsPrimaryCTA: true,
+      },
+      recommendedForPresets: ["organic-story"],
+    },
+  ),
+  v(
+    "overlay",
+    { fa: "پوششی", en: "Overlay" },
+    {
+      description: {
+        fa: "تصویر تمام‌قد با متن روی لایه",
+        en: "Full-bleed media with overlaid copy",
+      },
+      signature: {
+        composition: "full-bleed-overlay",
+        alignment: "start",
+        typography: "high-contrast",
+        density: "spacious",
+        media: "cover-focus",
+        cta: "solid-on-media",
+        hierarchy: "media-first",
+      },
+      responsive: {
+        mobile: "crop-safe-full-bleed",
+        tablet: "overlay-safe",
+        desktop: "overlay-safe",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsOverlay: true,
+        supportsDescription: true,
+        supportsPrimaryCTA: true,
+      },
+      recommendedForPresets: ["immersive-cinema", "mono-gallery"],
+      motion: "expressive",
+    },
+  ),
+  v(
+    "editorial",
+    { fa: "ادیتوریال", en: "Editorial" },
+    {
+      aliases: ["menu"],
+      description: {
+        fa: "چیدمان ادیتوریال با تایپ قوی",
+        en: "Editorial composition with strong type",
+      },
+      signature: {
+        composition: "asymmetric-editorial",
+        alignment: "start",
+        typography: "serif-display",
+        density: "spacious",
+        media: "secondary-bleed",
+        cta: "quiet-outline",
+        hierarchy: "type-led",
+      },
+      responsive: {
+        mobile: "stack-copy-first",
+        tablet: "asymmetric",
+        desktop: "asymmetric",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsEyebrow: true,
+        supportsDescription: true,
+        supportsPrimaryCTA: true,
+      },
+      recommendedForPresets: ["minimal-editorial", "quiet-luxury"],
+    },
+  ),
+  v(
+    "split",
+    { fa: "دو ستونه", en: "Split" },
+    {
+      description: {
+        fa: "کپی و رسانه در دو ستون",
+        en: "Copy and media in two columns",
+      },
+      signature: {
+        composition: "two-column-split",
+        alignment: "start",
+        typography: "neutral-sans",
+        density: "comfortable",
+        media: "column-frame",
+        cta: "inline-primary",
+        hierarchy: "balanced",
+      },
+      responsive: {
+        mobile: "split-stack",
+        tablet: "split-stack",
+        desktop: "asymmetric",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsDescription: true,
+        supportsPrimaryCTA: true,
+        supportsSecondaryCTA: true,
+      },
+      recommendedForPresets: ["studio-grid"],
+    },
+  ),
+  v(
+    "minimal",
+    { fa: "مینیمال", en: "Minimal" },
+    {
+      description: {
+        fa: "حداقل عناصر، تمرکز روی تیتر",
+        en: "Minimal elements, headline focus",
+      },
+      signature: {
+        composition: "minimal-stage",
+        alignment: "center",
+        typography: "restrained",
+        density: "spacious",
+        media: "optional-single",
+        cta: "text-link",
+        hierarchy: "headline-only",
+      },
+      responsive: {
+        mobile: "priority-content-first",
+        tablet: "centered-collapse",
+        desktop: "centered-collapse",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsDescription: false,
+        supportsPrimaryCTA: true,
+      },
+      recommendedForPresets: ["bento-creative"],
+      motion: "none",
+    },
+  ),
 ];
 
 const PRODUCT_CARD_VARIANTS: SectionVariant[] = [
-  { id: "classic", label: { fa: "کلاسیک", en: "Classic" } },
-  { id: "compact", label: { fa: "فشرده", en: "Compact" } },
-  { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
+  v(
+    "classic",
+    { fa: "کلاسیک", en: "Classic" },
+    {
+      default: true,
+      signature: {
+        composition: "product-grid",
+        alignment: "start",
+        typography: "product-title",
+        density: "comfortable",
+        media: "portrait-cover",
+        cta: "card-action",
+        hierarchy: "image-title-price",
+      },
+      responsive: {
+        mobile: "grid-2",
+        tablet: "grid-3",
+        desktop: "grid-4",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsPrice: true,
+        supportsMultipleItems: true,
+        supportsBadge: true,
+      },
+      recommendedForPresets: ["studio-grid", "organic-story"],
+    },
+  ),
+  v(
+    "compact",
+    { fa: "فشرده", en: "Compact" },
+    {
+      signature: {
+        composition: "dense-commerce-grid",
+        alignment: "start",
+        typography: "compact-meta",
+        density: "compact",
+        media: "square-cover",
+        cta: "high-contrast",
+        hierarchy: "scan-first",
+      },
+      responsive: {
+        mobile: "grid-2",
+        tablet: "grid-3",
+        desktop: "grid-4",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsPrice: true,
+        supportsMultipleItems: true,
+        supportsBadge: true,
+      },
+      recommendedForPresets: ["bold-commerce"],
+    },
+  ),
+  v(
+    "editorial",
+    { fa: "ادیتوریال", en: "Editorial" },
+    {
+      signature: {
+        composition: "editorial-product-stage",
+        alignment: "start",
+        typography: "editorial-serif",
+        density: "spacious",
+        media: "large-product",
+        cta: "understated",
+        hierarchy: "story-product",
+      },
+      responsive: {
+        mobile: "media-first",
+        tablet: "editorial-stack",
+        desktop: "asymmetric",
+      },
+      capabilities: {
+        supportsImage: true,
+        supportsPrice: true,
+        supportsMultipleItems: true,
+        supportsDescription: true,
+      },
+      recommendedForPresets: ["quiet-luxury", "minimal-editorial"],
+    },
+  ),
 ];
 
 /**
@@ -199,8 +476,57 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       en: "New arrivals or featured product rail",
     },
     variants: [
-      { id: "rail", label: { fa: "ریلی", en: "Rail" } },
-      { id: "classic", label: { fa: "کلاسیک", en: "Classic" } },
+      v(
+        "rail",
+        { fa: "ریلی", en: "Rail" },
+        {
+          default: true,
+          signature: {
+            composition: "horizontal-rail",
+            alignment: "start",
+            typography: "section-heading",
+            density: "comfortable",
+            media: "portrait-rail",
+            cta: "card-action",
+            hierarchy: "kicker-title-rail",
+          },
+          responsive: {
+            mobile: "rail-scroll",
+            tablet: "rail-scroll",
+            desktop: "rail-scroll",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsPrice: true,
+          },
+        },
+      ),
+      v(
+        "classic",
+        { fa: "کلاسیک", en: "Classic" },
+        {
+          signature: {
+            composition: "featured-grid",
+            alignment: "start",
+            typography: "section-heading",
+            density: "comfortable",
+            media: "portrait-cover",
+            cta: "card-action",
+            hierarchy: "title-grid",
+          },
+          responsive: {
+            mobile: "grid-2",
+            tablet: "grid-3",
+            desktop: "grid-4",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsPrice: true,
+          },
+        },
+      ),
     ],
     verticals: ["*"],
     capabilities: withCaps({ dataSource: true }),
@@ -324,8 +650,58 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       en: "Most-loved products rail",
     },
     variants: [
-      { id: "compact", label: { fa: "فشرده", en: "Compact" } },
-      { id: "classic", label: { fa: "کلاسیک", en: "Classic" } },
+      v(
+        "compact",
+        { fa: "فشرده", en: "Compact" },
+        {
+          default: true,
+          signature: {
+            composition: "bestseller-dense",
+            alignment: "start",
+            typography: "compact-meta",
+            density: "compact",
+            media: "square-cover",
+            cta: "card-action",
+            hierarchy: "rank-scan",
+          },
+          responsive: {
+            mobile: "grid-2",
+            tablet: "grid-3",
+            desktop: "grid-4",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsPrice: true,
+            supportsBadge: true,
+          },
+        },
+      ),
+      v(
+        "classic",
+        { fa: "کلاسیک", en: "Classic" },
+        {
+          signature: {
+            composition: "bestseller-classic",
+            alignment: "start",
+            typography: "product-title",
+            density: "comfortable",
+            media: "portrait-cover",
+            cta: "card-action",
+            hierarchy: "title-grid",
+          },
+          responsive: {
+            mobile: "grid-2",
+            tablet: "grid-3",
+            desktop: "grid-4",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsPrice: true,
+          },
+        },
+      ),
     ],
     verticals: ["*"],
     capabilities: withCaps({ dataSource: true }),
@@ -337,8 +713,57 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     label: { fa: "درباره / داستان برند", en: "About / Brand story" },
     description: { fa: "روایت کوتاه برند", en: "Short brand narrative" },
     variants: [
-      { id: "story", label: { fa: "داستان", en: "Story" } },
-      { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
+      v(
+        "story",
+        { fa: "داستان", en: "Story" },
+        {
+          default: true,
+          signature: {
+            composition: "story-split",
+            alignment: "start",
+            typography: "body-led",
+            density: "comfortable",
+            media: "side-portrait",
+            cta: "none",
+            hierarchy: "title-body-media",
+          },
+          responsive: {
+            mobile: "story-stack",
+            tablet: "story-stack",
+            desktop: "asymmetric",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsDescription: true,
+            supportsRichText: true,
+          },
+        },
+      ),
+      v(
+        "editorial",
+        { fa: "ادیتوریال", en: "Editorial" },
+        {
+          signature: {
+            composition: "about-editorial",
+            alignment: "start",
+            typography: "serif-editorial",
+            density: "spacious",
+            media: "bleed-secondary",
+            cta: "none",
+            hierarchy: "type-led-story",
+          },
+          responsive: {
+            mobile: "editorial-stack",
+            tablet: "editorial-stack",
+            desktop: "asymmetric",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsDescription: true,
+            supportsRichText: true,
+          },
+        },
+      ),
     ],
     verticals: ["*"],
     capabilities: withCaps(),
@@ -371,8 +796,57 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       en: "Lookbook and image showcase",
     },
     variants: [
-      { id: "lookbook", label: { fa: "لوک‌بوک", en: "Lookbook" } },
-      { id: "grid", label: { fa: "شبکه", en: "Grid" } },
+      v(
+        "lookbook",
+        { fa: "لوک‌بوک", en: "Lookbook" },
+        {
+          default: true,
+          signature: {
+            composition: "lookbook-stage",
+            alignment: "center",
+            typography: "quiet-caption",
+            density: "spacious",
+            media: "editorial-frame",
+            cta: "none",
+            hierarchy: "media-led",
+          },
+          responsive: {
+            mobile: "media-first",
+            tablet: "masonry-2",
+            desktop: "bento-priority-stack",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+          },
+          recommendedForPresets: ["quiet-luxury"],
+        },
+      ),
+      v(
+        "grid",
+        { fa: "شبکه", en: "Grid" },
+        {
+          signature: {
+            composition: "gallery-grid",
+            alignment: "start",
+            typography: "meta-quiet",
+            density: "comfortable",
+            media: "uniform-tiles",
+            cta: "none",
+            hierarchy: "equal-tiles",
+          },
+          responsive: {
+            mobile: "grid-2",
+            tablet: "grid-3",
+            desktop: "grid-4",
+          },
+          capabilities: {
+            supportsImage: true,
+            supportsMultipleItems: true,
+            supportsReorder: true,
+          },
+        },
+      ),
     ],
     verticals: ["*"],
     capabilities: withCaps({ dataSource: true }),
@@ -546,8 +1020,57 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     label: { fa: "فراخوان", en: "CTA" },
     description: { fa: "بنر دعوت به اقدام", en: "Call-to-action banner" },
     variants: [
-      { id: "banner", label: { fa: "بنر", en: "Banner" } },
-      { id: "promo", label: { fa: "پرومو", en: "Promo" } },
+      v(
+        "banner",
+        { fa: "بنر", en: "Banner" },
+        {
+          default: true,
+          signature: {
+            composition: "cta-banner",
+            alignment: "center",
+            typography: "cta-display",
+            density: "comfortable",
+            media: "none-or-soft",
+            cta: "primary-center",
+            hierarchy: "title-cta",
+          },
+          responsive: {
+            mobile: "centered-collapse",
+            tablet: "centered-collapse",
+            desktop: "centered-collapse",
+          },
+          capabilities: {
+            supportsEyebrow: true,
+            supportsPrimaryCTA: true,
+            supportsDescription: true,
+          },
+        },
+      ),
+      v(
+        "promo",
+        { fa: "پرومو", en: "Promo" },
+        {
+          signature: {
+            composition: "cta-promo-split",
+            alignment: "start",
+            typography: "promo-strong",
+            density: "compact",
+            media: "accent-panel",
+            cta: "solid-emphasis",
+            hierarchy: "offer-cta",
+          },
+          responsive: {
+            mobile: "priority-content-first",
+            tablet: "asymmetric",
+            desktop: "asymmetric",
+          },
+          capabilities: {
+            supportsEyebrow: true,
+            supportsPrimaryCTA: true,
+            supportsBadge: true,
+          },
+        },
+      ),
     ],
     verticals: ["*"],
     capabilities: withCaps(),
