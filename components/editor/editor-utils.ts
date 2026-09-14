@@ -2,6 +2,7 @@ import type { ColorConfig, TemplateType, WebsiteConfig, WebsiteSectionType } fro
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import { templates } from "@/lib/website/templates";
+import { createEntityId } from "@/lib/editor/ids";
 
 export type EditorTab =
   | "brand"
@@ -289,7 +290,7 @@ export function addOrShowSection(
   }
 
   const section = {
-    id: `${type}-${Date.now().toString(36)}`,
+    id: createEntityId(type),
     type,
     visible: true,
   };

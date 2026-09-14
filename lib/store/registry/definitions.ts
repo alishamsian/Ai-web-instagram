@@ -1,6 +1,7 @@
 import type {
   SectionCapabilities,
   SectionDefinition,
+  SectionVariant,
 } from "@/lib/store/registry/types";
 import { DEFAULT_CAPABILITIES } from "@/lib/store/registry/types";
 
@@ -9,6 +10,25 @@ function withCaps(
 ): SectionCapabilities {
   return { ...DEFAULT_CAPABILITIES, ...partial };
 }
+
+/** Derive schema select options from the same variant list (single source). */
+function variantsToSelectOptions(variants: SectionVariant[]) {
+  return variants.map((v) => ({ value: v.id, label: v.label }));
+}
+
+const HERO_VARIANTS: SectionVariant[] = [
+  { id: "fan", label: { fa: "مرکزی", en: "Centered" } },
+  { id: "overlay", label: { fa: "پوششی", en: "Overlay" } },
+  { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
+  { id: "split", label: { fa: "دو ستونه", en: "Split" } },
+  { id: "minimal", label: { fa: "مینیمال", en: "Minimal" } },
+];
+
+const PRODUCT_CARD_VARIANTS: SectionVariant[] = [
+  { id: "classic", label: { fa: "کلاسیک", en: "Classic" } },
+  { id: "compact", label: { fa: "فشرده", en: "Compact" } },
+  { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
+];
 
 /**
  * Core Store section definitions (metadata).
@@ -23,13 +43,7 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       fa: "تیتر اصلی و تصویر برند",
       en: "Primary headline and brand image",
     },
-    variants: [
-      { id: "fan", label: { fa: "مرکزی", en: "Centered" } },
-      { id: "overlay", label: { fa: "پوششی", en: "Overlay" } },
-      { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
-      { id: "split", label: { fa: "دو ستونه", en: "Split" } },
-      { id: "minimal", label: { fa: "مینیمال", en: "Minimal" } },
-    ],
+    variants: HERO_VARIANTS,
     verticals: ["*"],
     capabilities: withCaps(),
     schema: {
@@ -92,13 +106,7 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
           kind: "select",
           label: { fa: "استایل هیرو", en: "Hero style" },
           path: "content.hero.style",
-          options: [
-            { value: "fan", label: { fa: "مرکزی", en: "Centered" } },
-            { value: "overlay", label: { fa: "پوششی", en: "Overlay" } },
-            { value: "split", label: { fa: "دو ستونه", en: "Split" } },
-            { value: "minimal", label: { fa: "مینیمال", en: "Minimal" } },
-            { value: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
-          ],
+          options: variantsToSelectOptions(HERO_VARIANTS),
           defaultValue: "fan",
         },
         alignment: {
@@ -232,11 +240,7 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       fa: "شبکه محصولات فروشگاه",
       en: "Product grid for the shop",
     },
-    variants: [
-      { id: "classic", label: { fa: "کلاسیک", en: "Classic" } },
-      { id: "compact", label: { fa: "فشرده", en: "Compact" } },
-      { id: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
-    ],
+    variants: PRODUCT_CARD_VARIANTS,
     verticals: ["*"],
     capabilities: withCaps({ dataSource: true }),
     schema: {
@@ -304,11 +308,7 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
           kind: "select",
           label: { fa: "استایل کارت", en: "Card variant" },
           path: "variant",
-          options: [
-            { value: "classic", label: { fa: "کلاسیک", en: "Classic" } },
-            { value: "compact", label: { fa: "فشرده", en: "Compact" } },
-            { value: "editorial", label: { fa: "ادیتوریال", en: "Editorial" } },
-          ],
+          options: variantsToSelectOptions(PRODUCT_CARD_VARIANTS),
           defaultValue: "classic",
         },
       },

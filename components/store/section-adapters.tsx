@@ -7,6 +7,7 @@ import {
   getFeaturedProducts,
   getNewArrivalProducts,
 } from "@/lib/store/catalog";
+import { resolveResponsiveColumns } from "@/lib/editor/responsive";
 import { StoreHero, StoreCategories } from "@/components/store/StoreHero";
 import {
   StoreProductGrid,
@@ -23,10 +24,12 @@ import {
 import { StoreFooter } from "@/components/store/StoreFooter";
 import { StoreSectionFallback } from "@/components/store/StoreSectionFallback";
 
-function gridColumns(ctx: StoreSectionContext): 2 | 3 | 4 | 5 {
-  const n = Number(ctx.section.settings?.columns);
-  if (n === 2 || n === 3 || n === 4 || n === 5) return n;
-  return 4;
+function gridColumns(ctx: StoreSectionContext): {
+  mobile: number;
+  tablet: number;
+  desktop: number;
+} {
+  return resolveResponsiveColumns(ctx.section.settings?.columns, 4);
 }
 
 function productsBySource(

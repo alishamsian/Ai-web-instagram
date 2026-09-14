@@ -12,6 +12,8 @@ import {
 } from "@/lib/store/verticals/filters";
 import { cn } from "@/lib/utils";
 
+import { resolveResponsiveColumns } from "@/lib/editor/responsive";
+
 function settingString(
   section: SectionConfig,
   key: string,
@@ -21,13 +23,8 @@ function settingString(
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function settingNumber(
-  section: SectionConfig,
-  key: string,
-  fallback: number,
-): number {
-  const value = Number(section.settings?.[key]);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
+function settingColumns(section: SectionConfig, fallback = 4) {
+  return resolveResponsiveColumns(section.settings?.columns, fallback);
 }
 
 export function VerticalTaxonomySection({
@@ -247,14 +244,14 @@ export function VerticalFinderSection({
   const list = filtered.length ? filtered : products.slice(0, 8);
   if (!list.length) return null;
 
-  const columns = settingNumber(section, "columns", 4) as 2 | 3 | 4 | 5;
+  const columns = settingColumns(section, 4);
 
   return (
     <StoreProductGrid
       config={config}
       products={list}
       id={`finder-${section.id}`}
-      columns={columns === 5 ? 4 : columns}
+      columns={columns}
       soft={false}
       variant="classic"
       kicker={settingString(section, "kicker", defaultKicker)}

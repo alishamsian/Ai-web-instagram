@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Heart } from "lucide-react";
 import type { WebsiteConfig } from "@/types/website";
 import type { StoreCatalogProduct } from "@/lib/store/theme";
@@ -205,7 +205,12 @@ export function StoreProductGrid({
   kicker?: string;
   lead?: string;
   id?: string;
-  columns?: 2 | 3 | 4 | 5;
+  columns?:
+    | 2
+    | 3
+    | 4
+    | 5
+    | { mobile: number; tablet: number; desktop: number };
   onQuickView?: (product: StoreCatalogProduct) => void;
   featuredLead?: boolean;
   soft?: boolean;
@@ -223,6 +228,11 @@ export function StoreProductGrid({
         : variant === "minimal"
           ? "minimal"
           : "classic");
+
+  const responsiveCols =
+    typeof columns === "object"
+      ? columns
+      : { mobile: 2, tablet: Math.min(3, columns), desktop: columns };
 
   if (!products.length) {
     return (
@@ -308,10 +318,18 @@ export function StoreProductGrid({
         <div
           className={cn(
             "store-grid",
-            `store-grid--${columns}`,
+            "store-grid--responsive",
+            `store-grid--${responsiveCols.desktop}`,
             variant === "editorial" && "store-grid--editorial",
             variant === "compact" && "store-grid--compact",
           )}
+          style={
+            {
+              ["--sg-m" as string]: String(responsiveCols.mobile),
+              ["--sg-t" as string]: String(responsiveCols.tablet),
+              ["--sg-d" as string]: String(responsiveCols.desktop),
+            } as CSSProperties
+          }
         >
           {products.map((product, index) => (
             <StoreProductCard

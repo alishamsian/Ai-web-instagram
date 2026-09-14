@@ -5,7 +5,6 @@ import type { WebsiteConfig } from "@/types/website";
 import { Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MediaPicker } from "@/components/editor/MediaPicker";
-import { ensureTestimonials } from "@/components/editor/editor-utils";
 import {
   applyCommandResult,
   commandAddFaqItem,
@@ -18,6 +17,7 @@ import {
   commandDeleteService,
   commandDeleteTestimonial,
   commandDuplicateFaqItem,
+  commandEnsureTestimonials,
   commandReorderFaqItem,
   commandReorderProduct,
   commandReorderService,
@@ -226,12 +226,13 @@ export function ContentPanel({
                       className="text-muted-foreground hover:text-foreground"
                       aria-label={dict.editor.moveUp}
                       disabled={index === 0}
-                      onClick={() =>
+                      onClick={() => {
+                        if (!productId) return;
                         applyCommandResult(
-                          commandReorderProduct(config, index, index - 1),
+                          commandReorderProduct(config, productId, index - 1),
                           onChange,
-                        )
-                      }
+                        );
+                      }}
                     >
                       <ChevronDown size={14} className="rotate-180" />
                     </button>
@@ -240,12 +241,13 @@ export function ContentPanel({
                       className="text-muted-foreground hover:text-foreground"
                       aria-label={dict.editor.moveDown}
                       disabled={index >= products.items.length - 1}
-                      onClick={() =>
+                      onClick={() => {
+                        if (!productId) return;
                         applyCommandResult(
-                          commandReorderProduct(config, index, index + 1),
+                          commandReorderProduct(config, productId, index + 1),
                           onChange,
-                        )
-                      }
+                        );
+                      }}
                     >
                       <ChevronDown size={14} />
                     </button>
@@ -389,9 +391,12 @@ export function ContentPanel({
               }
             />
           </Field>
-          {services.items.map((item, index) => (
+          {services.items.map((item, index) => {
+            const serviceId = item.id;
+            if (!serviceId) return null;
+            return (
             <div
-              key={`service-${index}`}
+              key={serviceId}
               className="space-y-2 rounded-xl bg-muted/60 p-2.5"
             >
               <div className="flex items-center justify-between">
@@ -405,7 +410,7 @@ export function ContentPanel({
                     aria-label={dict.editor.moveUp}
                     onClick={() =>
                       applyCommandResult(
-                        commandReorderService(config, index, index - 1),
+                        commandReorderService(config, serviceId, index - 1),
                         onChange,
                       )
                     }
@@ -418,7 +423,7 @@ export function ContentPanel({
                     aria-label={dict.editor.moveDown}
                     onClick={() =>
                       applyCommandResult(
-                        commandReorderService(config, index, index + 1),
+                        commandReorderService(config, serviceId, index + 1),
                         onChange,
                       )
                     }
@@ -430,7 +435,7 @@ export function ContentPanel({
                     aria-label={dict.editor.removeItem}
                     onClick={() =>
                       applyCommandResult(
-                        commandDeleteService(config, index),
+                        commandDeleteService(config, serviceId),
                         onChange,
                       )
                     }
@@ -443,7 +448,7 @@ export function ContentPanel({
                 value={item.name}
                 onChange={(e) =>
                   applyCommandResult(
-                    commandUpdateService(config, index, {
+                    commandUpdateService(config, serviceId, {
                       name: e.target.value,
                     }),
                     onChange,
@@ -455,7 +460,7 @@ export function ContentPanel({
                 value={item.description}
                 onChange={(e) =>
                   applyCommandResult(
-                    commandUpdateService(config, index, {
+                    commandUpdateService(config, serviceId, {
                       description: e.target.value,
                     }),
                     onChange,
@@ -469,19 +474,20 @@ export function ContentPanel({
                 emptyLabel={dict.editor.noMedia}
                 onPick={(id) =>
                   applyCommandResult(
-                    commandUpdateService(config, index, { imageIds: [id] }),
+                    commandUpdateService(config, serviceId, { imageIds: [id] }),
                     onChange,
                   )
                 }
                 onClear={() =>
                   applyCommandResult(
-                    commandUpdateService(config, index, { imageIds: [] }),
+                    commandUpdateService(config, serviceId, { imageIds: [] }),
                     onChange,
                   )
                 }
               />
             </div>
-          ))}
+            );
+          })}
           <Button
             type="button"
             size="sm"
@@ -538,9 +544,12 @@ export function ContentPanel({
               }
             />
           </Field>
-          {faq.items.map((item, index) => (
+          {faq.items.map((item, index) => {
+            const faqId = item.id;
+            if (!faqId) return null;
+            return (
             <div
-              key={`faq-${index}`}
+              key={faqId}
               className="space-y-2 rounded-xl bg-muted/60 p-2.5"
             >
               <div className="flex justify-end gap-1">
@@ -550,7 +559,7 @@ export function ContentPanel({
                   aria-label={dict.editor.moveUp}
                   onClick={() =>
                     applyCommandResult(
-                      commandReorderFaqItem(config, index, index - 1),
+                      commandReorderFaqItem(config, faqId, index - 1),
                       onChange,
                     )
                   }
@@ -563,7 +572,7 @@ export function ContentPanel({
                   aria-label={dict.editor.moveDown}
                   onClick={() =>
                     applyCommandResult(
-                      commandReorderFaqItem(config, index, index + 1),
+                      commandReorderFaqItem(config, faqId, index + 1),
                       onChange,
                     )
                   }
@@ -575,7 +584,7 @@ export function ContentPanel({
                   aria-label={dict.editor.duplicate}
                   onClick={() =>
                     applyCommandResult(
-                      commandDuplicateFaqItem(config, index),
+                      commandDuplicateFaqItem(config, faqId),
                       onChange,
                     )
                   }
@@ -587,7 +596,7 @@ export function ContentPanel({
                   aria-label={dict.editor.removeItem}
                   onClick={() =>
                     applyCommandResult(
-                      commandDeleteFaqItem(config, index),
+                      commandDeleteFaqItem(config, faqId),
                       onChange,
                     )
                   }
@@ -599,7 +608,7 @@ export function ContentPanel({
                 value={item.question}
                 onChange={(e) =>
                   applyCommandResult(
-                    commandUpdateFaqItem(config, index, {
+                    commandUpdateFaqItem(config, faqId, {
                       question: e.target.value,
                     }),
                     onChange,
@@ -611,7 +620,7 @@ export function ContentPanel({
                 value={item.answer}
                 onChange={(e) =>
                   applyCommandResult(
-                    commandUpdateFaqItem(config, index, {
+                    commandUpdateFaqItem(config, faqId, {
                       answer: e.target.value,
                     }),
                     onChange,
@@ -619,7 +628,8 @@ export function ContentPanel({
                 }
               />
             </div>
-          ))}
+            );
+          })}
           <Button
             type="button"
             size="sm"
@@ -646,7 +656,9 @@ export function ContentPanel({
           type="button"
           size="sm"
           variant="outline"
-          onClick={() => onChange(ensureTestimonials(config))}
+          onClick={() =>
+            applyCommandResult(commandEnsureTestimonials(config), onChange)
+          }
         >
           {isFa ? "فعال‌سازی نظرات" : "Enable testimonials"}
         </Button>
@@ -679,7 +691,14 @@ export function ContentPanel({
           ).map(([key, label]) => (
             <Field key={key} label={label}>
               <Input
-                dir={key === "email" || key === "website" ? "ltr" : undefined}
+                dir={
+                  key === "email" ||
+                  key === "website" ||
+                  key === "phone" ||
+                  key === "whatsapp"
+                    ? "ltr"
+                    : undefined
+                }
                 value={contact.info[key] ?? ""}
                 onChange={(e) =>
                   applyCommandResult(
@@ -725,9 +744,12 @@ function TestimonialsBlock({
           }
         />
       </Field>
-      {testimonials.items.map((item, index) => (
+      {testimonials.items.map((item, index) => {
+        const testimonialId = item.id;
+        if (!testimonialId) return null;
+        return (
         <div
-          key={`t-${index}`}
+          key={testimonialId}
           className="space-y-2 rounded-xl bg-muted/60 p-2.5"
         >
           <div className="flex justify-end gap-1">
@@ -737,7 +759,7 @@ function TestimonialsBlock({
               aria-label={dict.editor.moveUp}
               onClick={() =>
                 applyCommandResult(
-                  commandReorderTestimonial(config, index, index - 1),
+                  commandReorderTestimonial(config, testimonialId, index - 1),
                   onChange,
                 )
               }
@@ -750,7 +772,7 @@ function TestimonialsBlock({
               aria-label={dict.editor.moveDown}
               onClick={() =>
                 applyCommandResult(
-                  commandReorderTestimonial(config, index, index + 1),
+                  commandReorderTestimonial(config, testimonialId, index + 1),
                   onChange,
                 )
               }
@@ -762,7 +784,7 @@ function TestimonialsBlock({
               aria-label={dict.editor.removeItem}
               onClick={() =>
                 applyCommandResult(
-                  commandDeleteTestimonial(config, index),
+                  commandDeleteTestimonial(config, testimonialId),
                   onChange,
                 )
               }
@@ -775,7 +797,7 @@ function TestimonialsBlock({
             value={item.quote}
             onChange={(e) =>
               applyCommandResult(
-                commandUpdateTestimonial(config, index, {
+                commandUpdateTestimonial(config, testimonialId, {
                   quote: e.target.value,
                 }),
                 onChange,
@@ -786,7 +808,7 @@ function TestimonialsBlock({
             value={item.author}
             onChange={(e) =>
               applyCommandResult(
-                commandUpdateTestimonial(config, index, {
+                commandUpdateTestimonial(config, testimonialId, {
                   author: e.target.value,
                 }),
                 onChange,
@@ -794,7 +816,8 @@ function TestimonialsBlock({
             }
           />
         </div>
-      ))}
+        );
+      })}
       <Button
         type="button"
         size="sm"

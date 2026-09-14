@@ -55,7 +55,7 @@ export const inputContract = {
 export const productCardContract = {
   canonicalImport: "@/components/store/StoreProductCard",
   legacyImport: "@/components/website/StoreProductCard",
-  variants: ["classic", "minimal", "editorial", "compact"] as const,
+  variants: ["classic", "editorial", "compact"] as const,
   ratios: ["1/1", "4/5", "3/4", "3/5"] as const,
   defaultRatio: "4/5" as const,
   imageTreatment: ["cover", "secondaryHover"] as const,

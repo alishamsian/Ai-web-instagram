@@ -87,7 +87,7 @@ function ResponsiveNumberControl({
     resolved.value == null ? "" : String(resolved.value);
   const hasOverride =
     viewport === "desktop"
-      ? current.base !== undefined
+      ? current.desktop !== undefined || current.base !== undefined
       : current[viewport] !== undefined;
 
   return (

@@ -9,19 +9,16 @@ import { StoreLinkButton, StoreKicker } from "@/components/store/primitives";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveEditorHref } from "@/lib/editor/links";
+import { getSectionVariants } from "@/lib/store/registry/catalog";
 
 function heroPrimaryHref(config: WebsiteConfig) {
   return resolveEditorHref(config.content.hero.ctaHref, "#shop");
 }
 
 function heroVariant(config: WebsiteConfig) {
-  const registered = new Set([
-    "fan",
-    "overlay",
-    "editorial",
-    "split",
-    "minimal",
-  ]);
+  const registered = new Set(
+    getSectionVariants("hero").map((variant) => variant.id),
+  );
   const raw =
     config.sections.find((s) => s.type === "hero")?.variant ||
     config.content.hero.style ||
@@ -29,7 +26,7 @@ function heroVariant(config: WebsiteConfig) {
   // Legacy "menu" maps to editorial; unknown → fan.
   if (raw === "menu") return "editorial";
   if (registered.has(raw)) return raw;
-  return "fan";
+  return registered.has("fan") ? "fan" : [...registered][0] ?? "fan";
 }
 
 function collectFanMedia(config: WebsiteConfig) {

@@ -29,6 +29,8 @@ export interface ProductIndustryData {
 }
 
 export interface Service {
+  /** Stable identity for editor commands (optional on legacy imports). */
+  id?: string;
   name: string;
   description: string;
   imageIds: string[];

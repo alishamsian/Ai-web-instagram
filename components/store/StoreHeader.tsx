@@ -13,6 +13,9 @@ function resolveHeroKind(config: WebsiteConfig) {
     config.sections.find((s) => s.type === "hero")?.variant ||
     config.content.hero.style ||
     "fan";
+  // Header chrome: overlay uses light-over-media treatment → fan chrome;
+  // legacy menu → editorial chrome.
+  if (raw === "menu") return "editorial";
   if (raw === "overlay") return "fan";
   return raw;
 }

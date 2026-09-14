@@ -1,15 +1,15 @@
 /**
  * Content collection commands — products, services, FAQ, testimonials, gallery.
- * Pure, deterministic, fail-safe. UI must not manually splice arrays.
+ * Pure state transforms. UI must not manually splice arrays.
+ *
+ * Identity: prefer stable item ids. Commands that create entities accept an
+ * optional explicit `id` (deterministic). Otherwise `createEntityId` is used.
  */
 
-import type { WebsiteConfig } from "@/types/website";
+import type { WebsiteConfig, FaqItem, TestimonialItem } from "@/types/website";
 import type { Product, Service } from "@/types/ai";
 import { type EditorCommandResult } from "@/lib/editor/types";
-
-function newId(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { createEntityId } from "@/lib/editor/ids";
 
 function moveIndex<T>(items: T[], from: number, to: number): T[] | null {
   if (
@@ -28,6 +28,17 @@ function moveIndex<T>(items: T[], from: number, to: number): T[] | null {
   return next;
 }
 
+function moveById<T extends { id?: string }>(
+  items: T[],
+  id: string,
+  toIndex: number,
+  resolveId: (item: T) => string | undefined = (item) => item.id,
+): T[] | null {
+  const from = items.findIndex((item) => resolveId(item) === id);
+  if (from < 0) return null;
+  return moveIndex(items, from, toIndex);
+}
+
 // ── Products ──────────────────────────────────────────────
 
 export function commandAddProduct(
@@ -36,10 +47,10 @@ export function commandAddProduct(
 ): EditorCommandResult | null {
   const products = config.content.products;
   if (!products) return null;
-  const id = newId("product");
+  const id = seed?.id ?? createEntityId("product");
   const item: Product = {
     id,
-    slug: id,
+    slug: seed?.slug ?? id,
     name: seed?.name ?? "New product",
     description: seed?.description ?? "",
     category: seed?.category ?? products.defaults?.category ?? "General",
@@ -86,6 +97,7 @@ export function commandDeleteProduct(
 export function commandDuplicateProduct(
   config: WebsiteConfig,
   productId: string,
+  newId?: string,
 ): EditorCommandResult | null {
   const products = config.content.products;
   if (!products) return null;
@@ -94,7 +106,7 @@ export function commandDuplicateProduct(
   );
   if (index < 0) return null;
   const source = products.items[index]!;
-  const id = newId("product");
+  const id = newId ?? createEntityId("product");
   const copy: Product = {
     ...structuredClone(source),
     id,
@@ -115,14 +127,20 @@ export function commandDuplicateProduct(
   };
 }
 
+/** Reorder product by stable id to target index. */
 export function commandReorderProduct(
   config: WebsiteConfig,
-  fromIndex: number,
+  productId: string,
   toIndex: number,
 ): EditorCommandResult | null {
   const products = config.content.products;
   if (!products) return null;
-  const items = moveIndex(products.items, fromIndex, toIndex);
+  const items = moveById(
+    products.items,
+    productId,
+    toIndex,
+    (item) => item.id || item.slug,
+  );
   if (!items) return null;
   return {
     config: {
@@ -213,6 +231,7 @@ export function commandAddService(
   const services = config.content.services;
   if (!services) return null;
   const item: Service = {
+    id: seed?.id ?? createEntityId("service"),
     name: seed?.name ?? "New service",
     description: seed?.description ?? "",
     imageIds: seed?.imageIds ?? [],
@@ -232,18 +251,20 @@ export function commandAddService(
 
 export function commandUpdateService(
   config: WebsiteConfig,
-  index: number,
-  patch: Partial<Service>,
+  serviceId: string,
+  patch: Partial<Omit<Service, "id">>,
 ): EditorCommandResult | null {
   const services = config.content.services;
-  if (!services || index < 0 || index >= services.items.length) return null;
+  if (!services) return null;
+  const index = services.items.findIndex((item) => item.id === serviceId);
+  if (index < 0) return null;
   if (patch.imageIds) {
     for (const id of patch.imageIds) {
       if (!config.media[id]) return null;
     }
   }
   const items = [...services.items];
-  items[index] = { ...items[index]!, ...patch };
+  items[index] = { ...items[index]!, ...patch, id: serviceId };
   return {
     config: {
       ...config,
@@ -252,37 +273,38 @@ export function commandUpdateService(
         services: { ...services, items },
       },
     },
-    label: `Edit service ${index}`,
+    label: `Edit service ${serviceId}`,
   };
 }
 
 export function commandDeleteService(
   config: WebsiteConfig,
-  index: number,
+  serviceId: string,
 ): EditorCommandResult | null {
   const services = config.content.services;
-  if (!services || index < 0 || index >= services.items.length) return null;
-  const items = services.items.filter((_, i) => i !== index);
+  if (!services) return null;
+  const nextItems = services.items.filter((item) => item.id !== serviceId);
+  if (nextItems.length === services.items.length) return null;
   return {
     config: {
       ...config,
       content: {
         ...config.content,
-        services: { ...services, items },
+        services: { ...services, items: nextItems },
       },
     },
-    label: `Delete service ${index}`,
+    label: `Delete service ${serviceId}`,
   };
 }
 
 export function commandReorderService(
   config: WebsiteConfig,
-  fromIndex: number,
+  serviceId: string,
   toIndex: number,
 ): EditorCommandResult | null {
   const services = config.content.services;
   if (!services) return null;
-  const items = moveIndex(services.items, fromIndex, toIndex);
+  const items = moveById(services.items, serviceId, toIndex);
   if (!items) return null;
   return {
     config: {
@@ -300,9 +322,15 @@ export function commandReorderService(
 
 export function commandAddFaqItem(
   config: WebsiteConfig,
+  seed?: Partial<FaqItem>,
 ): EditorCommandResult | null {
   const faq = config.content.faq;
   if (!faq) return null;
+  const item: FaqItem = {
+    id: seed?.id ?? createEntityId("faq"),
+    question: seed?.question ?? "New question",
+    answer: seed?.answer ?? "Answer",
+  };
   return {
     config: {
       ...config,
@@ -310,10 +338,7 @@ export function commandAddFaqItem(
         ...config.content,
         faq: {
           ...faq,
-          items: [
-            ...faq.items,
-            { question: "New question", answer: "Answer" },
-          ],
+          items: [...faq.items, item],
         },
       },
     },
@@ -323,13 +348,15 @@ export function commandAddFaqItem(
 
 export function commandUpdateFaqItem(
   config: WebsiteConfig,
-  index: number,
-  patch: Partial<{ question: string; answer: string }>,
+  faqId: string,
+  patch: Partial<Pick<FaqItem, "question" | "answer">>,
 ): EditorCommandResult | null {
   const faq = config.content.faq;
-  if (!faq || index < 0 || index >= faq.items.length) return null;
+  if (!faq) return null;
+  const index = faq.items.findIndex((item) => item.id === faqId);
+  if (index < 0) return null;
   const items = [...faq.items];
-  items[index] = { ...items[index]!, ...patch };
+  items[index] = { ...items[index]!, ...patch, id: faqId };
   return {
     config: {
       ...config,
@@ -338,39 +365,44 @@ export function commandUpdateFaqItem(
         faq: { ...faq, items },
       },
     },
-    label: `Edit FAQ ${index}`,
+    label: `Edit FAQ ${faqId}`,
   };
 }
 
 export function commandDeleteFaqItem(
   config: WebsiteConfig,
-  index: number,
+  faqId: string,
 ): EditorCommandResult | null {
   const faq = config.content.faq;
-  if (!faq || index < 0 || index >= faq.items.length) return null;
+  if (!faq) return null;
+  const nextItems = faq.items.filter((item) => item.id !== faqId);
+  if (nextItems.length === faq.items.length) return null;
   return {
     config: {
       ...config,
       content: {
         ...config.content,
-        faq: {
-          ...faq,
-          items: faq.items.filter((_, i) => i !== index),
-        },
+        faq: { ...faq, items: nextItems },
       },
     },
-    label: `Delete FAQ ${index}`,
+    label: `Delete FAQ ${faqId}`,
   };
 }
 
 export function commandDuplicateFaqItem(
   config: WebsiteConfig,
-  index: number,
+  faqId: string,
+  newId?: string,
 ): EditorCommandResult | null {
   const faq = config.content.faq;
-  if (!faq || index < 0 || index >= faq.items.length) return null;
+  if (!faq) return null;
+  const index = faq.items.findIndex((item) => item.id === faqId);
+  if (index < 0) return null;
   const items = [...faq.items];
-  const copy = structuredClone(items[index]!);
+  const copy: FaqItem = {
+    ...structuredClone(items[index]!),
+    id: newId ?? createEntityId("faq"),
+  };
   items.splice(index + 1, 0, copy);
   return {
     config: {
@@ -380,18 +412,18 @@ export function commandDuplicateFaqItem(
         faq: { ...faq, items },
       },
     },
-    label: `Duplicate FAQ ${index}`,
+    label: `Duplicate FAQ ${faqId}`,
   };
 }
 
 export function commandReorderFaqItem(
   config: WebsiteConfig,
-  fromIndex: number,
+  faqId: string,
   toIndex: number,
 ): EditorCommandResult | null {
   const faq = config.content.faq;
   if (!faq) return null;
-  const items = moveIndex(faq.items, fromIndex, toIndex);
+  const items = moveById(faq.items, faqId, toIndex);
   if (!items) return null;
   return {
     config: {
@@ -407,22 +439,52 @@ export function commandReorderFaqItem(
 
 // ── Testimonials ──────────────────────────────────────────
 
-export function commandAddTestimonial(
+export function commandEnsureTestimonials(
   config: WebsiteConfig,
-): EditorCommandResult | null {
-  const testimonials = config.content.testimonials;
-  if (!testimonials) return null;
+): EditorCommandResult {
+  if (config.content.testimonials) {
+    return { config, label: "Testimonials ready" };
+  }
   return {
     config: {
       ...config,
       content: {
         ...config.content,
         testimonials: {
+          title:
+            config.settings.language === "fa"
+              ? "نظر مشتریان"
+              : "What clients say",
+          items: [],
+        },
+      },
+    },
+    label: "Enable testimonials",
+  };
+}
+
+export function commandAddTestimonial(
+  config: WebsiteConfig,
+  seed?: Partial<TestimonialItem>,
+): EditorCommandResult | null {
+  const base = config.content.testimonials
+    ? config
+    : commandEnsureTestimonials(config).config;
+  const testimonials = base.content.testimonials;
+  if (!testimonials) return null;
+  const item: TestimonialItem = {
+    id: seed?.id ?? createEntityId("testimonial"),
+    quote: seed?.quote ?? "New quote",
+    author: seed?.author ?? "Author",
+  };
+  return {
+    config: {
+      ...base,
+      content: {
+        ...base.content,
+        testimonials: {
           ...testimonials,
-          items: [
-            ...testimonials.items,
-            { quote: "New quote", author: "Author" },
-          ],
+          items: [...testimonials.items, item],
         },
       },
     },
@@ -432,15 +494,17 @@ export function commandAddTestimonial(
 
 export function commandUpdateTestimonial(
   config: WebsiteConfig,
-  index: number,
-  patch: Partial<{ quote: string; author: string }>,
+  testimonialId: string,
+  patch: Partial<Pick<TestimonialItem, "quote" | "author">>,
 ): EditorCommandResult | null {
   const testimonials = config.content.testimonials;
-  if (!testimonials || index < 0 || index >= testimonials.items.length) {
-    return null;
-  }
+  if (!testimonials) return null;
+  const index = testimonials.items.findIndex(
+    (item) => item.id === testimonialId,
+  );
+  if (index < 0) return null;
   const items = [...testimonials.items];
-  items[index] = { ...items[index]!, ...patch };
+  items[index] = { ...items[index]!, ...patch, id: testimonialId };
   return {
     config: {
       ...config,
@@ -449,41 +513,40 @@ export function commandUpdateTestimonial(
         testimonials: { ...testimonials, items },
       },
     },
-    label: `Edit testimonial ${index}`,
+    label: `Edit testimonial ${testimonialId}`,
   };
 }
 
 export function commandDeleteTestimonial(
   config: WebsiteConfig,
-  index: number,
+  testimonialId: string,
 ): EditorCommandResult | null {
   const testimonials = config.content.testimonials;
-  if (!testimonials || index < 0 || index >= testimonials.items.length) {
-    return null;
-  }
+  if (!testimonials) return null;
+  const nextItems = testimonials.items.filter(
+    (item) => item.id !== testimonialId,
+  );
+  if (nextItems.length === testimonials.items.length) return null;
   return {
     config: {
       ...config,
       content: {
         ...config.content,
-        testimonials: {
-          ...testimonials,
-          items: testimonials.items.filter((_, i) => i !== index),
-        },
+        testimonials: { ...testimonials, items: nextItems },
       },
     },
-    label: `Delete testimonial ${index}`,
+    label: `Delete testimonial ${testimonialId}`,
   };
 }
 
 export function commandReorderTestimonial(
   config: WebsiteConfig,
-  fromIndex: number,
+  testimonialId: string,
   toIndex: number,
 ): EditorCommandResult | null {
   const testimonials = config.content.testimonials;
   if (!testimonials) return null;
-  const items = moveIndex(testimonials.items, fromIndex, toIndex);
+  const items = moveById(testimonials.items, testimonialId, toIndex);
   if (!items) return null;
   return {
     config: {
@@ -536,12 +599,14 @@ export function commandToggleGalleryImage(
 
 export function commandReorderGalleryImage(
   config: WebsiteConfig,
-  fromIndex: number,
+  mediaId: string,
   toIndex: number,
 ): EditorCommandResult | null {
   const gallery = config.content.gallery;
   if (!gallery) return null;
-  const imageIds = moveIndex(gallery.imageIds, fromIndex, toIndex);
+  const from = gallery.imageIds.indexOf(mediaId);
+  if (from < 0) return null;
+  const imageIds = moveIndex(gallery.imageIds, from, toIndex);
   if (!imageIds) return null;
   return {
     config: {

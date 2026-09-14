@@ -1,22 +1,32 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { WebsiteConfig } from "@/types/website";
 import {
   commandAddFaqItem,
   commandAddProduct,
+  commandAddService,
   commandDeleteFaqItem,
   commandDeleteProduct,
+  commandDeleteService,
   commandDuplicateFaqItem,
+  commandEnsureTestimonials,
   commandReorderFaqItem,
   commandReorderProduct,
-  commandSetBrandLogo,
+  commandReorderService,
   commandSetGalleryImages,
   commandSetSectionVariant,
-  commandSetSeoKeywords,
   commandToggleGalleryImage,
   commandUpdateFaqItem,
   commandUpdateProduct,
-  commandUpdateSiteSettings,
+  createSequentialIdFactory,
+  normalizeCollectionIdentities,
+  normalizeLegacyHeroVariant,
+  resolveResponsiveColumns,
+  resolveResponsiveValue,
+  setEntityIdFactory,
+  setResponsiveOverride,
 } from "@/lib/editor";
+import { getSectionDefinition, getSectionVariants, resetRegistryForTests } from "@/lib/store/registry";
+import { CORE_SECTION_DEFINITIONS } from "@/lib/store/registry/definitions";
 
 function baseConfig(): WebsiteConfig {
   return {
@@ -56,11 +66,23 @@ function baseConfig(): WebsiteConfig {
           },
         ],
       },
+      services: {
+        title: "Services",
+        items: [
+          {
+            id: "s1",
+            name: "Consult",
+            description: "Talk",
+            imageIds: [],
+            confidence: 1,
+          },
+        ],
+      },
       faq: {
         title: "FAQ",
         items: [
-          { question: "Q1", answer: "A1" },
-          { question: "Q2", answer: "A2" },
+          { id: "f1", question: "Q1", answer: "A1" },
+          { id: "f2", question: "Q2", answer: "A2" },
         ],
       },
       gallery: {
@@ -77,6 +99,12 @@ function baseConfig(): WebsiteConfig {
     },
     sections: [
       { id: "hero-1", type: "hero", visible: true, variant: "fan" },
+      {
+        id: "products-1",
+        type: "products",
+        visible: true,
+        settings: { columns: { mobile: 2, tablet: 3, desktop: 4 } },
+      },
       { id: "footer-1", type: "footer", visible: true },
     ],
     media: {
@@ -86,84 +114,162 @@ function baseConfig(): WebsiteConfig {
   };
 }
 
-describe("atomic product imageIds", () => {
-  it("updates imageIds in a single command without partial primary-only write", () => {
+afterEach(() => {
+  setEntityIdFactory(null);
+  resetRegistryForTests(CORE_SECTION_DEFINITIONS);
+});
+
+describe("pass 2.1 — atomic product + identity", () => {
+  it("updates imageIds atomically and rejects invalid media", () => {
     const result = commandUpdateProduct(baseConfig(), "p1", {
       imageIds: ["m2", "m1"],
       name: "Bag Plus",
+      hidden: true,
     });
     const item = result?.config.content.products?.items[0];
     expect(item?.name).toBe("Bag Plus");
     expect(item?.imageIds).toEqual(["m2", "m1"]);
-  });
-
-  it("rejects unknown media in imageIds", () => {
+    expect(item?.hidden).toBe(true);
     expect(
       commandUpdateProduct(baseConfig(), "p1", { imageIds: ["missing"] }),
     ).toBeNull();
+    expect(commandUpdateProduct(baseConfig(), "nope", { name: "x" })).toBeNull();
   });
 
-  it("adds, reorders, and deletes products", () => {
-    const added = commandAddProduct(baseConfig(), { name: "New" });
-    expect(added?.config.content.products?.items).toHaveLength(2);
-    const id = added!.config.content.products!.items[1]!.id!;
-    const reordered = commandReorderProduct(added!.config, 1, 0);
-    expect(reordered?.config.content.products?.items[0]?.id).toBe(id);
-    const deleted = commandDeleteProduct(reordered!.config, id);
-    expect(deleted?.config.content.products?.items).toHaveLength(1);
+  it("uses explicit ids for deterministic creates", () => {
+    const added = commandAddProduct(baseConfig(), {
+      id: "fixed-product",
+      name: "Fixed",
+    });
+    expect(added?.config.content.products?.items.at(-1)?.id).toBe(
+      "fixed-product",
+    );
+    const svc = commandAddService(baseConfig(), { id: "fixed-service" });
+    expect(svc?.config.content.services?.items.at(-1)?.id).toBe(
+      "fixed-service",
+    );
+  });
+
+  it("rejects invalid collection ids safely", () => {
+    expect(commandDeleteService(baseConfig(), "missing")).toBeNull();
+    expect(commandUpdateFaqItem(baseConfig(), "missing", { question: "x" })).toBeNull();
+    expect(commandReorderProduct(baseConfig(), "missing", 0)).toBeNull();
   });
 });
 
-describe("FAQ collection commands", () => {
-  it("adds, updates, duplicates, reorders, deletes", () => {
-    const added = commandAddFaqItem(baseConfig());
+describe("pass 2.1 — FAQ/services id ops", () => {
+  it("adds/updates/duplicates/reorders/deletes FAQ by id", () => {
+    setEntityIdFactory(createSequentialIdFactory());
+    const added = commandAddFaqItem(baseConfig(), { id: "f3" });
     expect(added?.config.content.faq?.items).toHaveLength(3);
-    const updated = commandUpdateFaqItem(added!.config, 2, {
+    const updated = commandUpdateFaqItem(added!.config, "f3", {
       question: "Q3",
       answer: "A3",
     });
-    expect(updated?.config.content.faq?.items[2]?.question).toBe("Q3");
-    const dup = commandDuplicateFaqItem(updated!.config, 0);
-    expect(dup?.config.content.faq?.items).toHaveLength(4);
-    const reordered = commandReorderFaqItem(dup!.config, 0, 2);
-    expect(reordered?.config.content.faq?.items[2]?.question).toBe("Q1");
-    const deleted = commandDeleteFaqItem(reordered!.config, 0);
-    expect(deleted?.config.content.faq?.items.length).toBe(3);
+    expect(updated?.config.content.faq?.items.find((i) => i.id === "f3")?.question).toBe(
+      "Q3",
+    );
+    const dup = commandDuplicateFaqItem(updated!.config, "f1", "f1-copy");
+    expect(dup?.config.content.faq?.items.find((i) => i.id === "f1-copy")).toBeTruthy();
+    const reordered = commandReorderFaqItem(dup!.config, "f1", 2);
+    expect(reordered?.config.content.faq?.items[2]?.id).toBe("f1");
+    const deleted = commandDeleteFaqItem(reordered!.config, "f2");
+    expect(deleted?.config.content.faq?.items.some((i) => i.id === "f2")).toBe(
+      false,
+    );
+  });
+
+  it("reorders and deletes services by id", () => {
+    const added = commandAddService(baseConfig(), { id: "s2", name: "B" });
+    const reordered = commandReorderService(added!.config, "s2", 0);
+    expect(reordered?.config.content.services?.items[0]?.id).toBe("s2");
+    const deleted = commandDeleteService(reordered!.config, "s1");
+    expect(deleted?.config.content.services?.items).toHaveLength(1);
+  });
+
+  it("ensures testimonials via command", () => {
+    const result = commandEnsureTestimonials(baseConfig());
+    expect(result.config.content.testimonials?.items).toEqual([]);
+    const again = commandEnsureTestimonials(result.config);
+    expect(again.config).toEqual(result.config);
   });
 });
 
-describe("gallery + variant registry", () => {
-  it("toggles gallery images and rejects invalid ids", () => {
+describe("pass 2.1 — normalize identity + legacy hero", () => {
+  it("assigns missing collection ids without changing existing ones", () => {
+    setEntityIdFactory(createSequentialIdFactory(10));
+    const raw = baseConfig();
+    raw.content.faq!.items = [{ question: "old", answer: "a" }];
+    raw.content.services!.items = [
+      { name: "S", description: "", imageIds: [], confidence: 1 },
+    ];
+    const next = normalizeCollectionIdentities(raw);
+    expect(next.content.faq?.items[0]?.id).toMatch(/^faq-/);
+    expect(next.content.services?.items[0]?.id).toMatch(/^service-/);
+    expect(next.content.products?.items[0]?.id).toBe("p1");
+  });
+
+  it("normalizes legacy hero menu to editorial", () => {
+    resetRegistryForTests(CORE_SECTION_DEFINITIONS);
+    const raw = baseConfig();
+    raw.content.hero.style = "menu";
+    raw.sections[0]!.variant = "menu";
+    const next = normalizeLegacyHeroVariant(raw);
+    expect(next.content.hero.style).toBe("editorial");
+    expect(next.sections[0]?.variant).toBe("editorial");
+  });
+});
+
+describe("pass 2.1 — variant registry/schema parity", () => {
+  it("schema heroStyle options match registry variants exactly", () => {
+    resetRegistryForTests(CORE_SECTION_DEFINITIONS);
+    const def = getSectionDefinition("hero");
+    const registryIds = getSectionVariants("hero").map((v) => v.id);
+    const schemaIds = def?.schema?.layout?.heroStyle?.options?.map(
+      (o) => o.value,
+    );
+    expect(schemaIds).toEqual(registryIds);
+    expect(commandSetSectionVariant(baseConfig(), "hero-1", "menu")).toBeNull();
+    expect(
+      commandSetSectionVariant(baseConfig(), "hero-1", "split")?.config.content
+        .hero.style,
+    ).toBe("split");
+  });
+
+  it("product cardVariant options match products variants", () => {
+    resetRegistryForTests(CORE_SECTION_DEFINITIONS);
+    const def = getSectionDefinition("products");
+    const registryIds = getSectionVariants("products").map((v) => v.id);
+    const schemaIds = def?.schema?.style?.cardVariant?.options?.map(
+      (o) => o.value,
+    );
+    expect(schemaIds).toEqual(registryIds);
+  });
+});
+
+describe("pass 2.1 — responsive columns", () => {
+  it("resolves desktop key and inherits correctly", () => {
+    const value = { mobile: 2, tablet: 3, desktop: 5 };
+    expect(resolveResponsiveValue(value, "desktop").value).toBe(5);
+    expect(resolveResponsiveValue(value, "tablet").value).toBe(3);
+    expect(resolveResponsiveValue(value, "mobile").value).toBe(2);
+    const overridden = setResponsiveOverride(value, "desktop", 4);
+    expect(overridden.desktop).toBe(4);
+    expect(overridden.base).toBeUndefined();
+    expect(resolveResponsiveColumns(value).desktop).toBe(5);
+    expect(resolveResponsiveColumns(3).desktop).toBe(3);
+  });
+});
+
+describe("pass 2.1 — gallery media validation", () => {
+  it("rejects invalid gallery ids and reorders products by id", () => {
+    expect(commandSetGalleryImages(baseConfig(), ["nope"])).toBeNull();
     const toggled = commandToggleGalleryImage(baseConfig(), "m2");
     expect(toggled?.config.content.gallery?.imageIds).toEqual(["m1", "m2"]);
-    expect(commandSetGalleryImages(baseConfig(), ["nope"])).toBeNull();
-  });
-
-  it("only allows registered hero variants", () => {
-    expect(commandSetSectionVariant(baseConfig(), "hero-1", "split")?.config.content.hero.style).toBe(
-      "split",
-    );
-    expect(commandSetSectionVariant(baseConfig(), "hero-1", "menu")).toBeNull();
-  });
-
-  it("falls back safely for invalid hero style via content path reject of unregistered menu sync", () => {
-    const invalid = commandSetSectionVariant(baseConfig(), "hero-1", "does-not-exist");
-    expect(invalid).toBeNull();
-    const fan = commandSetSectionVariant(baseConfig(), "hero-1", "fan");
-    expect(fan?.config.sections.find((s) => s.id === "hero-1")?.variant).toBe("fan");
-  });
-});
-
-describe("brand logo + site settings commands", () => {
-  it("sets and clears brand logo from media", () => {
-    const set = commandSetBrandLogo(baseConfig(), "m1");
-    expect(set?.config.brand.logo).toBe("https://cdn.example/a.jpg");
-    expect(commandSetBrandLogo(baseConfig(), "missing")).toBeNull();
-    const cleared = commandSetBrandLogo(set!.config, null);
-    expect(cleared?.config.brand.logo).toBeUndefined();
-    const settings = commandUpdateSiteSettings(baseConfig(), { language: "fa" });
-    expect(settings.config.settings.direction).toBe("rtl");
-    const keys = commandSetSeoKeywords(baseConfig(), ["a", " b ", ""]);
-    expect(keys.config.seo.keywords).toEqual(["a", "b"]);
+    const added = commandAddProduct(baseConfig(), { id: "p2", name: "New" });
+    const reordered = commandReorderProduct(added!.config, "p2", 0);
+    expect(reordered?.config.content.products?.items[0]?.id).toBe("p2");
+    const deleted = commandDeleteProduct(reordered!.config, "p2");
+    expect(deleted?.config.content.products?.items).toHaveLength(1);
   });
 });

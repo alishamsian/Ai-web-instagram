@@ -125,14 +125,28 @@ export interface GalleryConfig {
   imageIds: string[];
 }
 
+export interface TestimonialItem {
+  /** Stable identity for editor commands (optional on legacy imports). */
+  id?: string;
+  quote: string;
+  author: string;
+}
+
 export interface TestimonialConfig {
   title: string;
-  items: { quote: string; author: string }[];
+  items: TestimonialItem[];
+}
+
+export interface FaqItem {
+  /** Stable identity for editor commands (optional on legacy imports). */
+  id?: string;
+  question: string;
+  answer: string;
 }
 
 export interface FAQConfig {
   title: string;
-  items: { question: string; answer: string }[];
+  items: FaqItem[];
 }
 
 export interface ContactConfig {

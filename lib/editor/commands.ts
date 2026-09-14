@@ -23,6 +23,7 @@ import {
   EDITOR_FIELD_CONTENT_PATH,
   normalizeEditorHref,
 } from "@/lib/editor/links";
+import { createEntityId } from "@/lib/editor/ids";
 
 /** Keep footer sections pinned to the end after any reorder/move. */
 export function pinFooterLast(sections: SectionConfig[]): SectionConfig[] {
@@ -77,7 +78,7 @@ export function commandDuplicateSection(
   if (section.type === "footer") return null;
   const copy = {
     ...cloneWebsiteConfig({ ...config, sections: [section] }).sections[0]!,
-    id: `${section.type}-${Date.now().toString(36)}`,
+    id: createEntityId(section.type),
   };
   const sections = [...config.sections];
   sections.splice(index + 1, 0, copy);

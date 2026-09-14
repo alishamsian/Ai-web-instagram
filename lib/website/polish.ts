@@ -1,5 +1,6 @@
 import type { WebsiteConfig } from "@/types/website";
 import { ensureCatalogProduct } from "@/lib/website/product";
+import { normalizeEditorConfig } from "@/lib/editor/normalize-content";
 
 const JUNK_CATEGORIES = new Set([
   "image",
@@ -158,7 +159,7 @@ export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
         }
       : config.brand.colors;
 
-  return {
+  return normalizeEditorConfig({
     ...config,
     brand: {
       ...config.brand,
@@ -216,5 +217,5 @@ export function polishWebsiteConfig(config: WebsiteConfig): WebsiteConfig {
               }
             : undefined),
     },
-  };
+  });
 }

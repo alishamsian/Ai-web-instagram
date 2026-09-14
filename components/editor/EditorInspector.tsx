@@ -1355,8 +1355,12 @@ function ProductsSectionInspector({
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => {
                     if (dragIndex == null || dragIndex === realIndex) return;
+                    const movedId =
+                      products.items[dragIndex]?.id ||
+                      products.items[dragIndex]?.slug;
+                    if (!movedId) return;
                     applyCommandResult(
-                      commandReorderProduct(config, dragIndex, realIndex),
+                      commandReorderProduct(config, movedId, realIndex),
                       onChange,
                     );
                     setDragIndex(null);

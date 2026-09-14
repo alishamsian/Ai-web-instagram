@@ -71,12 +71,26 @@ export {
   commandUpdateTestimonial,
   commandDeleteTestimonial,
   commandReorderTestimonial,
+  commandEnsureTestimonials,
   commandSetGalleryImages,
   commandToggleGalleryImage,
   commandReorderGalleryImage,
   applyCommandResult,
   type ProductPatch,
 } from "@/lib/editor/content-commands";
+
+export {
+  createEntityId,
+  setEntityIdFactory,
+  createSequentialIdFactory,
+  type EntityIdFactory,
+} from "@/lib/editor/ids";
+
+export {
+  normalizeCollectionIdentities,
+  normalizeLegacyHeroVariant,
+  normalizeEditorConfig,
+} from "@/lib/editor/normalize-content";
 
 export {
   normalizeEditorHref,
@@ -94,6 +108,7 @@ export {
   resolveResponsiveValue,
   setResponsiveOverride,
   resetResponsiveOverride,
+  resolveResponsiveColumns,
   type ViewportBucket,
 } from "@/lib/editor/responsive";
 
