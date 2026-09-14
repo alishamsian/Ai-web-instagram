@@ -205,11 +205,31 @@ export function SeoPanel({
   dict: Dictionary;
   onChange: (next: WebsiteConfig) => void;
 }) {
+  const title = config.seo.title;
+  const description = config.seo.description;
+  const titleLen = title.length;
+  const descLen = description.length;
+
   return (
     <div className="space-y-4">
+      <div className="editor-seo-serp">
+        <p className="mb-2 text-[10px] font-medium tracking-[0.12em] text-muted-foreground uppercase">
+          {dict.editor.seoPreview}
+        </p>
+        <p className="editor-seo-serp-title line-clamp-2">
+          {title || config.brand.name || "—"}
+        </p>
+        <p className="editor-seo-serp-url" dir="ltr">
+          vitrin.app › s › …
+        </p>
+        <p className="editor-seo-serp-desc line-clamp-2">
+          {description || config.brand.tagline || "—"}
+        </p>
+      </div>
+
       <Field label={dict.editor.seoTitle}>
         <Input
-          value={config.seo.title}
+          value={title}
           onChange={(event) =>
             onChange({
               ...config,
@@ -217,11 +237,19 @@ export function SeoPanel({
             })
           }
         />
+        <p
+          className={cn(
+            "mt-1 text-[10.5px] tabular-nums",
+            titleLen > 60 ? "text-amber-700" : "text-muted-foreground",
+          )}
+        >
+          {titleLen}/60 · {dict.editor.seoTitleHint}
+        </p>
       </Field>
       <Field label={dict.editor.seoDescription}>
         <Textarea
           className="min-h-28 rounded-xl"
-          value={config.seo.description}
+          value={description}
           onChange={(event) =>
             onChange({
               ...config,
@@ -229,6 +257,14 @@ export function SeoPanel({
             })
           }
         />
+        <p
+          className={cn(
+            "mt-1 text-[10.5px] tabular-nums",
+            descLen > 155 ? "text-amber-700" : "text-muted-foreground",
+          )}
+        >
+          {descLen}/155 · {dict.editor.seoDescHint}
+        </p>
       </Field>
       <Field label={dict.editor.seoKeywords}>
         <Input
@@ -263,11 +299,16 @@ export function SettingsPanel({
   canRemoveBranding?: boolean;
 }) {
   return (
-    <div className="space-y-5">
-      <div className="space-y-2">
-        <p className="text-[11px] font-medium text-muted-foreground">
-          {dict.editor.language}
-        </p>
+    <div className="space-y-3">
+      <div className="editor-setting-row">
+        <div className="min-w-0">
+          <p className="text-[12.5px] font-medium text-ink">
+            {dict.editor.language}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+            {dict.editor.languageHint}
+          </p>
+        </div>
         <Segmented<"fa" | "en">
           value={config.settings.language}
           onChange={(language) =>
@@ -282,14 +323,20 @@ export function SettingsPanel({
           }
           options={[
             { id: "fa", label: "فارسی" },
-            { id: "en", label: "English" },
+            { id: "en", label: "EN" },
           ]}
         />
       </div>
-      <div className="space-y-2">
-        <p className="text-[11px] font-medium text-muted-foreground">
-          {dict.editor.direction}
-        </p>
+
+      <div className="editor-setting-row">
+        <div className="min-w-0">
+          <p className="text-[12.5px] font-medium text-ink">
+            {dict.editor.direction}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+            RTL / LTR
+          </p>
+        </div>
         <Segmented<"rtl" | "ltr">
           value={config.settings.direction}
           onChange={(direction) =>
@@ -304,17 +351,20 @@ export function SettingsPanel({
           ]}
         />
       </div>
-      <label className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2.5 text-sm">
-        <span>
-          {dict.editor.showBranding}
-          {!canRemoveBranding ? (
-            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              Pro
-            </span>
-          ) : null}
-        </span>
+
+      <label className="editor-setting-row cursor-pointer">
+        <div className="min-w-0">
+          <p className="text-[12.5px] font-medium text-ink">
+            {dict.editor.showBranding}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+            {dict.editor.brandingHint}
+            {!canRemoveBranding ? " · Pro" : ""}
+          </p>
+        </div>
         <input
           type="checkbox"
+          className="size-4 accent-ink"
           checked={config.settings.showBranding}
           disabled={!canRemoveBranding && config.settings.showBranding}
           onChange={(event) => {
@@ -363,17 +413,12 @@ export function TemplatePanel({
               className={cn(
                 "w-full rounded-2xl border px-3.5 py-3 text-start transition",
                 active
-                  ? "border-ink bg-ink text-white"
+                  ? "border-[color:rgba(91,141,239,0.55)] bg-white shadow-[0_0_0_3px_rgba(91,141,239,0.14)]"
                   : "border-border bg-white hover:border-ink/30",
               )}
             >
-              <p className="text-sm font-medium">{def.name[locale]}</p>
-              <p
-                className={cn(
-                  "mt-1 text-[12px] leading-5",
-                  active ? "text-white/70" : "text-muted-foreground",
-                )}
-              >
+              <p className="text-sm font-medium text-ink">{def.name[locale]}</p>
+              <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
                 {def.description[locale]}
               </p>
             </button>

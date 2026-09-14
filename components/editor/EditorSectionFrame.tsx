@@ -66,8 +66,8 @@ export function EditorSectionFrame({
         "relative transition-[outline,box-shadow] duration-150",
         spacingClass(spacing),
         widthClass(width),
-        selected && "z-10 outline outline-2 outline-[#FF6B57]/80 outline-offset-[-2px]",
-        hovered && "outline outline-1 outline-[#FF6B57]/45 outline-offset-[-1px]",
+        selected && "editor-section-selected z-10",
+        hovered && "editor-section-hover",
         className,
       )}
       onMouseEnter={() => edit.onHoverSection(sectionId)}
@@ -84,19 +84,19 @@ export function EditorSectionFrame({
         <div
           data-editor-chrome
           className={cn(
-            "pointer-events-none absolute start-2 top-2 z-20 flex max-w-[min(70%,14rem)] items-center gap-1.5",
-            "rounded-md bg-[#111113]/92 px-2 py-1 text-[11px] font-medium tracking-wide text-[#F7F7F8] shadow-sm sm:start-3 sm:top-3",
+            "editor-section-badge pointer-events-none absolute start-2 top-2 z-20 flex max-w-[min(70%,14rem)] items-center gap-1.5",
+            "px-2 py-1 text-[10px] font-medium tracking-[0.04em] text-[#F7F7F8] uppercase sm:start-3 sm:top-3",
           )}
         >
-          <GripVertical size={12} className="shrink-0 opacity-60" />
-          <span className="truncate">{label}</span>
+          <GripVertical size={11} className="shrink-0 opacity-50" />
+          <span className="truncate normal-case tracking-normal">{label}</span>
         </div>
       )}
 
       {selected && edit.onSectionAction ? (
         <div
           data-editor-chrome
-          className="absolute end-2 top-2 z-20 flex max-w-[calc(100%-5rem)] items-center gap-0.5 overflow-x-auto rounded-lg border border-white/10 bg-[#111113]/95 p-0.5 shadow-lg sm:end-3 sm:top-3 sm:max-w-none"
+          className="editor-section-toolbar absolute end-2 top-2 z-20 flex max-w-[calc(100%-5rem)] items-center gap-0.5 overflow-x-auto sm:end-3 sm:top-3 sm:max-w-none"
           onClick={(event) => event.stopPropagation()}
         >
           <ChromeButton
@@ -166,7 +166,7 @@ function ChromeButton({
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "inline-flex size-7 items-center justify-center rounded-md text-[#B5B5BC] transition",
+        "inline-flex size-8 items-center justify-center rounded-[7px] text-[#B5B5BC] transition",
         "hover:bg-white/10 hover:text-[#F7F7F8]",
         danger && "hover:bg-red-500/15 hover:text-red-300",
       )}

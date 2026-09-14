@@ -40,12 +40,12 @@ export function EditorCanvasFrame({
   }, []);
 
   const targetWidth = viewportWidth(viewport, customWidth);
-  const pad = 24;
+  const pad = 28;
   const available = Math.max(0, hostWidth - pad * 2);
   const scale = available > 0 ? Math.min(1, available / targetWidth) : 1;
   const isMobile = targetWidth <= 480;
   const isTablet = targetWidth > 480 && targetWidth < 1100;
-  const frameHeight = isMobile ? 720 : isTablet ? 900 : 780;
+  const frameHeight = isMobile ? 740 : isTablet ? 920 : 820;
   const presetLabel =
     EDITOR_VIEWPORT_PRESETS.find((p) => p.id === viewport)?.label.en ??
     `${targetWidth}px`;
@@ -54,7 +54,7 @@ export function EditorCanvasFrame({
     <div
       ref={hostRef}
       className={cn(
-        "flex min-h-full w-full items-start justify-center",
+        "flex min-h-full w-full items-start justify-center py-6",
         className,
       )}
     >
@@ -63,15 +63,12 @@ export function EditorCanvasFrame({
         style={{
           width: targetWidth * scale,
           height: frameHeight * scale,
-          marginBlock: pad,
         }}
       >
         <div
           className={cn(
-            "absolute start-0 top-0 origin-top-left overflow-hidden bg-white",
-            isMobile
-              ? "rounded-[1.75rem] border border-white/12 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-black/20"
-              : "rounded-xl border border-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.4)]",
+            "editor-frame-chrome absolute start-0 top-0 origin-top-left overflow-hidden bg-white",
+            isMobile ? "rounded-[1.85rem]" : "rounded-[12px]",
           )}
           style={{
             width: targetWidth,
@@ -80,18 +77,18 @@ export function EditorCanvasFrame({
           }}
         >
           {isMobile ? (
-            <div className="flex h-7 items-center justify-center border-b border-black/5 bg-[#F7F7F5]">
-              <span className="h-1.5 w-16 rounded-full bg-black/15" />
+            <div className="flex h-8 items-center justify-center border-b border-black/[0.04] bg-[#F3F3F1]">
+              <span className="h-1.5 w-[4.5rem] rounded-full bg-black/12" />
             </div>
           ) : (
-            <div className="flex h-9 items-center gap-1.5 border-b border-black/6 bg-[#FAFAF8] px-3">
-              <span className="size-2 rounded-full bg-[#FF5F57]" />
-              <span className="size-2 rounded-full bg-[#FEBC2E]" />
-              <span className="size-2 rounded-full bg-[#28C840]" />
-              <span className="ms-3 truncate text-[10px] text-black/40">
+            <div className="flex h-9 items-center gap-1.5 border-b border-black/[0.05] bg-[#F7F7F5] px-3">
+              <span className="size-2 rounded-full bg-[#FF5F57]/90" />
+              <span className="size-2 rounded-full bg-[#FEBC2E]/90" />
+              <span className="size-2 rounded-full bg-[#28C840]/90" />
+              <span className="ms-3 truncate text-[10px] tracking-wide text-black/35">
                 {brandName}
                 <span className="ms-2 tabular-nums text-black/25">
-                  {presetLabel} · {targetWidth}px
+                  {presetLabel} · {targetWidth}
                 </span>
               </span>
             </div>
@@ -100,7 +97,7 @@ export function EditorCanvasFrame({
           <div
             className="vitrin-editor-canvas overflow-y-auto overflow-x-hidden text-ink"
             style={{
-              height: isMobile ? frameHeight - 28 : frameHeight - 36,
+              height: isMobile ? frameHeight - 32 : frameHeight - 36,
               WebkitOverflowScrolling: "touch",
             }}
           >

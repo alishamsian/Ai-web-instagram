@@ -41,8 +41,6 @@ import {
   Eye,
   EyeOff,
   GripVertical,
-  LayoutTemplate,
-  MousePointerClick,
   Palette,
   Settings2,
   Type,
@@ -177,140 +175,130 @@ export function EditorInspector({
     <InspectorShell
       compactChrome={compactChrome}
       eyebrow={dict.editor.inspectorTab}
-      title={dict.editor.website}
+      title={config.brand.name || dict.editor.website}
       hint={dict.editor.inspectorHintSite}
     >
-      <div className="mb-4 rounded-2xl border border-dashed border-black/10 bg-[#FAFAF8] px-3.5 py-3.5">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-ink shadow-sm">
-            <MousePointerClick size={15} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-ink">
-              {dict.editor.inspectorHintEmpty}
-            </p>
-            {onOpenSections ? (
-              <button
-                type="button"
-                onClick={onOpenSections}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[12px] font-medium text-white"
-              >
-                <LayoutTemplate size={13} />
-                {dict.editor.pickSectionCta}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-black/[0.04] p-1">
-        {(
-          [
-            ["style", dict.editor.editGroupStyle, Palette],
-            ["content", dict.editor.editGroupContent, Type],
-            ["site", dict.editor.editGroupSite, Settings2],
-          ] as const
-        ).map(([id, label, Icon]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              setSiteGroup(id);
-              setSiteSub(
-                id === "style"
-                  ? "presets"
-                  : id === "content"
-                    ? "brand"
-                    : "seo",
-              );
-            }}
-            className={cn(
-              "flex flex-col items-center gap-1 rounded-lg px-2 py-2.5 text-[11px] font-medium transition",
-              siteGroup === id
-                ? "bg-white text-ink shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Icon size={15} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-4 flex gap-1 overflow-x-auto pb-0.5">
-        {subs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setSiteSub(item.id)}
-            className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-medium transition",
-              siteSub === item.id
-                ? "bg-ink text-white"
-                : "bg-muted text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
       <div className="space-y-4">
-        {siteGroup === "style" && siteSub === "presets" ? (
-          <WebsiteQuickSettings
-            config={config}
-            dict={dict}
-            locale={locale}
-            onChange={onChange}
-            presetsOnly
-          />
-        ) : null}
-        {siteGroup === "style" && siteSub === "colors" ? (
-          <ColorsPanel
-            config={config}
-            dict={dict}
-            locale={locale}
-            onChange={onChange}
-          />
-        ) : null}
-        {siteGroup === "style" && siteSub === "type" ? (
-          <TypographyPanel config={config} dict={dict} onChange={onChange} />
-        ) : null}
-        {siteGroup === "content" && siteSub === "brand" ? (
-          <BrandPanel config={config} dict={dict} onChange={onChange} />
-        ) : null}
-        {siteGroup === "content" && siteSub === "content" ? (
-          <ContentPanel config={config} dict={dict} onChange={onChange} />
-        ) : null}
-        {siteGroup === "content" && siteSub === "media" ? (
-          <MediaPanel config={config} dict={dict} onChange={onChange} />
-        ) : null}
-        {siteGroup === "site" && siteSub === "seo" ? (
-          <SeoPanel config={config} dict={dict} onChange={onChange} />
-        ) : null}
-        {siteGroup === "site" && siteSub === "settings" ? (
-          <SettingsPanel
-            config={config}
-            dict={dict}
-            onChange={onChange}
-            canRemoveBranding={canRemoveBranding}
-          />
-        ) : null}
-        {siteGroup === "site" && siteSub === "template" ? (
-          <TemplatePanel
-            config={config}
-            dict={dict}
-            locale={locale}
-            onChange={onChange}
-          />
-        ) : null}
-        {siteGroup === "site" && siteSub === "versions" ? (
-          <VersionsPanel
-            websiteId={websiteId}
-            dict={dict}
-            onRestored={onRestored}
-          />
-        ) : null}
+        <SiteIdentityCard config={config} dict={dict} locale={locale} />
+
+        <div className="editor-site-hint">
+          <p className="min-w-0 flex-1">{dict.editor.inspectorHintEmpty}</p>
+          {onOpenSections ? (
+            <button
+              type="button"
+              onClick={onOpenSections}
+              className="shrink-0 rounded-lg bg-ink px-2.5 py-1.5 text-[11px] font-medium text-white"
+            >
+              {dict.editor.pickSectionCta}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="editor-site-group" role="tablist" aria-label={dict.editor.website}>
+          {(
+            [
+              ["style", dict.editor.editGroupStyle, Palette],
+              ["content", dict.editor.editGroupContent, Type],
+              ["site", dict.editor.editGroupSite, Settings2],
+            ] as const
+          ).map(([id, label, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={siteGroup === id}
+              data-active={siteGroup === id}
+              onClick={() => {
+                setSiteGroup(id);
+                setSiteSub(
+                  id === "style"
+                    ? "presets"
+                    : id === "content"
+                      ? "brand"
+                      : "seo",
+                );
+              }}
+              className="editor-site-group-btn"
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="editor-site-subnav" role="tablist">
+          {subs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={siteSub === item.id}
+              data-active={siteSub === item.id}
+              onClick={() => setSiteSub(item.id)}
+              className="editor-site-subnav-btn"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-4 pt-1">
+          {siteGroup === "style" && siteSub === "presets" ? (
+            <WebsiteQuickSettings
+              config={config}
+              dict={dict}
+              locale={locale}
+              onChange={onChange}
+              presetsOnly
+            />
+          ) : null}
+          {siteGroup === "style" && siteSub === "colors" ? (
+            <ColorsPanel
+              config={config}
+              dict={dict}
+              locale={locale}
+              onChange={onChange}
+            />
+          ) : null}
+          {siteGroup === "style" && siteSub === "type" ? (
+            <TypographyPanel config={config} dict={dict} onChange={onChange} />
+          ) : null}
+          {siteGroup === "content" && siteSub === "brand" ? (
+            <BrandPanel config={config} dict={dict} onChange={onChange} />
+          ) : null}
+          {siteGroup === "content" && siteSub === "content" ? (
+            <ContentPanel config={config} dict={dict} onChange={onChange} />
+          ) : null}
+          {siteGroup === "content" && siteSub === "media" ? (
+            <MediaPanel config={config} dict={dict} onChange={onChange} />
+          ) : null}
+          {siteGroup === "site" && siteSub === "seo" ? (
+            <SeoPanel config={config} dict={dict} onChange={onChange} />
+          ) : null}
+          {siteGroup === "site" && siteSub === "settings" ? (
+            <SettingsPanel
+              config={config}
+              dict={dict}
+              onChange={onChange}
+              canRemoveBranding={canRemoveBranding}
+            />
+          ) : null}
+          {siteGroup === "site" && siteSub === "template" ? (
+            <TemplatePanel
+              config={config}
+              dict={dict}
+              locale={locale}
+              onChange={onChange}
+            />
+          ) : null}
+          {siteGroup === "site" && siteSub === "versions" ? (
+            <VersionsPanel
+              websiteId={websiteId}
+              dict={dict}
+              onRestored={onRestored}
+            />
+          ) : null}
+        </div>
       </div>
     </InspectorShell>
   );
@@ -332,14 +320,16 @@ function InspectorShell({
   return (
     <div className="flex h-full flex-col">
       {!compactChrome ? (
-        <div className="border-b border-white/[0.06] px-4 py-3.5">
-          <p className="text-[11px] font-medium tracking-wide text-[#77777F] uppercase">
+        <div className="border-b border-[color:var(--ed-border)] px-4 py-3.5">
+          <p className="text-[10px] font-medium tracking-[0.14em] text-[color:var(--ed-muted)] uppercase">
             {eyebrow}
           </p>
-          <p className="mt-1 text-[16px] font-medium tracking-tight text-[#F7F7F8]">
+          <p className="mt-1 truncate text-[15px] font-medium tracking-tight text-[color:var(--ed-fg)]">
             {title}
           </p>
-          <p className="mt-1 text-[12px] leading-5 text-[#77777F]">{hint}</p>
+          <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--ed-muted)]">
+            {hint}
+          </p>
         </div>
       ) : (
         <div className="border-b border-black/6 bg-[#FAFAF8] px-4 py-2.5">
@@ -348,6 +338,92 @@ function InspectorShell({
       )}
       <div className="editor-inspector-light min-h-0 flex-1 overflow-y-auto p-4">
         {children}
+      </div>
+    </div>
+  );
+}
+
+function SiteIdentityCard({
+  config,
+  dict,
+  locale,
+}: {
+  config: WebsiteConfig;
+  dict: Dictionary;
+  locale: Locale;
+}) {
+  const colors = config.brand.colors;
+  const langLabel = config.settings.language === "fa" ? "فارسی" : "English";
+  const dirLabel = config.settings.direction.toUpperCase();
+
+  return (
+    <div className="editor-site-identity">
+      <div className="flex items-start gap-3">
+        <div
+          className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/8 text-[13px] font-semibold tracking-tight text-white shadow-sm"
+          style={{
+            background: `linear-gradient(145deg, ${colors.accent}, ${colors.primary})`,
+          }}
+        >
+          {config.brand.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={config.brand.logo}
+              alt=""
+              className="size-full object-cover"
+            />
+          ) : (
+            (config.brand.name || "V").slice(0, 1).toUpperCase()
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold tracking-tight text-ink">
+            {config.brand.name || dict.editor.website}
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+            {config.brand.tagline || dict.editor.siteIdentity}
+          </p>
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  colors.background,
+                  colors.foreground,
+                  colors.accent,
+                  colors.primary,
+                ] as const
+              ).map((swatch, i) => (
+                <span
+                  key={`${swatch}-${i}`}
+                  className="editor-site-swatch"
+                  style={{ background: swatch }}
+                />
+              ))}
+            </div>
+            <span className="text-[10px] text-black/20" aria-hidden>
+              ·
+            </span>
+            <span className="text-[10.5px] font-medium text-muted-foreground">
+              {langLabel} · {dirLabel}
+            </span>
+            {config.settings.mood ? (
+              <>
+                <span className="text-[10px] text-black/20" aria-hidden>
+                  ·
+                </span>
+                <span className="text-[10.5px] capitalize text-muted-foreground">
+                  {config.settings.mood}
+                </span>
+              </>
+            ) : null}
+            <span className="text-[10px] text-black/20" aria-hidden>
+              ·
+            </span>
+            <span className="text-[10.5px] text-muted-foreground">
+              {locale === "fa" ? "قالب" : "Template"} · {config.template}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -369,39 +445,41 @@ function WebsiteQuickSettings({
   return (
     <div className="space-y-5">
       <InspectorGroup title={dict.editor.designPresets} defaultOpen>
-        <div className="grid grid-cols-2 gap-2">
-          {DESIGN_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() =>
-                onChange(applyDesignPreset(config, preset.id as DesignPresetId))
-              }
-              className="rounded-xl border border-black/8 bg-white p-2.5 text-start transition hover:border-black/16"
-            >
-              <div className="mb-2 flex gap-1">
-                {(
-                  [
-                    ["bg", preset.colors.background],
-                    ["fg", preset.colors.foreground],
-                    ["accent", preset.colors.accent],
-                  ] as const
-                ).map(([role, swatch]) => (
-                  <span
-                    key={`${preset.id}-${role}`}
-                    className="size-4 rounded-full border border-black/10"
-                    style={{ background: swatch }}
-                  />
-                ))}
-              </div>
-              <p className="text-[12px] font-medium text-ink">
-                {preset.label[locale]}
-              </p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                {preset.description[locale]}
-              </p>
-            </button>
-          ))}
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {DESIGN_PRESETS.map((preset) => {
+            const active =
+              config.settings.mood === preset.id ||
+              (preset.colors.background === config.brand.colors.background &&
+                preset.colors.accent === config.brand.colors.accent &&
+                preset.colors.foreground === config.brand.colors.foreground);
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                data-active={active}
+                onClick={() =>
+                  onChange(
+                    applyDesignPreset(config, preset.id as DesignPresetId),
+                  )
+                }
+                className="editor-preset-card"
+              >
+                <div className="editor-preset-strip">
+                  <span style={{ background: preset.colors.background }} />
+                  <span style={{ background: preset.colors.foreground }} />
+                  <span style={{ background: preset.colors.accent }} />
+                </div>
+                <div className="px-2.5 py-2">
+                  <p className="text-[12px] font-semibold text-ink">
+                    {preset.label[locale]}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+                    {preset.description[locale]}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </InspectorGroup>
 

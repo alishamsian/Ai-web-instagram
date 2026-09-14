@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
@@ -102,19 +102,15 @@ export function EditorSidebar({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex gap-1 border-b border-white/[0.06] p-2">
+    <div className="flex h-full flex-col bg-[color:var(--ed-bg-elevated)]">
+      <div className="editor-panel-tabs">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
+            data-active={nav === tab.id}
             onClick={() => onNavChange(tab.id)}
-            className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium transition",
-              nav === tab.id
-                ? "bg-white/[0.08] text-[#F7F7F8]"
-                : "text-[#77777F] hover:bg-white/[0.04] hover:text-[#B5B5BC]",
-            )}
+            className="editor-panel-tab"
           >
             {tab.label}
           </button>
@@ -123,17 +119,17 @@ export function EditorSidebar({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {nav === "pages" ? (
-          <ul className="space-y-1">
+          <ul className="space-y-0.5">
             {EDITOR_PAGES.map((page) => (
               <li key={page.id}>
                 <button
                   type="button"
                   onClick={() => onPageChange(page.id)}
                   className={cn(
-                    "flex w-full items-center rounded-md px-2.5 py-2 text-start text-[13px] transition",
+                    "flex w-full items-center rounded-lg px-2.5 py-2 text-start text-[12.5px] transition",
                     activePage === page.id
-                      ? "bg-white/[0.08] text-[#F7F7F8]"
-                      : "text-[#B5B5BC] hover:bg-white/[0.04] hover:text-[#F7F7F8]",
+                      ? "bg-white/[0.08] text-[color:var(--ed-fg)]"
+                      : "text-[color:var(--ed-muted)] hover:bg-white/[0.04] hover:text-[color:var(--ed-fg)]",
                   )}
                 >
                   {page.label[locale]}
@@ -148,31 +144,33 @@ export function EditorSidebar({
             <button
               type="button"
               onClick={onAddSection}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-white/12 px-3 py-2.5 text-[12px] font-medium text-[#B5B5BC] transition hover:border-[#FF6B57]/40 hover:bg-[#FF6B57]/8 hover:text-[#F7F7F8]"
+              className="editor-add-section"
             >
               <Plus size={14} />
               {dict.editor.addSection}
             </button>
 
             {config.sections.length === 0 ? (
-              <div className="rounded-lg border border-white/[0.06] px-3 py-6 text-center">
-                <p className="text-[13px] text-[#F7F7F8]">
+              <div className="rounded-xl border border-white/[0.06] px-3 py-8 text-center">
+                <p className="text-[13px] text-[color:var(--ed-fg)]">
                   {dict.editor.emptySections}
                 </p>
                 <button
                   type="button"
                   onClick={onAddSection}
-                  className="mt-3 text-[12px] text-[#FF6B57] hover:underline"
+                  className="mt-3 text-[12px] text-[color:var(--ed-select)] hover:underline"
                 >
                   {dict.editor.addSection}
                 </button>
               </div>
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-0.5">
                 {config.sections.map((section, index) => (
                   <li
                     key={section.id}
                     draggable
+                    data-selected={selectedSectionId === section.id}
+                    data-dragging={dragIndex === index}
                     onDragStart={() => setDragIndex(index)}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => {
@@ -181,25 +179,20 @@ export function EditorSidebar({
                       setDragIndex(null);
                     }}
                     onDragEnd={() => setDragIndex(null)}
-                    className={cn(
-                      "group relative flex items-center gap-1 rounded-md border px-1 py-1 transition",
-                      selectedSectionId === section.id
-                        ? "border-[#FF6B57]/35 bg-[#FF6B57]/10"
-                        : "border-transparent hover:bg-white/[0.04]",
-                      dragIndex === index && "opacity-50",
-                    )}
+                    className="editor-layer-row group relative"
                   >
-                    <span className="inline-flex size-7 cursor-grab items-center justify-center text-[#77777F] active:cursor-grabbing">
-                      <GripVertical size={14} />
+                    <span className="inline-flex size-7 cursor-grab items-center justify-center text-[color:var(--ed-subtle)] active:cursor-grabbing">
+                      <GripVertical size={13} />
                     </span>
                     <button
                       type="button"
-                      className="min-w-0 flex-1 truncate text-start text-[13px] text-[#F7F7F8]"
+                      className="min-w-0 flex-1 truncate py-1.5 text-start text-[12.5px] text-[color:var(--ed-fg)]"
                       onClick={() => onSelectSection(section.id)}
                     >
                       <span
                         className={cn(
-                          !section.visible && "text-[#77777F] line-through",
+                          !section.visible &&
+                            "text-[color:var(--ed-subtle)] line-through",
                         )}
                       >
                         {sectionLabel(
@@ -210,7 +203,7 @@ export function EditorSidebar({
                     </button>
                     <button
                       type="button"
-                      className="inline-flex size-7 items-center justify-center rounded text-[#77777F] hover:bg-white/[0.06] hover:text-[#F7F7F8]"
+                      className="inline-flex size-8 items-center justify-center rounded-md text-[color:var(--ed-subtle)] opacity-70 transition hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)] group-hover:opacity-100"
                       onClick={() => {
                         const sections = [...config.sections];
                         sections[index] = {
@@ -234,7 +227,7 @@ export function EditorSidebar({
                     <div className="relative">
                       <button
                         type="button"
-                        className="inline-flex size-7 items-center justify-center rounded text-[#77777F] hover:bg-white/[0.06] hover:text-[#F7F7F8]"
+                        className="inline-flex size-8 items-center justify-center rounded-md text-[color:var(--ed-subtle)] opacity-70 transition hover:bg-white/[0.06] hover:text-[color:var(--ed-fg)] group-hover:opacity-100"
                         onClick={() =>
                           setMenuId((id) =>
                             id === section.id ? null : section.id,
@@ -245,7 +238,7 @@ export function EditorSidebar({
                         <MoreHorizontal size={13} />
                       </button>
                       {menuId === section.id ? (
-                        <div className="absolute end-0 top-8 z-30 min-w-[140px] rounded-lg border border-white/10 bg-[#161618] p-1 shadow-xl">
+                        <div className="absolute end-0 top-9 z-30 min-w-[148px] rounded-xl border border-white/10 bg-[#16161a] p-1 shadow-2xl">
                           <MenuItem
                             icon={<Copy size={13} />}
                             label={dict.editor.duplicate}
@@ -298,7 +291,7 @@ function MenuItem({
   onClick,
   danger,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
@@ -358,11 +351,14 @@ function LayersTree({
           <li key={section.id}>
             <div
               className={cn(
-                "flex items-center gap-1 rounded-md px-1 py-1",
+                "editor-layer-row",
                 selectedSectionId === section.id &&
                   !selectedField &&
-                  "bg-[#FF6B57]/10",
+                  "bg-[color:var(--ed-select-soft)]",
               )}
+              data-selected={
+                selectedSectionId === section.id && !selectedField
+              }
             >
               <button
                 type="button"

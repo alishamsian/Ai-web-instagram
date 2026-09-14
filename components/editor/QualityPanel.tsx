@@ -40,13 +40,13 @@ export function QualityPanel({
         aria-label="Close"
         onClick={onClose}
       />
-      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-s border-white/10 bg-[#0D0D0F] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+      <aside className="relative z-10 flex h-full w-full max-w-md flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg-elevated)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[color:var(--ed-border)] px-4 py-3">
           <div>
-            <p className="text-[14px] font-medium text-[#F7F7F8]">
+            <p className="text-[14px] font-medium text-[color:var(--ed-fg)]">
               {isFa ? "کیفیت وب‌سایت" : "Website quality"}
             </p>
-            <p className="text-[11px] text-[#77777F]">
+            <p className="text-[11px] text-[color:var(--ed-muted)]">
               {isFa
                 ? "امتیاز قابل‌توضیح — نه تصادفی"
                 : "Explainable score — never random"}
@@ -55,24 +55,24 @@ export function QualityPanel({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-9 items-center justify-center rounded-md text-[#77777F] hover:bg-white/[0.06]"
+            className="editor-icon-btn"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="border-b border-white/[0.06] px-4 py-5">
-          <p className="text-[40px] font-medium tracking-tight text-[#F7F7F8]">
+        <div className="border-b border-[color:var(--ed-border)] px-4 py-5">
+          <p className="text-[40px] font-medium tracking-tight text-[color:var(--ed-fg)]">
             {score.total}
-            <span className="ms-1 text-[16px] text-[#77777F]">/ 100</span>
+            <span className="ms-1 text-[16px] text-[color:var(--ed-muted)]">/ 100</span>
           </p>
         </div>
 
-        <ul className="space-y-2 border-b border-white/[0.06] px-4 py-4">
+        <ul className="space-y-2 border-b border-[color:var(--ed-border)] px-4 py-4">
           {(Object.keys(score.categories) as (keyof typeof score.categories)[]).map(
             (key) => (
               <li key={key} className="flex items-center justify-between text-[12px]">
-                <span className="text-[#B5B5BC]">
+                <span className="text-[color:var(--ed-muted)]">
                   {CATEGORY_LABELS[key][locale]}
                 </span>
                 <span
@@ -93,11 +93,11 @@ export function QualityPanel({
         </ul>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[#77777F]">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[color:var(--ed-subtle)]">
             {isFa ? "دلایل کسر امتیاز" : "Deductions"}
           </p>
           {score.deductions.length === 0 ? (
-            <p className="text-[12px] text-[#B5B5BC]">
+            <p className="text-[12px] text-[color:var(--ed-muted)]">
               {isFa ? "کسر امتیازی ثبت نشده." : "No deductions."}
             </p>
           ) : (
@@ -105,12 +105,12 @@ export function QualityPanel({
               {score.deductions.map((d, i) => (
                 <li
                   key={`${d.category}-${i}`}
-                  className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2"
+                  className="rounded-lg border border-[color:var(--ed-border)] bg-white/[0.02] px-3 py-2"
                 >
-                  <p className="text-[12px] text-[#F7F7F8]">
+                  <p className="text-[12px] text-[color:var(--ed-fg)]">
                     {d.reason[locale]}
                   </p>
-                  <p className="mt-1 text-[11px] text-[#77777F]">
+                  <p className="mt-1 text-[11px] text-[color:var(--ed-muted)]">
                     −{d.points} · {CATEGORY_LABELS[d.category][locale]}
                   </p>
                 </li>

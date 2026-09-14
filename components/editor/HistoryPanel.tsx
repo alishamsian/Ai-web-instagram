@@ -33,13 +33,13 @@ export function HistoryPanel({
         aria-label="Close"
         onClick={onClose}
       />
-      <aside className="relative z-10 flex h-full w-full max-w-sm flex-col border-s border-white/10 bg-[#0D0D0F] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+      <aside className="relative z-10 flex h-full w-full max-w-sm flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg-elevated)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[color:var(--ed-border)] px-4 py-3">
           <div>
-            <p className="text-[14px] font-medium text-[#F7F7F8]">
+            <p className="text-[14px] font-medium text-[color:var(--ed-fg)]">
               {isFa ? "تاریخچه" : "History"}
             </p>
-            <p className="text-[11px] text-[#77777F]">
+            <p className="text-[11px] text-[color:var(--ed-muted)]">
               {isFa
                 ? "بازیابی وضعیت قبلی ویرایش"
                 : "Restore a previous editor state"}
@@ -48,7 +48,7 @@ export function HistoryPanel({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-9 items-center justify-center rounded-md text-[#77777F] hover:bg-white/[0.06]"
+            className="editor-icon-btn"
           >
             <X size={16} />
           </button>
@@ -65,14 +65,14 @@ export function HistoryPanel({
                   className={cn(
                     "mb-1 w-full rounded-lg px-3 py-2.5 text-start transition",
                     active
-                      ? "bg-white/[0.1] text-[#F7F7F8]"
-                      : "text-[#B5B5BC] hover:bg-white/[0.05]",
+                      ? "bg-[color:var(--ed-select-soft)] text-[color:var(--ed-fg)]"
+                      : "text-[color:var(--ed-muted)] hover:bg-white/[0.05] hover:text-[color:var(--ed-fg)]",
                   )}
                 >
                   <span className="block text-[13px] font-medium">
                     {entry.label}
                   </span>
-                  <span className="mt-0.5 block text-[11px] text-[#77777F]">
+                  <span className="mt-0.5 block text-[11px] text-[color:var(--ed-subtle)]">
                     {new Date(entry.createdAt).toLocaleTimeString(
                       isFa ? "fa-IR" : "en-US",
                       { hour: "2-digit", minute: "2-digit", second: "2-digit" },

@@ -103,7 +103,7 @@ export function EditorCommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label={isFa ? "پالت فرمان" : "Command palette"}
-        className="relative z-10 w-full max-w-lg overflow-hidden rounded-xl border border-white/10 bg-[#0D0D0F] shadow-2xl"
+        className="relative z-10 w-full max-w-lg overflow-hidden rounded-xl border border-[color:var(--ed-border)] bg-[color:var(--ed-bg-elevated)] shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-2.5">
           <Search size={15} className="text-[#77777F]" />
@@ -136,8 +136,8 @@ export function EditorCommandPalette({
                   className={cn(
                     "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-start transition",
                     index === active
-                      ? "bg-white/[0.08] text-[#F7F7F8]"
-                      : "text-[#B5B5BC] hover:bg-white/[0.04]",
+                      ? "bg-[color:var(--ed-select-soft)] text-[color:var(--ed-fg)]"
+                      : "text-[color:var(--ed-muted)] hover:bg-white/[0.04] hover:text-[color:var(--ed-fg)]",
                   )}
                 >
                   <span className="min-w-0">

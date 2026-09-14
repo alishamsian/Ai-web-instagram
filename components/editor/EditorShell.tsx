@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { WebsiteConfig, WebsiteRecord, WebsiteSectionType } from "@/types/website";
 import { WebsiteRenderer } from "@/components/website/WebsiteRenderer";
-import { Button } from "@/components/ui/button";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import { cn } from "@/lib/utils";
@@ -34,6 +33,7 @@ import {
   EditorViewportBar,
 } from "@/components/editor/EditorMobileChrome";
 import { EditorCanvasFrame } from "@/components/editor/EditorCanvasFrame";
+import { EditorTopBar } from "@/components/editor/EditorTopBar";
 import { EditorCommandPalette, type EditorCommandItem } from "@/components/editor/EditorCommandPalette";
 import { HistoryPanel } from "@/components/editor/HistoryPanel";
 import { QualityPanel } from "@/components/editor/QualityPanel";
@@ -61,14 +61,6 @@ import {
 } from "@/lib/editor";
 import {
   ArrowLeft,
-  ExternalLink,
-  Gauge,
-  History,
-  Monitor,
-  Redo2,
-  Smartphone,
-  Tablet,
-  Undo2,
 } from "lucide-react";
 
 const AUTOSAVE_MS = 900;
@@ -839,190 +831,113 @@ export function EditorShell({
   );
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-[#080808] text-[#F7F7F8]">
-      {/* ── Phone header: minimal ── */}
-      <header className="relative z-30 flex h-12 shrink-0 items-center gap-2 border-b border-white/[0.06] bg-[#0D0D0F] px-3 md:hidden">
+    <div className="editor-shell relative flex h-dvh flex-col overflow-hidden">
+      {/* ── Phone header ── */}
+      <header className="editor-mobile-header relative z-30 flex h-12 shrink-0 items-center gap-2 px-3 md:hidden">
         <Link
           href={`/${locale}/dashboard/website?id=${website.id}`}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[#B5B5BC] hover:bg-white/[0.06]"
+          className="editor-icon-btn shrink-0"
           aria-label={dict.editor.back}
         >
           <ArrowLeft size={16} />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium tracking-wide">
+          <p className="truncate text-[13px] font-medium tracking-[-0.01em]">
             {config.brand.name}
           </p>
-          <p
-            className={cn(
-              "truncate text-[10px]",
-              savePhase === "error"
-                ? "text-red-300"
-                : dirty
-                  ? "text-amber-300"
-                  : "text-[#77777F]",
-            )}
-          >
-            {saveLabel}
-          </p>
-        </div>
-        {savePhase === "error" ? (
-          <button
-            type="button"
-            onClick={() => void save()}
-            className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-[#FF6B57]"
-          >
-            {dict.editor.retrySave}
-          </button>
-        ) : null}
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => {
-            setPublishError(null);
-            setPublishOpen(true);
-          }}
-          disabled={publishing}
-          className="shrink-0 bg-[#FF6B57] px-3 text-white hover:bg-[#ff7d6c]"
-        >
-          {isPublished ? dict.editor.unpublish : dict.editor.publish}
-        </Button>
-      </header>
-
-      {/* ── Desktop / tablet header ── */}
-      <header className="relative z-30 hidden h-14 shrink-0 items-center gap-2 border-b border-white/[0.06] bg-[#0D0D0F] px-4 md:flex">
-        <Link
-          href={`/${locale}/dashboard/website?id=${website.id}`}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[13px] text-[#B5B5BC] hover:bg-white/[0.06] hover:text-[#F7F7F8]"
-        >
-          <ArrowLeft size={15} />
-          {dict.editor.back}
-        </Link>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium tracking-[0.06em] uppercase">
-            {config.brand.name}
-          </p>
-        </div>
-        <div className="flex items-center gap-0.5 rounded-lg bg-white/[0.04] p-1">
-          {(
-            [
-              ["1280", Monitor, dict.editor.desktop],
-              ["768", Tablet, dict.editor.tablet],
-              ["390", Smartphone, dict.editor.mobile],
-            ] as const
-          ).map(([id, Icon, label]) => (
-            <button
-              key={id}
-              type="button"
-              title={label}
-              onClick={() => setViewport(id)}
+          <div className="flex items-center gap-1.5">
+            <span
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] transition",
-                viewport === id
-                  ? "bg-white/[0.1] text-[#F7F7F8]"
-                  : "text-[#77777F] hover:text-[#B5B5BC]",
+                "size-1.5 rounded-full",
+                savePhase === "error"
+                  ? "bg-red-400"
+                  : dirty
+                    ? "bg-amber-400"
+                    : "bg-emerald-400/90",
+              )}
+            />
+            <p
+              className={cn(
+                "truncate text-[10px]",
+                savePhase === "error"
+                  ? "text-red-300"
+                  : dirty
+                    ? "text-amber-200/90"
+                    : "text-[color:var(--ed-muted)]",
               )}
             >
-              <Icon size={14} />
-              <span className="hidden lg:inline">{label}</span>
-            </button>
-          ))}
+              {saveLabel}
+            </p>
+          </div>
         </div>
-        <IconButton label={`${dict.editor.undo} ⌘Z`} onClick={undo} disabled={!canUndo}>
-          <Undo2 size={15} />
-        </IconButton>
-        <IconButton label={`${dict.editor.redo} ⌘⇧Z`} onClick={redo} disabled={!canRedo}>
-          <Redo2 size={15} />
-        </IconButton>
-        <IconButton
-          label={locale === "fa" ? "تاریخچه" : "History"}
-          onClick={() => setHistoryOpen(true)}
-        >
-          <History size={15} />
-        </IconButton>
-        <IconButton
-          label={locale === "fa" ? "کیفیت" : "Quality"}
-          onClick={() => setQualityOpen(true)}
-        >
-          <Gauge size={15} />
-        </IconButton>
-        <p
-          className={cn(
-            "text-[11px]",
-            savePhase === "error"
-              ? "text-red-300"
-              : dirty
-                ? "text-amber-300"
-                : "text-[#77777F]",
-          )}
-        >
-          {saveLabel}
-        </p>
         {savePhase === "error" ? (
           <button
             type="button"
             onClick={() => void save()}
-            className="rounded-md px-2 py-1 text-[11px] text-[#FF6B57] hover:bg-[#FF6B57]/10"
+            className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-[color:var(--ed-accent)]"
           >
             {dict.editor.retrySave}
           </button>
         ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          asChild
-          className="text-[#B5B5BC] hover:bg-white/[0.06] hover:text-[#F7F7F8]"
-        >
-          <Link
-            href={`/${locale}/preview/${website.id}`}
-            target="_blank"
-            title={`${dict.editor.preview} ⌘P`}
-          >
-            <ExternalLink size={14} className="me-1.5" />
-            {dict.editor.preview}
-          </Link>
-        </Button>
-        {isPublished ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="hidden text-[#B5B5BC] hover:bg-white/[0.06] hover:text-[#F7F7F8] lg:inline-flex"
-          >
-            <a href={`/s/${website.slug}`} target="_blank" rel="noreferrer">
-              {dict.editor.live}
-            </a>
-          </Button>
-        ) : null}
-        <Button
+        <button
           type="button"
-          size="sm"
           onClick={() => {
             setPublishError(null);
             setPublishOpen(true);
           }}
           disabled={publishing}
-          className="bg-[#FF6B57] px-3 text-white hover:bg-[#ff7d6c]"
+          className="editor-publish-btn shrink-0"
         >
           {isPublished ? dict.editor.unpublish : dict.editor.publish}
-        </Button>
-        {flash ? (
-          <div className="pointer-events-none absolute start-1/2 top-[calc(100%+8px)] z-50 -translate-x-1/2 rounded-full bg-[#161618] px-3 py-1.5 text-[11px] text-[#F7F7F8] shadow-lg ring-1 ring-white/10">
-            {flash}
-          </div>
-        ) : null}
+        </button>
       </header>
+
+      <EditorTopBar
+        locale={locale}
+        websiteId={website.id}
+        websiteSlug={website.slug}
+        brandName={config.brand.name}
+        isPublished={isPublished}
+        dirty={dirty}
+        saveLabel={saveLabel}
+        saveError={savePhase === "error"}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        viewport={viewport}
+        publishing={publishing}
+        publishLabel={isPublished ? dict.editor.unpublish : dict.editor.publish}
+        previewLabel={dict.editor.preview}
+        liveLabel={dict.editor.live}
+        backLabel={dict.editor.back}
+        onUndo={undo}
+        onRedo={redo}
+        onRetrySave={() => void save()}
+        onViewportChange={setViewport}
+        onHistory={() => setHistoryOpen(true)}
+        onQuality={() => setQualityOpen(true)}
+        onCommandPalette={() => setCommandOpen(true)}
+        onPublish={() => {
+          setPublishError(null);
+          setPublishOpen(true);
+        }}
+      />
+
+      {flash ? (
+        <div className="pointer-events-none absolute start-1/2 top-14 z-50 -translate-x-1/2 rounded-full border border-[color:var(--ed-border)] bg-[color:var(--ed-bg-elevated)] px-3 py-1.5 text-[11px] text-[color:var(--ed-fg)] shadow-lg">
+          {flash}
+        </div>
+      ) : null}
 
       <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Tablet/desktop left sidebar */}
-        <aside className="hidden w-[240px] shrink-0 flex-col border-e border-white/[0.06] bg-[#0D0D0F] md:flex lg:w-[280px]">
+        <aside className="editor-panel hidden w-[240px] shrink-0 flex-col border-e border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] md:flex lg:w-[280px]">
           {sidebar}
         </aside>
 
         {/* Phone: sections pane (full screen, exclusive) */}
         <div
           className={cn(
-            "min-h-0 flex-1 flex-col bg-[#0D0D0F] md:hidden",
+            "min-h-0 flex-1 flex-col bg-[color:var(--ed-bg)] md:hidden",
             phonePane === "sections" ? "flex" : "hidden",
           )}
         >
@@ -1036,7 +951,7 @@ export function EditorShell({
         {/* Phone: inspector pane (full screen, exclusive) */}
         <div
           className={cn(
-            "min-h-0 flex-1 flex-col bg-[#0D0D0F] md:hidden",
+            "min-h-0 flex-1 flex-col bg-[color:var(--ed-bg)] md:hidden",
             phonePane === "inspector" ? "flex" : "hidden",
           )}
         >
@@ -1050,7 +965,7 @@ export function EditorShell({
         {/* Canvas */}
         <main
           className={cn(
-            "relative min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#0A0A0B]",
+            "editor-canvas-stage relative min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
             phonePane === "canvas" ? "flex" : "hidden md:flex",
           )}
           onClick={(event) => {
@@ -1079,14 +994,7 @@ export function EditorShell({
           </div>
 
           <div className="relative min-h-0 flex-1 overflow-auto">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-[0.35]"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0)",
-                backgroundSize: "22px 22px",
-              }}
-            />
+            <div className="editor-canvas-dotgrid pointer-events-none absolute inset-0" />
             <div className="relative min-h-full">
               <EditorCanvasFrame viewport={viewport} brandName={config.brand.name}>
                 {canvas}
@@ -1096,7 +1004,7 @@ export function EditorShell({
         </main>
 
         {/* Desktop inspector */}
-        <aside className="hidden w-[320px] shrink-0 flex-col border-s border-white/[0.06] bg-[#0D0D0F] lg:flex xl:w-[340px]">
+        <aside className="editor-panel hidden w-[320px] shrink-0 flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg)] lg:flex xl:w-[340px]">
           {inspectorDesktop}
         </aside>
 
@@ -1109,7 +1017,7 @@ export function EditorShell({
               aria-label="Close"
               onClick={() => setTabletInspectorOpen(false)}
             />
-            <div className="absolute inset-y-0 end-0 z-50 hidden w-[min(100%,360px)] flex-col border-s border-white/[0.08] bg-[#0D0D0F] shadow-2xl md:flex lg:hidden">
+            <div className="editor-panel absolute inset-y-0 end-0 z-50 hidden w-[min(100%,360px)] flex-col border-s border-[color:var(--ed-border)] bg-[color:var(--ed-bg-elevated)] shadow-2xl md:flex lg:hidden">
               <EditorPaneHeader
                 title={inspectorTitle}
                 onClose={() => setTabletInspectorOpen(false)}
@@ -1199,30 +1107,5 @@ export function EditorShell({
         onClose={() => setQualityOpen(false)}
       />
     </div>
-  );
-}
-
-function IconButton({
-  children,
-  label,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex size-8 items-center justify-center rounded-md text-[#77777F] transition hover:bg-white/[0.06] hover:text-[#F7F7F8] disabled:opacity-30"
-    >
-      {children}
-    </button>
   );
 }
