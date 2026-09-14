@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, useEffect, type ReactNode } from "react";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
@@ -46,6 +46,7 @@ import { SECTION_LAYER_BLOCKS } from "@/components/editor/editor-selection";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
+  Copy,
   Eye,
   EyeOff,
   GripVertical,
@@ -53,8 +54,11 @@ import {
   Plus,
   Search,
   Settings2,
+  Trash2,
   Type,
 } from "lucide-react";
+import { sectionTypeIcon } from "@/components/editor/section-icons";
+import type { SectionAction } from "@/components/editor/EditContext";
 
 type SiteGroup = EditorSiteGroup;
 type SectionTab = EditorSectionTab;
@@ -72,6 +76,7 @@ export function EditorInspector({
   compactChrome = false,
   sectionTab,
   siteGroup,
+  propertySearchFocus = 0,
   onSectionTabChange,
   onSiteGroupChange,
   onChange,
@@ -79,6 +84,8 @@ export function EditorInspector({
   onOpenSections,
   onAddSection,
   onBrowseTemplates,
+  onSectionAction,
+  onClearField,
   viewport = "desktop",
 }: {
   config: WebsiteConfig;
@@ -94,6 +101,7 @@ export function EditorInspector({
   compactChrome?: boolean;
   sectionTab: SectionTab;
   siteGroup: SiteGroup;
+  propertySearchFocus?: number;
   onSectionTabChange: (tab: SectionTab) => void;
   onSiteGroupChange: (group: SiteGroup) => void;
   onChange: (next: WebsiteConfig) => void;
@@ -101,6 +109,8 @@ export function EditorInspector({
   onOpenSections?: () => void;
   onAddSection?: () => void;
   onBrowseTemplates?: () => void;
+  onSectionAction?: (id: string, action: SectionAction) => void;
+  onClearField?: () => void;
   viewport?: "desktop" | "tablet" | "mobile";
 }) {
   const selected = useMemo(
@@ -139,15 +149,82 @@ export function EditorInspector({
       selected.type as WebsiteSectionType,
       locale,
     );
+    const SectionIcon = sectionTypeIcon(selected.type);
     return (
       <InspectorShell
         compactChrome={compactChrome}
         eyebrow={dict.editor.inspectorTab}
         title={sectionTitle}
+        icon={<SectionIcon size={14} />}
         breadcrumb={fieldCrumb ? [sectionTitle, fieldCrumb] : [sectionTitle]}
+        onBreadcrumbClick={(index) => {
+          if (index === 0) {
+            onClearField?.();
+          }
+        }}
         hint={dict.editor.inspectorHintSection}
+        actions={
+          selected.type !== "footer" ? (
+            <div className="editor-inspector-actions">
+              <button
+                type="button"
+                className="editor-inspector-action"
+                title={dict.editor.duplicate}
+                aria-label={dict.editor.duplicate}
+                onClick={() => onSectionAction?.(selected.id, "duplicate")}
+              >
+                <Copy size={13} />
+              </button>
+              <button
+                type="button"
+                className="editor-inspector-action"
+                title={dict.editor.moveUp}
+                aria-label={dict.editor.moveUp}
+                onClick={() => onSectionAction?.(selected.id, "move-up")}
+              >
+                <ChevronDown size={13} className="rotate-180" />
+              </button>
+              <button
+                type="button"
+                className="editor-inspector-action"
+                title={dict.editor.moveDown}
+                aria-label={dict.editor.moveDown}
+                onClick={() => onSectionAction?.(selected.id, "move-down")}
+              >
+                <ChevronDown size={13} />
+              </button>
+              <button
+                type="button"
+                className="editor-inspector-action"
+                title={
+                  selected.visible
+                    ? dict.editor.sectionVisible
+                    : dict.editor.sectionHidden
+                }
+                aria-label={
+                  selected.visible
+                    ? dict.editor.sectionVisible
+                    : dict.editor.sectionHidden
+                }
+                onClick={() => onSectionAction?.(selected.id, "toggle")}
+              >
+                {selected.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+              </button>
+              <button
+                type="button"
+                className="editor-inspector-action"
+                data-danger=""
+                title={dict.editor.delete}
+                aria-label={dict.editor.delete}
+                onClick={() => onSectionAction?.(selected.id, "delete")}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ) : null
+        }
       >
-        <div className="editor-site-group mb-4" role="tablist">
+        <div className="editor-site-group mb-3" role="tablist">
           {(
             [
               ["content", dict.editor.sectionTabContent],
@@ -177,6 +254,7 @@ export function EditorInspector({
           tab={sectionTab}
           selectedField={selectedField}
           viewport={viewport}
+          propertySearchFocus={propertySearchFocus}
           onChange={onChange}
         />
       </InspectorShell>
@@ -397,87 +475,102 @@ function InspectorShell({
   compactChrome,
   eyebrow,
   title,
+  icon,
   breadcrumb,
+  onBreadcrumbClick,
   hint,
+  actions,
   children,
 }: {
   compactChrome: boolean;
   eyebrow: string;
   title: string;
+  icon?: ReactNode;
   breadcrumb?: string[];
+  onBreadcrumbClick?: (index: number) => void;
   hint: string;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="flex h-full flex-col">
-      {!compactChrome ? (
-        <div className="border-b border-[color:var(--ed-border)] px-3.5 py-3">
-          <p className="text-[10px] font-medium tracking-[0.12em] text-[color:var(--ed-subtle)] uppercase">
-            {eyebrow}
-          </p>
-          {breadcrumb && breadcrumb.length > 1 ? (
-            <nav
-              aria-label="Breadcrumb"
-              className="editor-breadcrumb mt-1.5 flex flex-wrap items-center gap-1.5"
-            >
-              {breadcrumb.map((crumb, index) => (
-                <span key={`${crumb}-${index}`} className="contents">
-                  {index > 0 ? (
-                    <span className="text-[color:var(--ed-subtle)]">›</span>
-                  ) : null}
-                  <span
-                    className={cn(
-                      "truncate text-[13px]",
-                      index === breadcrumb.length - 1
-                        ? "font-medium text-[color:var(--ed-fg)]"
-                        : "text-[color:var(--ed-muted)]",
-                    )}
-                  >
-                    {crumb}
+    <div className="flex h-full min-h-0 flex-col">
+      <div
+        className={cn(
+          "editor-inspector-sticky-header shrink-0 border-b border-[color:var(--ed-border)]",
+          compactChrome ? "px-3 py-2" : "px-3.5 py-2.5",
+        )}
+      >
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            {!compactChrome ? (
+              <p className="text-[10px] font-medium tracking-[0.12em] text-[color:var(--ed-subtle)] uppercase">
+                {eyebrow}
+              </p>
+            ) : null}
+            {breadcrumb && breadcrumb.length > 0 ? (
+              <nav
+                aria-label="Breadcrumb"
+                className={cn(
+                  "editor-breadcrumb flex flex-wrap items-center gap-1.5",
+                  !compactChrome && "mt-1",
+                )}
+              >
+                {icon ? (
+                  <span className="inline-flex size-5 items-center justify-center rounded-md bg-[color:var(--ed-bg-soft)] text-[color:var(--ed-muted)]">
+                    {icon}
                   </span>
-                </span>
-              ))}
-            </nav>
-          ) : (
-            <p className="mt-1 truncate text-[15px] font-medium tracking-tight text-[color:var(--ed-fg)]">
-              {title}
-            </p>
-          )}
-          <p className="mt-1 text-[11.5px] leading-5 text-[color:var(--ed-muted)]">
-            {hint}
-          </p>
-        </div>
-      ) : (
-        <div className="border-b border-[color:var(--ed-border)] bg-[color:var(--ed-bg-soft)] px-4 py-2.5">
-          {breadcrumb && breadcrumb.length > 1 ? (
-            <nav
-              aria-label="Breadcrumb"
-              className="editor-breadcrumb mb-1 flex flex-wrap items-center gap-1.5"
-            >
-              {breadcrumb.map((crumb, index) => (
-                <span key={`${crumb}-${index}`} className="contents">
-                  {index > 0 ? (
-                    <span className="text-[color:var(--ed-subtle)]">›</span>
-                  ) : null}
-                  <span
-                    className={cn(
-                      "truncate text-[12px]",
-                      index === breadcrumb.length - 1
-                        ? "font-medium text-[color:var(--ed-fg)]"
-                        : "text-[color:var(--ed-muted)]",
+                ) : null}
+                {breadcrumb.map((crumb, index) => (
+                  <span key={`${crumb}-${index}`} className="contents">
+                    {index > 0 ? (
+                      <span className="text-[color:var(--ed-subtle)]">›</span>
+                    ) : null}
+                    {onBreadcrumbClick && index < breadcrumb.length - 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => onBreadcrumbClick(index)}
+                        className={cn(
+                          "truncate text-[color:var(--ed-muted)] transition hover:text-[color:var(--ed-fg)]",
+                          compactChrome ? "text-[12px]" : "text-[13px]",
+                        )}
+                      >
+                        {crumb}
+                      </button>
+                    ) : (
+                      <span
+                        className={cn(
+                          "truncate",
+                          compactChrome ? "text-[12px]" : "text-[13px]",
+                          index === breadcrumb.length - 1
+                            ? "font-semibold text-[color:var(--ed-fg)]"
+                            : "text-[color:var(--ed-muted)]",
+                        )}
+                      >
+                        {crumb}
+                      </span>
                     )}
-                  >
-                    {crumb}
                   </span>
-                </span>
-              ))}
-            </nav>
-          ) : null}
-          <p className="text-[12px] leading-5 text-[color:var(--ed-muted)]">
-            {hint}
-          </p>
+                ))}
+              </nav>
+            ) : (
+              <p
+                className={cn(
+                  "truncate font-semibold tracking-tight text-[color:var(--ed-fg)]",
+                  compactChrome ? "text-[13px]" : "mt-1 text-[14px]",
+                )}
+              >
+                {title}
+              </p>
+            )}
+            {!compactChrome ? (
+              <p className="mt-1 text-[11px] leading-4 text-[color:var(--ed-muted)]">
+                {hint}
+              </p>
+            ) : null}
+          </div>
+          {actions}
         </div>
-      )}
+      </div>
       <div className="editor-inspector editor-inspector-compact editor-inspector-light min-h-0 flex-1 overflow-y-auto p-3">
         {children}
       </div>
@@ -715,6 +808,7 @@ function SectionInspector({
   tab,
   selectedField,
   viewport,
+  propertySearchFocus = 0,
   onChange,
 }: {
   config: WebsiteConfig;
@@ -725,24 +819,22 @@ function SectionInspector({
   tab: SectionTab;
   selectedField?: EditorFieldPath;
   viewport: "desktop" | "tablet" | "mobile";
+  propertySearchFocus?: number;
   onChange: (next: WebsiteConfig) => void;
 }) {
   const [propertyQuery, setPropertyQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const section = config.sections.find((s) => s.id === sectionId);
-  if (!section) return null;
-
-  const showContent = tab === "content";
-  const showLayout = tab === "layout";
-  const showStyle = tab === "style";
 
   const schema = getSectionSchema(sectionType);
   const schemaDriven = Boolean(
-    schema && Object.keys(schema).some((key) => {
-      const block = schema[key as keyof typeof schema];
-      if (!block) return false;
-      if (Array.isArray(block)) return block.length > 0;
-      return Object.keys(block).length > 0;
-    }),
+    schema &&
+      Object.keys(schema).some((key) => {
+        const block = schema[key as keyof typeof schema];
+        if (!block) return false;
+        if (Array.isArray(block)) return block.length > 0;
+        return Object.keys(block).length > 0;
+      }),
   );
 
   const schemaGroups: ElementSchemaGroup[] =
@@ -752,23 +844,41 @@ function SectionInspector({
         ? ["layout", "responsive"]
         : ["style", "typography", "visibility"];
 
+  const showContent = tab === "content";
+  const showLayout = tab === "layout";
+  const showStyle = tab === "style";
+
+  useEffect(() => {
+    if (!propertySearchFocus) return;
+    searchRef.current?.focus();
+    searchRef.current?.select();
+  }, [propertySearchFocus]);
+
+  if (!section) return null;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {schemaDriven ? (
         <label className="editor-search-field">
           <Search size={13} />
           <input
+            ref={searchRef}
             value={propertyQuery}
             onChange={(e) => setPropertyQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.preventDefault();
-                setPropertyQuery("");
+                if (propertyQuery) {
+                  setPropertyQuery("");
+                } else {
+                  (e.target as HTMLInputElement).blur();
+                }
               }
             }}
             placeholder={dict.editor.searchProperties}
             className="min-w-0 flex-1 bg-transparent text-[12px] text-[color:var(--ed-fg)] outline-none placeholder:text-[color:var(--ed-subtle)]"
           />
+          <kbd className="editor-kbd">⌘/</kbd>
         </label>
       ) : null}
 

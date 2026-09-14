@@ -81,6 +81,14 @@ export {
 } from "@/lib/editor/keyboard";
 
 export {
+  buildLayerTreeItems,
+  resolveLayerTreeKeyCommand,
+  inferSectionTabFromField,
+  schemaGroupPriority,
+  type LayerTreeItem,
+} from "@/lib/editor/layer-tree";
+
+export {
   loadEditorUiState,
   saveEditorUiState,
   editorFieldToSchemaPath,

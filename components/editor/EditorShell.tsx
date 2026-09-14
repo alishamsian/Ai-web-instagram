@@ -60,6 +60,7 @@ import {
   saveEditorUiState,
   panelWidthPx,
   normalizeLeftNav,
+  inferSectionTabFromField,
   type HistoryEntry,
   type EditorViewportId,
   type EditorSectionTab,
@@ -68,9 +69,7 @@ import {
   type EditorPanelWidth,
   EDITOR_HISTORY_LIMIT,
 } from "@/lib/editor";
-import {
-  ArrowLeft,
-} from "lucide-react";
+import { ArrowLeft, PanelLeft, PanelRight } from "lucide-react";
 
 const AUTOSAVE_MS = 900;
 
@@ -109,6 +108,9 @@ export function EditorShell({
   const [viewport, setViewport] = useState<EditorViewportId>("1280");
   const device = deviceFromViewport(viewport);
   const [leftNav, setLeftNav] = useState<LeftNavTab>("layers");
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [propertySearchFocus, setPropertySearchFocus] = useState(0);
   const [activePage, setActivePage] = useState("home");
   const [phonePane, setPhonePane] = useState<PhonePane>("canvas");
   const [tabletInspectorOpen, setTabletInspectorOpen] = useState(false);
@@ -233,6 +235,8 @@ export function EditorShell({
       if (saved.leftNav) {
         setLeftNav(normalizeLeftNav(saved.leftNav) as LeftNavTab);
       }
+      if (saved.leftCollapsed != null) setLeftCollapsed(saved.leftCollapsed);
+      if (saved.rightCollapsed != null) setRightCollapsed(saved.rightCollapsed);
       if (saved.sectionTab) setSectionTab(saved.sectionTab);
       if (saved.siteGroup) setSiteGroup(saved.siteGroup);
       if (saved.zoom) setZoom(saved.zoom);
@@ -257,6 +261,8 @@ export function EditorShell({
       panelWidth,
       inspectorLight,
       splitPreview,
+      leftCollapsed,
+      rightCollapsed,
     });
   }, [
     uiHydrated,
@@ -271,6 +277,8 @@ export function EditorShell({
     panelWidth,
     inspectorLight,
     splitPreview,
+    leftCollapsed,
+    rightCollapsed,
   ]);
 
   function commitHistory(snapshot: WebsiteConfig, label = pendingLabel) {
@@ -543,6 +551,30 @@ export function EditorShell({
         return;
       }
 
+      if (command === "searchProperties") {
+        event.preventDefault();
+        setRightCollapsed(false);
+        setFocusMode(false);
+        setPhonePane("inspector");
+        setTabletInspectorOpen(true);
+        setPropertySearchFocus((n) => n + 1);
+        return;
+      }
+
+      if (command === "toggleLeftPanel") {
+        event.preventDefault();
+        setFocusMode(false);
+        setLeftCollapsed((v) => !v);
+        return;
+      }
+
+      if (command === "toggleRightPanel") {
+        event.preventDefault();
+        setFocusMode(false);
+        setRightCollapsed((v) => !v);
+        return;
+      }
+
       if (command === "deleteSection" && selectedSectionId) {
         event.preventDefault();
         handleSectionAction(selectedSectionId, "delete");
@@ -581,7 +613,7 @@ export function EditorShell({
 
   function selectField(path: EditorFieldPath, sectionId?: string) {
     setSelectedField(path);
-    setSectionTab("content");
+    setSectionTab(inferSectionTabFromField(path));
     const type = fieldToSectionType(path);
     const matched =
       sectionId ??
@@ -590,6 +622,8 @@ export function EditorShell({
         : undefined);
     if (matched) setSelectedSectionId(matched);
     setLeftNav("layers");
+    setLeftCollapsed(false);
+    setRightCollapsed(false);
     setFocusMode(false);
     setPhonePane("inspector");
     setTabletInspectorOpen(true);
@@ -602,6 +636,8 @@ export function EditorShell({
       setActivePage((page) => (page === "product" ? "home" : page));
       if (canvasProduct) setCanvasProduct(null);
       setLeftNav("layers");
+      setLeftCollapsed(false);
+      setRightCollapsed(false);
       setFocusMode(false);
       setPhonePane("inspector");
       setTabletInspectorOpen(true);
@@ -864,6 +900,59 @@ export function EditorShell({
         run: () => setFocusMode((v) => !v),
       },
       {
+        id: "toggle-left",
+        label: isFa ? "نوار کناری چپ" : "Toggle left sidebar",
+        hint: "⌘B",
+        group: isFa ? "نمایش" : "View",
+        run: () => {
+          setFocusMode(false);
+          setLeftCollapsed((v) => !v);
+        },
+      },
+      {
+        id: "toggle-right",
+        label: isFa ? "بازرس ویژگی‌ها" : "Toggle inspector",
+        hint: "⌘⇧B",
+        group: isFa ? "نمایش" : "View",
+        run: () => {
+          setFocusMode(false);
+          setRightCollapsed((v) => !v);
+        },
+      },
+      {
+        id: "open-inspector",
+        label: isFa ? "باز کردن بازرس" : "Open inspector",
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setFocusMode(false);
+          setRightCollapsed(false);
+          setPhonePane("inspector");
+          setTabletInspectorOpen(true);
+        },
+      },
+      {
+        id: "search-properties",
+        label: isFa ? "جستجوی ویژگی‌ها" : "Search properties",
+        hint: "⌘/",
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setFocusMode(false);
+          setRightCollapsed(false);
+          setPhonePane("inspector");
+          setTabletInspectorOpen(true);
+          setPropertySearchFocus((n) => n + 1);
+        },
+      },
+      {
+        id: "focus-canvas",
+        label: isFa ? "تمرکز روی بوم" : "Focus canvas",
+        group: isFa ? "ناوبری" : "Navigate",
+        run: () => {
+          setPhonePane("canvas");
+          setTabletInspectorOpen(false);
+        },
+      },
+      {
         id: "viewport-mobile",
         label: isFa ? "ویوپورت موبایل" : "Mobile viewport",
         group: isFa ? "نمایش" : "View",
@@ -908,6 +997,30 @@ export function EditorShell({
             window.dispatchEvent(
               new CustomEvent("vitrin-editor-section", {
                 detail: { id: sectionId, action: "duplicate" },
+              }),
+            );
+          },
+        },
+        {
+          id: "move-section-up",
+          label: isFa ? "انتقال سکشن به بالا" : "Move section up",
+          group: isFa ? "سکشن" : "Sections",
+          run: () => {
+            window.dispatchEvent(
+              new CustomEvent("vitrin-editor-section", {
+                detail: { id: sectionId, action: "move-up" },
+              }),
+            );
+          },
+        },
+        {
+          id: "move-section-down",
+          label: isFa ? "انتقال سکشن به پایین" : "Move section down",
+          group: isFa ? "سکشن" : "Sections",
+          run: () => {
+            window.dispatchEvent(
+              new CustomEvent("vitrin-editor-section", {
+                detail: { id: sectionId, action: "move-down" },
               }),
             );
           },
@@ -1082,6 +1195,7 @@ export function EditorShell({
       compactChrome
       sectionTab={sectionTab}
       siteGroup={siteGroup}
+      propertySearchFocus={propertySearchFocus}
       onSectionTabChange={setSectionTab}
       onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
@@ -1101,6 +1215,8 @@ export function EditorShell({
         setLeftNav("layers");
         setTabletInspectorOpen(false);
       }}
+      onSectionAction={handleSectionAction}
+      onClearField={() => setSelectedField(undefined)}
     />
   );
 
@@ -1117,6 +1233,7 @@ export function EditorShell({
       productSlug={canvasProduct}
       sectionTab={sectionTab}
       siteGroup={siteGroup}
+      propertySearchFocus={propertySearchFocus}
       onSectionTabChange={setSectionTab}
       onSiteGroupChange={setSiteGroup}
       onChange={applyConfig}
@@ -1127,7 +1244,12 @@ export function EditorShell({
       }}
       onBrowseTemplates={() => setSiteGroup("site")}
       viewport={device}
-      onOpenSections={() => setLeftNav("layers")}
+      onOpenSections={() => {
+        setLeftNav("layers");
+        setLeftCollapsed(false);
+      }}
+      onSectionAction={handleSectionAction}
+      onClearField={() => setSelectedField(undefined)}
     />
   );
 
@@ -1139,12 +1261,14 @@ export function EditorShell({
       nav={leftNav}
       selectedSectionId={selectedSectionId}
       selectedField={selectedField}
+      hoveredSectionId={hoveredSectionId}
       activePage={activePage}
       onNavChange={setLeftNav}
       onSelectSection={(id) => {
         selectSection(id);
       }}
       onSelectField={(path, sectionId) => selectField(path, sectionId)}
+      onHoverSection={setHoveredSectionId}
       onChange={applyConfig}
       onAddSection={() => {
         setLibraryInsertAfterId(null);
@@ -1167,6 +1291,7 @@ export function EditorShell({
         setSelectedSectionId(undefined);
         setSelectedField(undefined);
         setSiteGroup(group);
+        setRightCollapsed(false);
         setPhonePane("inspector");
         setTabletInspectorOpen(true);
       }}
@@ -1330,15 +1455,25 @@ export function EditorShell({
 
       <div className="relative flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Tablet/desktop left sidebar */}
-        <aside
-          className={cn(
-            "editor-panel hidden shrink-0 flex-col border-e border-[color:var(--ed-border)]",
-            !focusMode && "md:flex",
-          )}
-          style={{ width: panelWidthPx("left", panelWidth) }}
-        >
-          {sidebar}
-        </aside>
+        {!leftCollapsed && !focusMode ? (
+          <aside
+            className="editor-panel hidden shrink-0 flex-col border-e border-[color:var(--ed-border)] md:flex"
+            style={{ width: panelWidthPx("left", panelWidth) }}
+          >
+            {sidebar}
+          </aside>
+        ) : null}
+        {leftCollapsed && !focusMode ? (
+          <button
+            type="button"
+            className="editor-panel-restore hidden md:inline-flex"
+            title={dict.editor.layers}
+            aria-label={dict.editor.layers}
+            onClick={() => setLeftCollapsed(false)}
+          >
+            <PanelLeft size={15} />
+          </button>
+        ) : null}
 
         {/* Phone: sections pane (full screen, exclusive) */}
         <div
@@ -1420,15 +1555,25 @@ export function EditorShell({
         </main>
 
         {/* Desktop inspector */}
-        <aside
-          className={cn(
-            "editor-inspector-panel editor-panel hidden shrink-0 flex-col border-s border-[color:var(--ed-border)]",
-            !focusMode && "lg:flex",
-          )}
-          style={{ width: panelWidthPx("right", panelWidth) }}
-        >
-          {inspectorDesktop}
-        </aside>
+        {!rightCollapsed && !focusMode ? (
+          <aside
+            className="editor-inspector-panel editor-panel hidden shrink-0 flex-col border-s border-[color:var(--ed-border)] lg:flex"
+            style={{ width: panelWidthPx("right", panelWidth) }}
+          >
+            {inspectorDesktop}
+          </aside>
+        ) : null}
+        {rightCollapsed && !focusMode ? (
+          <button
+            type="button"
+            className="editor-panel-restore editor-panel-restore-end hidden lg:inline-flex"
+            title={dict.editor.inspectorTab}
+            aria-label={dict.editor.inspectorTab}
+            onClick={() => setRightCollapsed(false)}
+          >
+            <PanelRight size={15} />
+          </button>
+        ) : null}
 
         {/* Tablet inspector overlay — clean end panel */}
         {tabletInspectorOpen && !focusMode ? (

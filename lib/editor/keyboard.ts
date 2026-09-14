@@ -7,7 +7,10 @@ export type EditorKeyCommand =
   | "escape"
   | "deleteSection"
   | "duplicateSection"
-  | "focusMode";
+  | "focusMode"
+  | "searchProperties"
+  | "toggleLeftPanel"
+  | "toggleRightPanel";
 
 export function resolveEditorKeyCommand(
   event: Pick<
@@ -35,6 +38,9 @@ export function resolveEditorKeyCommand(
 
   if (!meta) return null;
 
+  if (key === "/" || key === "?") return "searchProperties";
+  if (key.toLowerCase() === "b" && !event.shiftKey) return "toggleLeftPanel";
+  if (key.toLowerCase() === "b" && event.shiftKey) return "toggleRightPanel";
   if (key.toLowerCase() === "k") return "commandPalette";
   if (key === "z" && !event.shiftKey) return "undo";
   if (key === "z" && event.shiftKey) return "redo";

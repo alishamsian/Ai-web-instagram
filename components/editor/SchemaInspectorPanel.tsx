@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Locale } from "@/lib/config/env";
 import type { WebsiteConfig, SectionConfig } from "@/types/website";
 import type {
@@ -17,7 +17,11 @@ import {
   isSchemaFieldActive,
 } from "@/lib/store/registry/element-schema";
 import type { EditorFieldPath } from "@/components/editor/EditContext";
-import { schemaFieldMatchesEditorPath, matchesInspectorQuery } from "@/lib/editor";
+import {
+  schemaFieldMatchesEditorPath,
+  matchesInspectorQuery,
+  schemaGroupPriority,
+} from "@/lib/editor";
 import {
   resolveResponsiveValue,
   resetResponsiveOverride,
@@ -27,6 +31,7 @@ import {
 import { Input, Textarea } from "@/components/ui/input";
 import { MediaPicker } from "@/components/editor/MediaPicker";
 import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
 
 const GROUP_LABELS: Record<ElementSchemaGroup, { fa: string; en: string }> = {
   content: { fa: "محتوا", en: "Content" },
@@ -107,32 +112,42 @@ function ResponsiveNumberControl({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <Input
-          type="number"
-          disabled={disabled}
-          min={field.min}
-          max={field.max}
-          step={field.step ?? 1}
-          className="h-9 flex-1 rounded-lg"
-          value={display}
-          onChange={(event) => {
-            const raw = event.target.value.trim();
-            if (!raw) {
-              onChange(resetResponsiveOverride(current, viewport));
-              return;
-            }
-            const n = Number(raw);
-            if (!Number.isFinite(n)) return;
-            onChange(setResponsiveOverride(current, viewport, n));
-          }}
-        />
+        <div className="relative min-w-0 flex-1">
+          <Input
+            type="number"
+            disabled={disabled}
+            min={field.min}
+            max={field.max}
+            step={field.step ?? 1}
+            className={cn(
+              "editor-prop-control h-8 w-full rounded-md pe-8",
+              resolved.inherited && "editor-prop-inherited",
+            )}
+            value={display}
+            onChange={(event) => {
+              const raw = event.target.value.trim();
+              if (!raw) {
+                onChange(resetResponsiveOverride(current, viewport));
+                return;
+              }
+              const n = Number(raw);
+              if (!Number.isFinite(n)) return;
+              onChange(setResponsiveOverride(current, viewport, n));
+            }}
+          />
+          {resolved.inherited ? (
+            <span className="pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 text-[10px] text-[color:var(--ed-subtle)]">
+              ↳
+            </span>
+          ) : null}
+        </div>
         {hasOverride && viewport !== "desktop" ? (
           <button
             type="button"
             disabled={disabled}
             title={locale === "fa" ? "بازنشانی به مقدار ارث‌برده" : "Reset to inherited"}
             aria-label={locale === "fa" ? "بازنشانی به مقدار ارث‌برده" : "Reset to inherited"}
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[color:var(--ed-border)] text-[13px] text-[color:var(--ed-muted)] hover:bg-[color:var(--ed-bg-hover)] hover:text-[color:var(--ed-fg)]"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-[color:var(--ed-border)] text-[12px] text-[color:var(--ed-muted)] transition hover:bg-[color:var(--ed-bg-hover)] hover:text-[color:var(--ed-fg)]"
             onClick={() => onChange(resetResponsiveOverride(current, viewport))}
           >
             ↺
@@ -179,7 +194,7 @@ export function SchemaFieldControl({
   if (kind === "textarea") {
     return (
       <Textarea
-        className="min-h-24 rounded-xl"
+        className="editor-prop-control min-h-20 rounded-md"
         disabled={disabled}
         value={typeof value === "string" ? value : ""}
         onChange={(event) => onChange(event.target.value)}
@@ -189,8 +204,8 @@ export function SchemaFieldControl({
 
   if (kind === "boolean") {
     return (
-      <label className="flex min-h-11 items-center justify-between gap-3 text-[13px]">
-        <span className="text-muted-foreground">
+      <label className="flex min-h-8 items-center justify-between gap-3 text-[12px]">
+        <span className="text-[color:var(--ed-muted)]">
           {locale === "fa" ? "فعال" : "Enabled"}
         </span>
         <input
@@ -217,7 +232,7 @@ export function SchemaFieldControl({
       return (
         <Input
           disabled={disabled}
-          className="h-10 rounded-xl font-mono text-[12px]"
+          className="editor-prop-control h-8 rounded-md font-mono text-[12px]"
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
           placeholder={field.token ?? field.key}
@@ -226,7 +241,13 @@ export function SchemaFieldControl({
     }
     if (options.length <= 5) {
       return (
-        <div className="flex flex-wrap gap-1 rounded-xl bg-black/[0.04] p-1">
+        <div
+          className={cn(
+            "flex flex-wrap gap-0.5 rounded-md bg-black/[0.04] p-0.5",
+            kind === "alignment" && "editor-align-group",
+          )}
+          role="group"
+        >
           {options.map((opt) => {
             const active = value === opt.value;
             return (
@@ -236,7 +257,7 @@ export function SchemaFieldControl({
                 disabled={disabled}
                 onClick={() => onChange(opt.value)}
                 className={cn(
-                  "min-h-9 flex-1 rounded-lg px-2 py-2 text-[11px] font-medium transition",
+                  "min-h-8 flex-1 rounded px-2 text-[11px] font-medium transition",
                   active
                     ? "bg-white text-ink shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
@@ -251,7 +272,7 @@ export function SchemaFieldControl({
     }
     return (
       <select
-        className="h-10 w-full rounded-xl border border-black/10 bg-white px-3 text-[13px]"
+        className="editor-prop-control h-8 w-full rounded-md border border-black/10 bg-white px-2.5 text-[12px]"
         disabled={disabled}
         value={typeof value === "string" ? value : ""}
         onChange={(event) => onChange(event.target.value)}
@@ -273,7 +294,7 @@ export function SchemaFieldControl({
         min={field.min}
         max={field.max}
         step={field.step ?? 1}
-        className="h-10 rounded-xl"
+        className="editor-prop-control h-8 rounded-md"
         value={typeof value === "number" ? String(value) : ""}
         onChange={(event) => {
           const raw = event.target.value.trim();
@@ -310,11 +331,12 @@ export function SchemaFieldControl({
           disabled={disabled}
           value={color.startsWith("#") ? color : "#111111"}
           onChange={(event) => onChange(event.target.value)}
-          className="size-10 cursor-pointer rounded-lg border border-black/10 bg-white p-1"
+          className="size-8 cursor-pointer rounded-md border border-black/10 bg-white p-0.5"
+          aria-label={labelOf(field, locale)}
         />
         <Input
           disabled={disabled}
-          className="h-10 rounded-xl font-mono text-[12px]"
+          className="editor-prop-control h-8 rounded-md font-mono text-[12px]"
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -326,7 +348,7 @@ export function SchemaFieldControl({
   return (
     <Input
       disabled={disabled}
-      className="h-10 rounded-xl"
+      className="editor-prop-control h-8 rounded-md"
       value={typeof value === "string" ? value : ""}
       onChange={(event) => onChange(event.target.value)}
     />
@@ -388,6 +410,35 @@ export function SchemaInspectorPanel({
     return map;
   }, [fields, groups, values, query, locale]);
 
+  const rankedGroups = useMemo(() => {
+    return [...byGroup.entries()]
+      .filter(([, list]) => list.length > 0)
+      .sort(
+        ([a], [b]) => schemaGroupPriority(a) - schemaGroupPriority(b),
+      );
+  }, [byGroup]);
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!rankedGroups.length) return;
+    const searching = Boolean(query.trim());
+    if (searching) {
+      const next: Record<string, boolean> = {};
+      for (const [group] of rankedGroups) next[group] = true;
+      setOpenGroups(next);
+      return;
+    }
+    const preferred =
+      rankedGroups.find(([, list]) =>
+        list.some((field) =>
+          schemaFieldMatchesEditorPath(field.path, field.key, selectedField),
+        ),
+      )?.[0] ?? rankedGroups[0]?.[0];
+    if (!preferred) return;
+    setOpenGroups({ [preferred]: true });
+  }, [section.id, selectedField, query, rankedGroups]);
+
   useEffect(() => {
     if (!selectedField) return;
     const node = document.querySelector(
@@ -396,78 +447,97 @@ export function SchemaInspectorPanel({
     node?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedField, section.id]);
 
-  const visibleCount = [...byGroup.values()].reduce(
-    (sum, list) => sum + list.length,
+  const visibleCount = rankedGroups.reduce(
+    (sum, [, list]) => sum + list.length,
     0,
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-1">
       {query.trim() && visibleCount === 0 ? (
-        <p className="py-6 text-center text-[12px] text-[color:var(--ed-muted)]">
-          {locale === "fa" ? "ویژگی‌ای پیدا نشد" : "No properties match"}
-        </p>
+        <div className="editor-prop-empty py-8 text-center">
+          <p className="text-[12px] font-medium text-[color:var(--ed-fg)]">
+            {locale === "fa" ? "ویژگی منطبقی نیست" : "No matching properties"}
+          </p>
+          <p className="mt-1 text-[11px] text-[color:var(--ed-muted)]">
+            {locale === "fa" ? "جستجوی دیگری امتحان کنید" : "Try another search"}
+          </p>
+        </div>
       ) : null}
-      {[...byGroup.entries()].map(([group, groupFields]) => {
-        if (!groupFields.length) return null;
+      {rankedGroups.map(([group, groupFields]) => {
+        const open = openGroups[group] ?? false;
         return (
-          <div
-            key={group}
-            className="border-b border-[color:var(--ed-border)] last:border-b-0"
-          >
-            <div className="px-0 py-2">
-              <p className="text-[10px] font-semibold tracking-wide text-[color:var(--ed-subtle)] uppercase">
-                {GROUP_LABELS[group][locale]}
-              </p>
-            </div>
-            <div className="space-y-2.5 pb-3">
-              {groupFields.map((field) => {
-                const active = schemaFieldMatchesEditorPath(
-                  field.path,
-                  field.key,
-                  selectedField,
-                );
-                return (
-                  <label
-                    key={field.key}
-                    data-editor-schema-field={
-                      active && selectedField ? selectedField : undefined
-                    }
-                    data-active={active || undefined}
-                    className={cn(
-                      "editor-schema-field block space-y-1.5 rounded-lg p-1.5 -m-1.5 transition",
-                      active && "editor-schema-field-active",
-                    )}
-                  >
-                    <span className="text-[12px] font-medium text-[color:var(--ed-fg)]">
-                      {labelOf(field, locale)}
-                    </span>
-                    {field.description ? (
-                      <span className="block text-[11px] text-[color:var(--ed-muted)]">
-                        {field.description[locale]}
+          <div key={group} className="editor-schema-group">
+            <button
+              type="button"
+              className="editor-schema-group-toggle"
+              aria-expanded={open}
+              onClick={() =>
+                setOpenGroups((prev) => ({
+                  ...prev,
+                  [group]: !open,
+                }))
+              }
+            >
+              <span>{GROUP_LABELS[group][locale]}</span>
+              <ChevronDown
+                size={13}
+                className={cn(
+                  "text-[color:var(--ed-subtle)] transition-transform",
+                  open ? "rotate-0" : "-rotate-90",
+                )}
+              />
+            </button>
+            {open ? (
+              <div className="editor-schema-group-body space-y-2 pb-2.5">
+                {groupFields.map((field) => {
+                  const active = schemaFieldMatchesEditorPath(
+                    field.path,
+                    field.key,
+                    selectedField,
+                  );
+                  return (
+                    <label
+                      key={field.key}
+                      data-editor-schema-field={
+                        active && selectedField ? selectedField : undefined
+                      }
+                      data-active={active || undefined}
+                      className={cn(
+                        "editor-schema-field block space-y-1 rounded-md p-1 -m-1 transition",
+                        active && "editor-schema-field-active",
+                      )}
+                    >
+                      <span className="text-[11.5px] font-medium text-[color:var(--ed-fg)]">
+                        {labelOf(field, locale)}
                       </span>
-                    ) : null}
-                    <SchemaFieldControl
-                      field={field}
-                      value={values[field.key]}
-                      config={config}
-                      locale={locale}
-                      viewport={viewport}
-                      onChange={(nextValue) => {
-                        const result = applySchemaFieldUpdate({
-                          config,
-                          sectionId: section.id,
-                          field,
-                          value: nextValue,
-                        });
-                        if ("error" in result) return;
-                        onChange(result.config);
-                      }}
-                    />
-                  </label>
-                );
-              })}
-            </div>
+                      {field.description && !query.trim() ? (
+                        <span className="block text-[10.5px] text-[color:var(--ed-muted)]">
+                          {field.description[locale]}
+                        </span>
+                      ) : null}
+                      <SchemaFieldControl
+                        field={field}
+                        value={values[field.key]}
+                        config={config}
+                        locale={locale}
+                        viewport={viewport}
+                        onChange={(nextValue) => {
+                          const result = applySchemaFieldUpdate({
+                            config,
+                            sectionId: section.id,
+                            field,
+                            value: nextValue,
+                          });
+                          if ("error" in result) return;
+                          onChange(result.config);
+                        }}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         );
       })}
