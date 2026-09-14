@@ -35,6 +35,12 @@ export const motion: SemanticMotionTokens = {
   easeInOut: primitiveMotion.easeInOut,
 };
 
+/** Instant + reduced-motion helpers for website motion tokens. */
+export const motionExtras = {
+  instant: "0ms",
+  reduced: "0.01ms",
+} as const;
+
 /** Image aspect vocabulary — verticals pick; DS does not force one ratio. */
 export const imageAspect = {
   square: "1 / 1",

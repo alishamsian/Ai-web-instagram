@@ -1,6 +1,6 @@
 import type { WebsiteConfig } from "@/types/website";
 import type { Product } from "@/types/ai";
-import { moodChrome, type StoreMood } from "@/lib/design-system/themes";
+import { moodChrome, resolveColorScheme, type StoreMood } from "@/lib/design-system/themes";
 import { primitiveColor } from "@/lib/design-system/primitives";
 import { applyDesignChrome } from "@/lib/design-system/brand-design";
 
@@ -99,9 +99,17 @@ export function inferStoreMood(config: WebsiteConfig): StoreMood {
   return "editorial";
 }
 
-export function buildStoreTokens(config: WebsiteConfig): StoreTokens {
+export function buildStoreTokens(
+  config: WebsiteConfig,
+  options: { systemPreference?: "light" | "dark" | null } = {},
+): StoreTokens {
   const c = config.brand.colors;
   const mood = inferStoreMood(config);
+  const scheme = resolveColorScheme(
+    config.settings.themeMode,
+    options.systemPreference,
+  );
+  const treatAsDark = scheme === "dark" || mood === "dark";
   const bg = c.background;
   const fg = c.foreground;
   const muted = c.muted;
@@ -113,9 +121,10 @@ export function buildStoreTokens(config: WebsiteConfig): StoreTokens {
   return {
     background: bg,
     backgroundSubtle: mixApprox(muted, bg, 0.55),
-    surface: mood === "dark" ? mixApprox(bg, fg, 0.06) : mixApprox(bg, "#ffffff", 0.7),
-    surfaceElevated:
-      mood === "dark" ? mixApprox(bg, fg, 0.1) : "#ffffff",
+    surface: treatAsDark
+      ? mixApprox(bg, fg, 0.06)
+      : mixApprox(bg, "#ffffff", 0.7),
+    surfaceElevated: treatAsDark ? mixApprox(bg, fg, 0.1) : "#ffffff",
     foreground: fg,
     foregroundSecondary: mixApprox(fg, bg, 0.28),
     foregroundMuted: mixApprox(fg, bg, 0.45),

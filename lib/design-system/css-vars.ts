@@ -1,5 +1,11 @@
 import type { CSSProperties } from "react";
 import type { StoreTokens } from "@/lib/store/theme";
+import type { DesignTokens } from "@/lib/design-system/tokens";
+import {
+  EDITOR_TOKEN_PREFIX,
+  SITE_TOKEN_PREFIX,
+  STORE_TOKEN_PREFIX,
+} from "@/lib/design-system/tokens";
 import {
   primitiveLayout,
   primitiveMotion,
@@ -76,4 +82,116 @@ export function storeCssVars(tokens: StoreTokens): CSSProperties {
     background: tokens.background,
     color: tokens.foreground,
   };
+}
+
+/**
+ * Website semantic CSS variables (`--site-*`).
+ * Future section variants should prefer these over hardcoded colors.
+ * Never emits `--ed-*` editor chrome tokens.
+ */
+export function siteCssVars(tokens: DesignTokens): CSSProperties {
+  const c = tokens.colors;
+  const s = tokens.spacing;
+  const r = tokens.radius;
+  const e = tokens.elevation;
+  const m = tokens.motion;
+  const l = tokens.layout;
+  const f = tokens.fonts;
+
+  return {
+    ["--site-color-background" as string]: c.background,
+    ["--site-color-background-subtle" as string]: c.backgroundSubtle,
+    ["--site-color-surface" as string]: c.surface,
+    ["--site-color-surface-elevated" as string]: c.surfaceElevated,
+    ["--site-color-surface-muted" as string]: c.surfaceMuted,
+    ["--site-color-foreground" as string]: c.foreground,
+    ["--site-color-muted" as string]: c.mutedForeground,
+    ["--site-color-subtle" as string]: c.foregroundSubtle,
+    ["--site-color-border" as string]: c.border,
+    ["--site-color-border-subtle" as string]: c.borderSubtle,
+    ["--site-color-border-strong" as string]: c.borderStrong,
+    ["--site-color-accent" as string]: c.accent,
+    ["--site-color-accent-foreground" as string]: c.accentForeground,
+    ["--site-color-destructive" as string]: c.destructive,
+    ["--site-color-destructive-foreground" as string]: c.destructiveForeground,
+    ["--site-color-success" as string]: c.success,
+    ["--site-color-success-foreground" as string]: c.successForeground,
+    ["--site-color-warning" as string]: c.warning,
+    ["--site-color-warning-foreground" as string]: c.warningForeground,
+
+    ["--site-font-display" as string]: f.display,
+    ["--site-font-heading" as string]: f.heading,
+    ["--site-font-body" as string]: f.body,
+    ["--site-font-mono" as string]: f.mono,
+
+    ["--site-type-display-size" as string]: tokens.typography.display.fontSize,
+    ["--site-type-heading-size" as string]: tokens.typography.heading.fontSize,
+    ["--site-type-body-size" as string]: tokens.typography.body.fontSize,
+
+    ["--site-space-micro" as string]: s.micro,
+    ["--site-space-tight" as string]: s.tight,
+    ["--site-space-compact" as string]: s.compact,
+    ["--site-space-component" as string]: s.component,
+    ["--site-space-comfortable" as string]: s.comfortable,
+    ["--site-space-card" as string]: s.card,
+    ["--site-space-section-gap" as string]: s.sectionGap,
+    ["--site-space-section" as string]: s.section,
+    ["--site-space-page" as string]: s.page,
+
+    ["--site-radius-none" as string]: r.none,
+    ["--site-radius-subtle" as string]: r.subtle,
+    ["--site-radius-control" as string]: r.control,
+    ["--site-radius-card" as string]: r.card,
+    ["--site-radius-large" as string]: r.large,
+    ["--site-radius-pill" as string]: r.pill,
+
+    ["--site-elevation-none" as string]: e.none,
+    ["--site-elevation-subtle" as string]: e.subtle,
+    ["--site-elevation-medium" as string]: e.medium,
+    ["--site-elevation-strong" as string]: e.strong,
+
+    ["--site-motion-instant" as string]: m.instant,
+    ["--site-motion-fast" as string]: m.fast,
+    ["--site-motion-normal" as string]: m.normal,
+    ["--site-motion-slow" as string]: m.slow,
+    ["--site-motion-ease" as string]: m.ease,
+    ["--site-motion-ease-out" as string]: m.easeOut,
+    ["--site-motion-ease-in-out" as string]: m.easeInOut,
+    ["--site-motion-reduced" as string]: m.reduced,
+
+    ["--site-layout-page-max" as string]: l.pageMaxWidth,
+    ["--site-layout-content-max" as string]: l.contentMaxWidth,
+    ["--site-layout-readable" as string]: l.readableWidth,
+    ["--site-layout-section-pad" as string]: l.sectionPadding,
+    ["--site-layout-inline-pad" as string]: l.inlinePadding,
+    ["--site-layout-grid-gap" as string]: l.gridGap,
+    ["--site-layout-content-gap" as string]: l.contentGap,
+    ["--site-layout-touch-min" as string]: l.touchMin,
+
+    ["--site-color-scheme" as string]: tokens.scheme,
+  };
+}
+
+/** Merge store + site vars for StoreRoot. Site vars never overwrite editor tokens. */
+export function websiteCssVars(
+  store: StoreTokens,
+  design: DesignTokens,
+): CSSProperties {
+  return {
+    ...storeCssVars(store),
+    ...siteCssVars(design),
+  };
+}
+
+/** Test helper — assert no editor token leakage in generated style maps. */
+export function assertNoEditorTokenLeakage(
+  vars: Record<string, unknown>,
+): string[] {
+  return Object.keys(vars).filter((key) => key.startsWith(EDITOR_TOKEN_PREFIX));
+}
+
+export function isWebsiteTokenName(name: string) {
+  return (
+    name.startsWith(SITE_TOKEN_PREFIX) || name.startsWith(STORE_TOKEN_PREFIX)
+  );
 }

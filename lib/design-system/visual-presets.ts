@@ -1,4 +1,7 @@
 import type { WebsiteConfig } from "@/types/website";
+import type { ThemeMode } from "@/lib/design-system/tokens";
+
+export type { ThemeMode };
 
 /**
  * Visual direction is deliberately separate from color presets.
@@ -15,8 +18,6 @@ export type VisualPresetId =
   | "bento-creative"
   | "mono-gallery";
 
-export type ThemeMode = "light" | "dark" | "system";
-
 export type VisualSectionKind =
   | "navbar"
   | "hero"
@@ -30,6 +31,16 @@ export type ResponsiveStrategy = {
   mobile: string;
   tablet: string;
   desktop: string;
+};
+
+/** Design-system personality hints — not section layouts. */
+export type VisualPresetDesignHints = {
+  spacingDensity?: "compact" | "comfortable" | "spacious";
+  radiusPersonality?: "sharp" | "soft" | "rounded";
+  elevationPersonality?: "none" | "subtle" | "elevated";
+  typographyPersonality?: "serif" | "sans" | "display" | "mixed";
+  imageTreatment?: "cover" | "editorial" | "grid" | "bleed";
+  compositionHint?: string;
 };
 
 export type VisualPreset = {
@@ -51,6 +62,7 @@ export type VisualPreset = {
     supportsDark: boolean;
     semanticTokens: boolean;
   };
+  designHints?: VisualPresetDesignHints;
 };
 
 export const VISUAL_PRESETS: readonly VisualPreset[] = [
@@ -62,6 +74,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "wordmark", hero: "editorial", content: "story", products: "editorial", gallery: "lookbook", trust: "numbers", conversion: "minimal-cta" },
     responsive: { mobile: "stack-copy-first", tablet: "asymmetric", desktop: "asymmetric" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "spacious",
+      radiusPersonality: "sharp",
+      elevationPersonality: "none",
+      typographyPersonality: "serif",
+      imageTreatment: "editorial",
+      compositionHint: "asymmetric-editorial",
+    },
   },
   {
     id: "immersive-cinema",
@@ -71,6 +91,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "transparent-overlay", hero: "immersive", content: "image-led", products: "rail", gallery: "masonry", trust: "overlay-stats", conversion: "floating" },
     responsive: { mobile: "crop-safe-stack", tablet: "full-bleed", desktop: "full-height" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "spacious",
+      radiusPersonality: "soft",
+      elevationPersonality: "subtle",
+      typographyPersonality: "sans",
+      imageTreatment: "bleed",
+      compositionHint: "full-bleed",
+    },
   },
   {
     id: "studio-grid",
@@ -80,6 +108,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "compact", hero: "split", content: "two-column", products: "grid", gallery: "grid", trust: "inline", conversion: "bar" },
     responsive: { mobile: "2-column", tablet: "3-column", desktop: "4-column" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "compact",
+      radiusPersonality: "soft",
+      elevationPersonality: "subtle",
+      typographyPersonality: "sans",
+      imageTreatment: "grid",
+      compositionHint: "strict-grid",
+    },
   },
   {
     id: "quiet-luxury",
@@ -89,6 +125,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "centered", hero: "product-focus", content: "editorial", products: "luxury", gallery: "gallery-stage", trust: "quiet-proof", conversion: "private" },
     responsive: { mobile: "single-column", tablet: "balanced", desktop: "wide-stage" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "spacious",
+      radiusPersonality: "sharp",
+      elevationPersonality: "none",
+      typographyPersonality: "serif",
+      imageTreatment: "cover",
+      compositionHint: "gallery-stage",
+    },
   },
   {
     id: "bold-commerce",
@@ -98,6 +142,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "commerce", hero: "statement", content: "feature-split", products: "compact-commerce", gallery: "product-grid", trust: "badges", conversion: "purchase" },
     responsive: { mobile: "commerce-stack", tablet: "dense-grid", desktop: "wide-grid" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "compact",
+      radiusPersonality: "rounded",
+      elevationPersonality: "elevated",
+      typographyPersonality: "display",
+      imageTreatment: "cover",
+      compositionHint: "modular-commerce",
+    },
   },
   {
     id: "organic-story",
@@ -107,6 +159,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "soft", hero: "split", content: "story", products: "editorial", gallery: "offset", trust: "quotes", conversion: "warm" },
     responsive: { mobile: "stack-with-offset", tablet: "offset-grid", desktop: "asymmetric-flow" },
     theme: { default: "light", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "comfortable",
+      radiusPersonality: "rounded",
+      elevationPersonality: "subtle",
+      typographyPersonality: "serif",
+      imageTreatment: "editorial",
+      compositionHint: "offset-flow",
+    },
   },
   {
     id: "bento-creative",
@@ -116,6 +176,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "minimal", hero: "bento", content: "bento-story", products: "bento-products", gallery: "collage", trust: "metric-cards", conversion: "featured-block" },
     responsive: { mobile: "priority-stack", tablet: "bento-2", desktop: "bento-12" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "compact",
+      radiusPersonality: "soft",
+      elevationPersonality: "elevated",
+      typographyPersonality: "mixed",
+      imageTreatment: "grid",
+      compositionHint: "bento",
+    },
   },
   {
     id: "mono-gallery",
@@ -125,6 +193,14 @@ export const VISUAL_PRESETS: readonly VisualPreset[] = [
     recommendedSections: { navbar: "portfolio", hero: "gallery-hero", content: "captioned", products: "case-grid", gallery: "masonry", trust: "clients", conversion: "contact-link" },
     responsive: { mobile: "single-flow", tablet: "masonry-2", desktop: "masonry-3" },
     theme: { default: "dark", supportsDark: true, semanticTokens: true },
+    designHints: {
+      spacingDensity: "comfortable",
+      radiusPersonality: "sharp",
+      elevationPersonality: "none",
+      typographyPersonality: "sans",
+      imageTreatment: "bleed",
+      compositionHint: "gallery-first",
+    },
   },
 ];
 

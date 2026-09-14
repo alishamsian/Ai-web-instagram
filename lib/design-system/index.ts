@@ -3,11 +3,14 @@
  *
  * Layers:
  * 1. primitives — raw values
- * 2. semantic — meaning-based roles
- * 3. component contracts — Registry-ready vocabulary
+ * 2. semantic / tokens — meaning-based roles
+ * 3. theme — light/dark/system + mood chrome
+ * 4. brand / visual presets — overlays
+ * 5. component contracts — Registry-ready vocabulary
  *
  * Runtime Store still uses `--store-*` CSS vars via `storeCssVars`.
- * Theme mood (luxury/minimal/…) ≠ Vertical (beauty/coffee/…).
+ * Future sections should prefer `--site-*` via `siteCssVars`.
+ * Editor chrome (`--ed-*`) is a separate system.
  */
 
 export * from "@/lib/design-system/primitives";
@@ -18,4 +21,26 @@ export * from "@/lib/design-system/layout";
 export * from "@/lib/design-system/foundation";
 export * from "@/lib/design-system/components";
 export * from "@/lib/design-system/themes";
-export { storeCssVars } from "@/lib/design-system/css-vars";
+export * from "@/lib/design-system/tokens";
+export {
+  resolveDesignTokens,
+  REQUIRED_COLOR_KEYS,
+  type ResolveDesignOptions,
+} from "@/lib/design-system/resolve-design";
+export {
+  storeCssVars,
+  siteCssVars,
+  websiteCssVars,
+  assertNoEditorTokenLeakage,
+  isWebsiteTokenName,
+} from "@/lib/design-system/css-vars";
+export {
+  VISUAL_PRESETS,
+  getVisualPreset,
+  applyVisualPreset,
+  validateVisualPresetCatalog,
+  isVisualPresetDistinct,
+  type VisualPreset,
+  type VisualPresetId,
+  type VisualPresetDesignHints,
+} from "@/lib/design-system/visual-presets";
