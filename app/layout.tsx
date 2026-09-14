@@ -6,6 +6,7 @@ import "@fontsource-variable/vazirmatn/wght.css";
 import "./globals.css";
 import "./store.css";
 import "./editor.css";
+import "./editor-polish.css";
 import "./auth.css";
 import { IconProvider } from "@/components/ui/icon-provider";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
