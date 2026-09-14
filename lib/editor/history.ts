@@ -19,6 +19,19 @@ export function createHistoryEntry(
   };
 }
 
+/**
+ * Typing / continuous property edits stay debounced.
+ * Discrete structural commands commit immediately (one intentional edit = one entry).
+ */
+export function shouldDebounceHistoryLabel(label: string): boolean {
+  if (label === "Edit") return true;
+  if (label.startsWith("Edit ")) return true;
+  if (label.startsWith("Change brand.")) return true;
+  if (label === "Change brand colors") return true;
+  if (label === "Edit SEO keywords") return true;
+  return false;
+}
+
 export function pushHistory(params: {
   entries: HistoryEntry[];
   index: number;
@@ -27,11 +40,12 @@ export function pushHistory(params: {
   limit?: number;
 }): { entries: HistoryEntry[]; index: number } {
   const limit = params.limit ?? EDITOR_HISTORY_LIMIT;
-  const base = params.entries.slice(0, params.index + 1);
-  const last = base[base.length - 1];
-  if (last && configsEqual(last.config, params.next)) {
-    return { entries: base, index: base.length - 1 };
+  const current = params.entries[params.index];
+  // No-op must NOT truncate the redo stack (slice before equality was a Phase 6 bug).
+  if (current && configsEqual(current.config, params.next)) {
+    return { entries: params.entries, index: params.index };
   }
+  const base = params.entries.slice(0, params.index + 1);
   const merged = [
     ...base,
     createHistoryEntry(params.next, params.label),

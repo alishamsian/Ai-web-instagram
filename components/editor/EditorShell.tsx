@@ -43,6 +43,7 @@ import {
   undoHistory,
   redoHistory,
   restoreHistoryIndex,
+  shouldDebounceHistoryLabel,
   resolveEditorKeyCommand,
   deviceFromViewport,
   viewportFromDevice,
@@ -301,12 +302,32 @@ export function EditorShell({
   }
 
   function applyConfig(next: WebsiteConfig, label = "Edit") {
-    setConfig(next);
-    setPendingLabel(label);
     if (skipHistory.current) {
       skipHistory.current = false;
+      setConfig(next);
+      configRef.current = next;
       return;
     }
+
+    const debounce = shouldDebounceHistoryLabel(label);
+
+    if (!debounce) {
+      // Flush pending typed edits first so discrete commands don't swallow them.
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+        commitHistory(configRef.current, pendingLabel);
+      }
+      setConfig(next);
+      configRef.current = next;
+      setPendingLabel(label);
+      commitHistory(next, label);
+      return;
+    }
+
+    setConfig(next);
+    configRef.current = next;
+    setPendingLabel(label);
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => {
       commitHistory(next, label);
@@ -314,7 +335,7 @@ export function EditorShell({
   }
 
   function undo() {
-    if (debounceRef.current) commitHistory(config, pendingLabel);
+    if (debounceRef.current) commitHistory(configRef.current, pendingLabel);
     const result = undoHistory({
       entries: historyRef.current,
       index: historyIndexRef.current,
@@ -324,13 +345,14 @@ export function EditorShell({
     historyIndexRef.current = result.index;
     setHistoryIndex(result.index);
     setConfig(result.config);
+    configRef.current = result.config;
     const label =
       historyRef.current[result.index]?.label ?? dict.editor.undo;
     flashMessage(flashTemplate(dict.editor.undoFlash, label));
   }
 
   function redo() {
-    if (debounceRef.current) commitHistory(config, pendingLabel);
+    if (debounceRef.current) commitHistory(configRef.current, pendingLabel);
     const result = redoHistory({
       entries: historyRef.current,
       index: historyIndexRef.current,
@@ -340,6 +362,7 @@ export function EditorShell({
     historyIndexRef.current = result.index;
     setHistoryIndex(result.index);
     setConfig(result.config);
+    configRef.current = result.config;
     const label =
       historyRef.current[result.index]?.label ?? dict.editor.redo;
     flashMessage(flashTemplate(dict.editor.redoFlash, label));
@@ -347,15 +370,18 @@ export function EditorShell({
 
   function restoreHistory(index: number) {
     if (debounceRef.current) {
-      window.clearTimeout(debounceRef.current);
-      debounceRef.current = null;
+      commitHistory(configRef.current, pendingLabel);
     }
-    const result = restoreHistoryIndex({ entries: history, index });
+    const result = restoreHistoryIndex({
+      entries: historyRef.current,
+      index,
+    });
     if (!result.config) return;
     skipHistory.current = true;
     historyIndexRef.current = result.index;
     setHistoryIndex(result.index);
     setConfig(result.config);
+    configRef.current = result.config;
     setHistoryOpen(false);
   }
 

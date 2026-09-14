@@ -1,11 +1,14 @@
 import type { WebsiteConfig } from "@/types/website";
-import type { EditorCommandResult } from "@/lib/editor/types";
+import {
+  cloneWebsiteConfig,
+  findSection,
+  type EditorCommandResult,
+} from "@/lib/editor/types";
 import { commandSetSectionVariant } from "@/lib/editor/commands";
 import {
   isVariantSupported,
   resolveSectionVariant,
 } from "@/lib/store/registry/variant-api";
-import { findSection } from "@/lib/editor/types";
 
 /**
  * Thin apply engine for section variants.
@@ -30,8 +33,9 @@ export function applySectionVariant(
 }
 
 /**
- * Build an in-memory config clone for preview only.
+ * Build a deep-cloned config for preview only.
  * Never pass the result to onChange / history / autosave.
+ * Isolation: mutating preview trees must not touch editor WebsiteConfig.
  */
 export function buildVariantPreviewConfig(
   config: WebsiteConfig,
@@ -43,23 +47,15 @@ export function buildVariantPreviewConfig(
   const resolved = resolveSectionVariant(section.type, variantId);
   if (!resolved.id) return null;
 
-  let next: WebsiteConfig = {
-    ...config,
-    sections: config.sections.map((s) =>
-      s.id === sectionId ? { ...s, variant: resolved.id! } : s,
-    ),
-  };
+  const next = cloneWebsiteConfig(config);
+  const target = next.sections.find((s) => s.id === sectionId);
+  if (!target) return null;
+  target.variant = resolved.id;
 
   if (section.type === "hero") {
-    next = {
-      ...next,
-      content: {
-        ...next.content,
-        hero: {
-          ...next.content.hero,
-          style: resolved.id as typeof next.content.hero.style,
-        },
-      },
+    next.content.hero = {
+      ...next.content.hero,
+      style: resolved.id as typeof next.content.hero.style,
     };
   }
 

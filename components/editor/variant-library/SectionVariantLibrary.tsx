@@ -171,29 +171,35 @@ function VariantCard({
   const responsive = variant.responsive;
   const desc = variant.description?.[locale];
 
+  const applyLabel = selected
+    ? locale === "fa"
+      ? `${variant.label[locale]} — فعلی`
+      : `${variant.label[locale]} — current`
+    : locale === "fa"
+      ? `اعمال ${variant.label[locale]}`
+      : `Apply ${variant.label[locale]}`;
+
+  // Interactive option must not wrap preview store chrome in <button> —
+  // real section renderers include nested <button>/<a> (wishlist, CTAs).
   return (
     <div
       role="option"
+      tabIndex={0}
       aria-selected={selected}
+      aria-label={applyLabel}
       className={cn(
         "ed-variant-card",
         selected && "ed-variant-card--selected",
       )}
-    >
-      <button
-        type="button"
-        className="ed-variant-card__hit"
-        aria-label={
-          selected
-            ? locale === "fa"
-              ? `${variant.label[locale]} — فعلی`
-              : `${variant.label[locale]} — current`
-            : locale === "fa"
-              ? `اعمال ${variant.label[locale]}`
-              : `Apply ${variant.label[locale]}`
+      onClick={onApply}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onApply();
         }
-        onClick={onApply}
-      >
+      }}
+    >
+      <div className="ed-variant-card__hit">
         <LazyVariantPreview
           config={config}
           sectionId={sectionId}
@@ -227,7 +233,7 @@ function VariantCard({
             </p>
           ) : null}
         </div>
-      </button>
+      </div>
     </div>
   );
 }

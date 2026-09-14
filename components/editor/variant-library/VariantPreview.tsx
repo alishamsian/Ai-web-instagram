@@ -44,6 +44,8 @@ export function VariantPreview({
       className={cn("ed-variant-preview", className)}
       data-variant-preview={variantId}
       aria-hidden
+      // Decorative thumbnail only — strip nested interactive chrome from a11y/focus.
+      inert
     >
       <div className="ed-variant-preview__scaler">
         <PreviewProviders config={preview.config}>
@@ -83,7 +85,7 @@ function PreviewProviders({
           onHomeNavigate: () => {},
         }}
       >
-        <StoreCartProvider storageKey="vitrin-editor-variant-preview-cart">
+        <StoreCartProvider persist={false}>
           <StoreRoot config={config} className="ed-variant-preview__store">
             {children}
           </StoreRoot>

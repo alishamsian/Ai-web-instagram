@@ -10,6 +10,7 @@ import {
   deleteWebsiteForWorkspace,
   isSupabaseSchemaReady,
 } from "@/lib/database/supabase-store";
+import { hasOptimisticVersionConflict } from "@/lib/website/optimistic-version";
 
 export async function GET(
   _request: Request,
@@ -65,8 +66,7 @@ export async function PATCH(
     if (!website) return;
 
     if (
-      typeof body.expectedVersion === "number" &&
-      body.expectedVersion !== website.version
+      hasOptimisticVersionConflict(body.expectedVersion, website.version)
     ) {
       versionConflict = true;
       return;

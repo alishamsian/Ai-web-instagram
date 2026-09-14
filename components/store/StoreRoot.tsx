@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import type { WebsiteConfig } from "@/types/website";
 import { buildStoreTokens, inferStoreMood } from "@/lib/store/theme";
 import {
@@ -10,10 +13,44 @@ import {
 } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
 
+function subscribeColorScheme(onStoreChange: () => void) {
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function getColorSchemeSnapshot(): "light" | "dark" {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+/** SSR + first hydration snapshot — deterministic, no window. */
+function getServerColorSchemeSnapshot(): "light" | "dark" {
+  return "light";
+}
+
+function subscribeReducedMotion(onStoreChange: () => void) {
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function getReducedMotionSnapshot(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getServerReducedMotionSnapshot(): boolean {
+  return false;
+}
+
 /**
  * Store design-system root.
  * Injects `--store-*` (legacy) + `--site-*` (semantic foundation) CSS variables.
  * Editor chrome tokens (`--ed-*`) are never emitted here.
+ *
+ * System theme: SSR-safe light fallback via useSyncExternalStore getServerSnapshot.
+ * Avoids hydration mismatch; client preference applies after hydration.
  */
 export function StoreRoot({
   config,
@@ -25,30 +62,16 @@ export function StoreRoot({
   className?: string;
 }) {
   const themeMode = normalizeThemeMode(config.settings.themeMode);
-  const [systemPreference, setSystemPreference] = useState<
-    "light" | "dark" | null
-  >(null);
-  const [reducedMotion, setReducedMotion] = useState(false);
-
-  useEffect(() => {
-    if (themeMode !== "system") {
-      setSystemPreference(null);
-      return;
-    }
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const sync = () => setSystemPreference(mq.matches ? "dark" : "light");
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, [themeMode]);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReducedMotion(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
+  const systemPreference = useSyncExternalStore(
+    subscribeColorScheme,
+    getColorSchemeSnapshot,
+    getServerColorSchemeSnapshot,
+  );
+  const reducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotionSnapshot,
+    getServerReducedMotionSnapshot,
+  );
 
   const storeTokens = buildStoreTokens(config, {
     systemPreference: themeMode === "system" ? systemPreference : null,

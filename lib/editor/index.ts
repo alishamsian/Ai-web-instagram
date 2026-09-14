@@ -21,6 +21,7 @@ export {
   undoHistory,
   redoHistory,
   restoreHistoryIndex,
+  shouldDebounceHistoryLabel,
 } from "@/lib/editor/history";
 
 export {

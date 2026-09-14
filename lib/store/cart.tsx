@@ -45,27 +45,34 @@ function readStored(key: string): CartLine[] {
 export function StoreCartProvider({
   children,
   storageKey = "vitrin-store-cart",
+  /** When false, cart stays ephemeral (variant thumbnails / previews). */
+  persist = true,
 }: {
   children: ReactNode;
   storageKey?: string;
+  persist?: boolean;
 }) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [open, setOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(!persist);
 
   useEffect(() => {
+    if (!persist) {
+      setHydrated(true);
+      return;
+    }
     setLines(readStored(storageKey));
     setHydrated(true);
-  }, [storageKey]);
+  }, [storageKey, persist]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!persist || !hydrated) return;
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(lines));
     } catch {
       /* ignore quota */
     }
-  }, [lines, storageKey, hydrated]);
+  }, [lines, storageKey, hydrated, persist]);
 
   const add = useCallback((product: StoreCatalogProduct, qty = 1) => {
     setLines((prev) => {
