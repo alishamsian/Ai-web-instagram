@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { ImportProgress } from "@/components/import/ImportProgress";
+import { PostCountStep } from "@/components/import/PostCountStep";
 import { InstagramInput } from "@/components/landing/InstagramInput";
 import { IconInstagram } from "@/components/icons";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ function importStartCache() {
 
 export function CreateClient({
   locale,
-  maxPosts = 10,
+  maxPosts = 12,
 }: {
   locale: Locale;
   maxPosts?: number;
@@ -189,6 +190,21 @@ export function CreateClient({
     );
   }
 
+  // URL ready → ask for post count on its own step (not in the URL field).
+  if (url && !hasPostsChoice && !error) {
+    return (
+      <CreateShell>
+        <PostCountStep
+          dict={dict}
+          locale={locale}
+          url={url}
+          maxPosts={maxPosts}
+          forceRefresh={forceRefresh}
+        />
+      </CreateShell>
+    );
+  }
+
   return (
     <CreateShell>
       <div className="relative mx-auto max-w-[720px] text-center">
@@ -213,10 +229,10 @@ export function CreateClient({
           className="relative mt-4 font-display tracking-[-0.04em]"
         >
           <span className="block text-[clamp(2rem,6vw,3.5rem)] leading-[1.08] text-foreground-secondary">
-            {url && !hasPostsChoice ? dict.create.postsTitle : dict.create.line1}
+            {dict.create.line1}
           </span>
           <span className="mt-1 block text-[clamp(2rem,6vw,3.5rem)] leading-[1.08] text-foreground md:mt-2">
-            {url && !hasPostsChoice ? dict.create.postsSubtitle : dict.create.line2}
+            {dict.create.line2}
           </span>
         </motion.h1>
 
@@ -226,7 +242,7 @@ export function CreateClient({
           transition={{ delay: reduce ? 0 : 0.12, duration: 0.45 }}
           className="relative mx-auto mt-5 max-w-lg text-pretty text-[15px] leading-7 text-foreground-muted md:mt-6 md:text-[16px] md:leading-8"
         >
-          {url && !hasPostsChoice ? dict.create.postsBody : dict.create.body}
+          {dict.create.body}
         </motion.p>
 
         <motion.div
@@ -239,7 +255,6 @@ export function CreateClient({
             dict={dict}
             locale={locale}
             defaultValue={url}
-            maxPosts={maxPosts}
             ctaLabel={dict.hero.cta}
           />
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12px] text-foreground-muted md:text-[13px]">
@@ -251,22 +266,20 @@ export function CreateClient({
               {dict.create.sites}
             </Link>
           </div>
-          {!url ? (
-            <ol className="mt-6 grid gap-2 text-start text-[12px] text-foreground-muted sm:grid-cols-3">
-              <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
-                <span className="font-medium text-foreground-secondary">1.</span>{" "}
-                {locale === "fa" ? "ورود پیج اینستاگرام" : "Enter Instagram"}
-              </li>
-              <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
-                <span className="font-medium text-foreground-secondary">2.</span>{" "}
-                {locale === "fa" ? "نرمال‌سازی محتوا" : "Normalize content"}
-              </li>
-              <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
-                <span className="font-medium text-foreground-secondary">3.</span>{" "}
-                {locale === "fa" ? "باز شدن ادیتور" : "Open the editor"}
-              </li>
-            </ol>
-          ) : null}
+          <ol className="mt-6 grid gap-2 text-start text-[12px] text-foreground-muted sm:grid-cols-3">
+            <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+              <span className="font-medium text-foreground-secondary">1.</span>{" "}
+              {locale === "fa" ? "ورود پیج اینستاگرام" : "Enter Instagram"}
+            </li>
+            <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+              <span className="font-medium text-foreground-secondary">2.</span>{" "}
+              {locale === "fa" ? "انتخاب تعداد پست" : "Choose post count"}
+            </li>
+            <li className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+              <span className="font-medium text-foreground-secondary">3.</span>{" "}
+              {locale === "fa" ? "باز شدن ادیتور" : "Open the editor"}
+            </li>
+          </ol>
         </motion.div>
 
         {error ? (

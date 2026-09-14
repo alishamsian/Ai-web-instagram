@@ -25,7 +25,7 @@ describe("honest catalog", () => {
 describe("plan limits", () => {
   it("free plan is capped to four sites and ten import posts", () => {
     expect(planLimits("free").maxWebsites).toBe(4);
-    expect(planLimits("free").maxImportPosts).toBe(10);
+    expect(planLimits("free").maxImportPosts).toBe(12);
     expect(planLimits("free").customDomain).toBe(false);
     expect(planLimits("pro").maxImportPosts).toBe(50);
     expect(planLimits("pro").customDomain).toBe(true);

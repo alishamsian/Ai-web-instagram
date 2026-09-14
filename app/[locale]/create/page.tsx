@@ -4,6 +4,7 @@ import { HeroAtmosphere } from "@/components/landing/HeroAtmosphere";
 import { MarketingThemeProvider } from "@/components/landing/MarketingTheme";
 import { Navbar } from "@/components/landing/Navbar";
 import { getSession } from "@/lib/auth/session";
+import { IMPORT_POSTS_HARD_MAX } from "@/lib/config/import";
 import { planLimits } from "@/lib/config/plans";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { parseLocale } from "@/lib/i18n/paths";
@@ -16,7 +17,10 @@ export default async function CreatePage({
   const locale = parseLocale((await params).locale);
   const dict = getDictionary(locale);
   const session = await getSession();
-  const maxPosts = planLimits(session?.workspace.plan).maxImportPosts;
+  const maxPosts = Math.min(
+    planLimits(session?.workspace.plan).maxImportPosts,
+    IMPORT_POSTS_HARD_MAX,
+  );
 
   return (
     <MarketingThemeProvider>

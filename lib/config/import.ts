@@ -1,12 +1,20 @@
 import { planLimits, type PlanId } from "@/lib/config/plans";
 
+/** Absolute product ceiling — never scrape more than this. */
+export const IMPORT_POSTS_ABSOLUTE_MAX = 50;
+
 /**
- * Absolute ceiling for any import (env override, still plan-capped at call sites).
- * Override with IMPORT_POSTS_LIMIT in .env.local (1–50).
+ * Server-enforced ceiling for any import (still plan-capped at call sites).
+ * Set IMPORT_POSTS_LIMIT in env only to lower cost/ops caps (1–50).
+ * This value is NOT available on the client — pass maxPosts from the server.
  */
 export const IMPORT_POSTS_HARD_MAX = Math.max(
   1,
-  Math.min(50, Number(process.env.IMPORT_POSTS_LIMIT ?? 50) || 50),
+  Math.min(
+    IMPORT_POSTS_ABSOLUTE_MAX,
+    Number(process.env.IMPORT_POSTS_LIMIT ?? IMPORT_POSTS_ABSOLUTE_MAX) ||
+      IMPORT_POSTS_ABSOLUTE_MAX,
+  ),
 );
 
 /** Default suggestion when the user hasn't chosen yet. */

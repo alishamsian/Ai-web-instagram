@@ -25,7 +25,7 @@ describe("dashboard smoke — core happy path helpers", () => {
 
   it("keeps free/pro plan gates honest", () => {
     expect(planLimits("free").maxWebsites).toBe(4);
-    expect(planLimits("free").maxImportPosts).toBe(10);
+    expect(planLimits("free").maxImportPosts).toBe(12);
     expect(planLimits("free").customDomain).toBe(false);
     expect(isProPlan("pro")).toBe(true);
     expect(isProPlan("free")).toBe(false);

@@ -55,6 +55,7 @@ export const fa = {
     postsTitle: "تعداد پست‌ها.",
     postsSubtitle: "قبل از ساخت انتخاب کن.",
     postsBody: "هرچه پست بیشتری بخوانیم، محصولات و گالری غنی‌تر می‌شود — ولی ساخت کمی بیشتر طول می‌کشد.",
+    postsContinue: "شروع ساخت سایت",
     steps: [
       { n: "۰۱", label: "لینک" },
       { n: "۰۲", label: "فهم" },
@@ -793,6 +794,7 @@ export const en: Dictionary = {
     postsTitle: "Post count.",
     postsSubtitle: "Choose before we build.",
     postsBody: "More posts mean a richer catalog and gallery — and a slightly longer build.",
+    postsContinue: "Build my website",
     steps: [
       { n: "01", label: "Link" },
       { n: "02", label: "Read" },

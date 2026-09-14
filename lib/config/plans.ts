@@ -4,7 +4,7 @@ export type PlanId = "free" | "pro";
 export const PLAN_LIMITS = {
   free: {
     maxWebsites: 4,
-    maxImportPosts: 10,
+    maxImportPosts: 12,
     customDomain: false,
     removeBranding: false,
     analytics: true, // basic pageviews for everyone

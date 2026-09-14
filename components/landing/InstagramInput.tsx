@@ -6,48 +6,28 @@ import { cn } from "@/lib/utils";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 import { InstagramUrlError, normalizeInstagramUrl } from "@/lib/instagram/url";
-import {
-  IMPORT_POSTS_DEFAULT,
-  importPostChoices,
-} from "@/lib/config/import";
 
 /**
- * Single dark control: label + URL field + post count + CTA.
+ * URL-only entry. Post count is chosen on the create step after submit.
  */
 export function InstagramInput({
   dict,
   locale,
   className,
   defaultValue = "",
-  defaultPosts,
-  maxPosts = 10,
   ctaLabel,
 }: {
   dict: Dictionary;
   locale: Locale;
   className?: string;
   defaultValue?: string;
-  defaultPosts?: number;
-  /** Plan ceiling — free is 10. */
-  maxPosts?: number;
   ctaLabel?: string;
 }) {
-  const choices = importPostChoices(maxPosts);
-  const initialPosts = Math.min(
-    defaultPosts && choices.includes(defaultPosts)
-      ? defaultPosts
-      : IMPORT_POSTS_DEFAULT,
-    maxPosts,
-  );
   const [value, setValue] = useState(defaultValue);
-  const [posts, setPosts] = useState(
-    choices.includes(initialPosts) ? initialPosts : choices[0]!,
-  );
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
   const inputId = useId();
-  const postsId = useId();
   const errorId = useId();
   const Arrow = forwardArrow(locale);
 
@@ -91,7 +71,7 @@ export function InstagramInput({
 
       <div
         className={cn(
-          "flex flex-col overflow-hidden rounded-xl border bg-[#0a0a0a]",
+          "flex overflow-hidden rounded-xl border bg-[#0a0a0a]",
           "transition-[border-color,box-shadow] duration-150",
           error
             ? "border-[#ff6b57] shadow-[0_0_0_3px_rgba(255,107,87,0.18)]"
@@ -100,7 +80,7 @@ export function InstagramInput({
               : "border-[#2a2a2e] hover:border-[#3a3a40]",
         )}
       >
-        <div className="flex h-12 min-w-0 items-center gap-2.5 px-3.5 sm:h-[3.25rem] sm:px-4">
+        <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 px-3.5 sm:h-[3.25rem] sm:px-4">
           <IconInstagram
             size={18}
             className="shrink-0 text-[#a0a0a8]"
@@ -135,47 +115,12 @@ export function InstagramInput({
           />
         </div>
 
-        <div className="border-t border-[#2a2a2e] px-3.5 py-3 sm:px-4">
-          <label
-            htmlFor={postsId}
-            className="mb-2 block text-start text-[12px] font-medium text-[#a0a0a8]"
-          >
-            {dict.create.postsLabel}
-          </label>
-          <input type="hidden" name="posts" value={posts} />
-          <div
-            id={postsId}
-            role="group"
-            aria-label={dict.create.postsLabel}
-            className="flex flex-wrap gap-1.5"
-          >
-            {choices.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setPosts(n)}
-                className={cn(
-                  "min-h-10 min-w-10 rounded-lg px-3 text-[13px] font-semibold tabular-nums transition",
-                  posts === n
-                    ? "bg-[#ff6b57] text-[#080808]"
-                    : "bg-[#161618] text-[#c8c8ce] ring-1 ring-[#2a2a2e] hover:ring-[#3a3a40]",
-                )}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2 text-start text-[11px] leading-4 text-[#7a7a84]">
-            {dict.create.postsHint.replace("{max}", String(maxPosts))}
-          </p>
-        </div>
-
         <button
           type="submit"
           disabled={loading}
           aria-busy={loading || undefined}
           className={cn(
-            "inline-flex h-12 shrink-0 items-center justify-center gap-2 border-t border-[#2a2a2e] px-5",
+            "inline-flex h-12 shrink-0 items-center justify-center gap-2 border-s border-[#2a2a2e] px-4 sm:h-[3.25rem] sm:px-5",
             "bg-[#ff6b57] text-[14px] font-semibold text-[#080808]",
             "transition-[filter,opacity] duration-150 hover:brightness-110",
             "disabled:pointer-events-none disabled:opacity-70",
@@ -188,11 +133,11 @@ export function InstagramInput({
                 className="size-3.5 animate-spin rounded-full border-2 border-[#080808]/25 border-t-[#080808]"
                 aria-hidden
               />
-              {dict.hero.building}
+              <span className="hidden sm:inline">{dict.hero.building}</span>
             </>
           ) : (
             <>
-              {ctaLabel ?? dict.hero.cta}
+              <span className="hidden sm:inline">{ctaLabel ?? dict.hero.cta}</span>
               <Arrow size={15} data-arrow aria-hidden />
             </>
           )}
