@@ -27,18 +27,22 @@ export default async function AdminLayout({
   }
 
   return (
-    <Suspense fallback={<AdminLoadingState rows={6} />}>
-      <AdminShell
-        locale={locale}
-        role={actor.role}
-        email={session.user.email}
-        breadcrumbs={[
-          { label: locale === "fa" ? "ادمین" : "Admin", href: `/${locale}/admin/dashboard` },
-          { label: locale === "fa" ? "کنسول" : "Console" },
-        ]}
-      >
-        {children}
-      </AdminShell>
-    </Suspense>
+    // Suspense only around the shell chrome (useSearchParams in topbar).
+    // Do NOT wrap {children} here — remounting the whole tree on every
+    // suspended child caused repeated dashboard RSC fetches / stream aborts.
+    <AdminShell
+      locale={locale}
+      role={actor.role}
+      email={session.user.email}
+      breadcrumbs={[
+        {
+          label: locale === "fa" ? "ادمین" : "Admin",
+          href: `/${locale}/admin/dashboard`,
+        },
+        { label: locale === "fa" ? "کنسول" : "Console" },
+      ]}
+    >
+      <Suspense fallback={<AdminLoadingState rows={6} />}>{children}</Suspense>
+    </AdminShell>
   );
 }

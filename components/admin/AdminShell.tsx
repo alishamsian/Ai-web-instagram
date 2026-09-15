@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopbar } from "@/components/admin/AdminTopbar";
 import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
@@ -22,23 +22,22 @@ export function AdminShell({
   children: ReactNode;
 }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [themeReady, setThemeReady] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [loadedAt] = useState(() => new Date().toISOString());
 
   useEffect(() => {
     const stored = window.localStorage.getItem("vitrin-admin-theme");
     if (stored === "dark" || stored === "light") {
-      setTheme(stored);
+      setTheme((prev) => (prev === stored ? prev : stored));
     }
+    setThemeReady(true);
   }, []);
 
   useEffect(() => {
-    // Persist only after mount hydration so we don't overwrite stored preference.
-    const frame = window.requestAnimationFrame(() => {
-      window.localStorage.setItem("vitrin-admin-theme", theme);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [theme]);
+    if (!themeReady) return;
+    window.localStorage.setItem("vitrin-admin-theme", theme);
+  }, [theme, themeReady]);
 
   const freshnessLabel =
     locale === "fa"
@@ -52,18 +51,24 @@ export function AdminShell({
     >
       <AdminSidebar locale={locale} role={role} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar
-          locale={locale}
-          role={role}
-          email={email}
-          theme={theme}
-          onToggleTheme={() =>
-            setTheme((t) => (t === "dark" ? "light" : "dark"))
+        <Suspense
+          fallback={
+            <div className="h-[73px] border-b border-[var(--admin-border)]" />
           }
-          onOpenCommand={() => setCommandOpen(true)}
-          freshnessLabel={freshnessLabel}
-          breadcrumbs={breadcrumbs}
-        />
+        >
+          <AdminTopbar
+            locale={locale}
+            role={role}
+            email={email}
+            theme={theme}
+            onToggleTheme={() =>
+              setTheme((t) => (t === "dark" ? "light" : "dark"))
+            }
+            onOpenCommand={() => setCommandOpen(true)}
+            freshnessLabel={freshnessLabel}
+            breadcrumbs={breadcrumbs}
+          />
+        </Suspense>
         <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
       </div>
       <AdminCommandPalette
