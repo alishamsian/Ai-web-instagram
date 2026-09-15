@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { TurnstileField } from "@/components/auth/TurnstileField";
-import { safeAuthNext } from "@/lib/auth/redirect";
+import { resolvePostLoginPath, safeAuthNext } from "@/lib/auth/redirect";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 
@@ -28,7 +28,8 @@ export function AuthForm({
 }) {
   const router = useRouter();
   const search = useSearchParams();
-  const next = safeAuthNext(search.get("next"), locale);
+  const rawNext = search.get("next");
+  const next = safeAuthNext(rawNext, locale);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [pending, setPending] = useState(false);
@@ -81,6 +82,7 @@ export function AuthForm({
     const payload = (await response.json().catch(() => ({}))) as {
       error?: string;
       message?: string;
+      isAdmin?: boolean;
     };
 
     if (response.status === 202 && payload.error === "CONFIRM_EMAIL") {
@@ -109,7 +111,15 @@ export function AuthForm({
       }
       return;
     }
-    router.replace(next);
+    const destination =
+      mode === "login"
+        ? resolvePostLoginPath({
+            locale,
+            rawNext,
+            isAdmin: Boolean(payload.isAdmin),
+          })
+        : next;
+    router.replace(destination);
     router.refresh();
   }
 

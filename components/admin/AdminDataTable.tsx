@@ -20,6 +20,7 @@ export function AdminDataTable<T extends { id: string }>({
   emptyBody,
   pageSize = 20,
   locale,
+  onRowClick,
 }: {
   rows: T[];
   columns: AdminColumn<T>[];
@@ -28,6 +29,7 @@ export function AdminDataTable<T extends { id: string }>({
   emptyBody?: string;
   pageSize?: number;
   locale: "fa" | "en";
+  onRowClick?: (row: T) => void;
 }) {
   const [query, setQuery] = useState("");
   const [sortId, setSortId] = useState<string | null>(null);
@@ -137,7 +139,22 @@ export function AdminDataTable<T extends { id: string }>({
             {pageRows.map((row) => (
               <tr
                 key={row.id}
-                className="border-b border-[var(--admin-border)]/70 last:border-0 hover:bg-[var(--admin-muted-bg)]/60"
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onRowClick(row);
+                        }
+                      }
+                    : undefined
+                }
+                tabIndex={onRowClick ? 0 : undefined}
+                className={cn(
+                  "border-b border-[var(--admin-border)]/70 last:border-0 hover:bg-[var(--admin-muted-bg)]/60",
+                  onRowClick && "cursor-pointer",
+                )}
               >
                 {columns.map((col) => (
                   <td

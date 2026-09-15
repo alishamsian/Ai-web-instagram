@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validatePasswordStrength } from "@/lib/auth/password";
-import { safeAuthNext } from "@/lib/auth/redirect";
+import { resolvePostLoginPath, safeAuthNext } from "@/lib/auth/redirect";
 import { consumeRateLimit } from "@/lib/auth/rate-limit";
 
 describe("auth password rules", () => {
@@ -27,6 +27,27 @@ describe("safeAuthNext", () => {
     expect(safeAuthNext("https://evil.com", "fa")).toBe("/fa/dashboard");
     expect(safeAuthNext("/fa/editor/x", "fa")).toBe("/fa/editor/x");
     expect(safeAuthNext("/fa/reset-password", "fa")).toBe("/fa/reset-password");
+  });
+});
+
+describe("resolvePostLoginPath", () => {
+  it("sends admins to founder console by default", () => {
+    expect(
+      resolvePostLoginPath({ locale: "fa", isAdmin: true }),
+    ).toBe("/fa/admin/dashboard");
+    expect(
+      resolvePostLoginPath({ locale: "en", isAdmin: false }),
+    ).toBe("/en/dashboard");
+  });
+
+  it("honors an explicit next for admins", () => {
+    expect(
+      resolvePostLoginPath({
+        locale: "fa",
+        isAdmin: true,
+        rawNext: "/fa/dashboard/settings",
+      }),
+    ).toBe("/fa/dashboard/settings");
   });
 });
 

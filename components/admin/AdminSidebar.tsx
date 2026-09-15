@@ -75,6 +75,7 @@ export function AdminSidebar({
                   <li key={item.id}>
                     <Link
                       href={href}
+                      prefetch={false}
                       title={item.label[locale]}
                       className={cn(
                         "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors",
@@ -123,6 +124,7 @@ export function AdminSidebar({
         )}
         <Link
           href={`/${locale}/dashboard`}
+          prefetch={false}
           className={cn(
             "mt-2 flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-[var(--admin-muted)] hover:bg-[var(--admin-muted-bg)] hover:text-[var(--admin-fg)]",
             collapsed && "justify-center",

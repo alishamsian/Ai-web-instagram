@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { TurnstileField } from "@/components/auth/TurnstileField";
+import { resolvePostLoginPath } from "@/lib/auth/redirect";
 import type { Dictionary } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/config/env";
 
@@ -52,6 +53,7 @@ export function ResetPasswordForm({
     const payload = (await response.json().catch(() => ({}))) as {
       error?: string;
       message?: string;
+      isAdmin?: boolean;
     };
     if (!response.ok) {
       if (payload.error === "WEAK_PASSWORD") {
@@ -65,7 +67,12 @@ export function ResetPasswordForm({
       }
       return;
     }
-    router.replace(`/${locale}/dashboard`);
+    router.replace(
+      resolvePostLoginPath({
+        locale,
+        isAdmin: Boolean(payload.isAdmin),
+      }),
+    );
     router.refresh();
   }
 

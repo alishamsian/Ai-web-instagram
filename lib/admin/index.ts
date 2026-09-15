@@ -139,3 +139,30 @@ export {
   getAdminMetricSeries,
 } from "@/lib/admin/queries";
 export { requireAdminPage, getAdminPageActor } from "@/lib/admin/gate";
+export {
+  getAdminUsersEnriched,
+  getAdminUser360,
+  getAdminWorkspacesEnriched,
+  getAdminWebsitesEnriched,
+  getAdminDomainsList,
+  getAdminMediaList,
+  getAdminContentList,
+  getAdminPublishingList,
+  getAdminSubscriptionsView,
+  getAdminAIBreakdown,
+  getAdminProductAnalytics,
+  getAdminFunnelView,
+  getAdminIncidents,
+  getAdminAtRiskWorkspaces,
+  searchAdminEntities,
+} from "@/lib/admin/phase3-queries";
+export {
+  createAdminSupportNote,
+  createAdminIncident,
+  updateAdminIncidentStatus,
+  retryAdminImportJob,
+} from "@/lib/admin/phase3-actions";
+export {
+  assessWorkspaceHealth,
+  assessWebsiteHealth,
+} from "@/lib/admin/health";

@@ -1,8 +1,16 @@
+import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin/gate";
-import { getAdminWebsites } from "@/lib/admin/queries";
-import { AdminPageHeader, AdminStatusBadge } from "@/components/admin/primitives";
+import { getAdminWebsitesEnriched } from "@/lib/admin/phase3-queries";
+import {
+  AdminPageHeader,
+  AdminSection,
+  AdminStatusBadge,
+} from "@/components/admin/primitives";
+import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
+import { HealthBadge } from "@/components/admin/phase3/HealthBadge";
 import { relativeTime } from "@/components/admin/format";
+import { adminHref } from "@/components/admin/nav";
 
 export default async function AdminWebsitesPage({
   params,
@@ -11,34 +19,65 @@ export default async function AdminWebsitesPage({
 }) {
   const { locale: raw } = await params;
   const { locale, userId } = await requireAdminPage(raw, "websites.read");
-  const websites = await getAdminWebsites({ userId, limit: 100 });
-  const rows = websites.map((w) => ({
-    id: w.id as string,
-    slug: (w.slug as string) ?? "",
-    status: (w.status as string) ?? "",
-    version: Number(w.version ?? 0),
-    updated_at: w.updated_at as string,
-  }));
+  const { metrics, rows } = await getAdminWebsitesEnriched({
+    userId,
+    limit: 100,
+  });
+  const isFa = locale === "fa";
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader title={locale === "fa" ? "سایت‌ها" : "Websites"} />
+      <AdminPageHeader title={isFa ? "سایت‌ها" : "Websites"} />
+      <AdminSection>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminMetricCard label={isFa ? "کل" : "Total"} metric={metrics.total} />
+          <AdminMetricCard
+            label={isFa ? "منتشر" : "Published"}
+            metric={metrics.published}
+          />
+          <AdminMetricCard
+            label={isFa ? "پیش‌نویس" : "Unpublished"}
+            metric={metrics.unpublished}
+          />
+          <AdminMetricCard
+            label={isFa ? "دامین" : "With domain"}
+            metric={metrics.withDomain}
+          />
+        </div>
+      </AdminSection>
       <AdminDataTable
         locale={locale}
         rows={rows}
-        searchPlaceholder={locale === "fa" ? "جستجوی slug…" : "Search slug…"}
-        emptyTitle={locale === "fa" ? "سایتی نیست" : "No websites"}
+        searchPlaceholder="slug…"
+        emptyTitle={isFa ? "سایتی نیست" : "No websites"}
         columns={[
           {
             id: "slug",
             header: "Slug",
             sortValue: (r) => r.slug,
-            cell: (r) => r.slug,
+            cell: (r) => (
+              <div>
+                <p className="font-medium">{r.slug}</p>
+                <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
+                  <Link
+                    href={`/${locale}/editor/${r.id}`}
+                    className="underline-offset-2 hover:underline"
+                  >
+                    Editor
+                  </Link>
+                  <Link
+                    href={`${adminHref(locale, "/workspaces")}?focus=${r.workspaceId}`}
+                    className="underline-offset-2 hover:underline"
+                  >
+                    Workspace
+                  </Link>
+                </div>
+              </div>
+            ),
           },
           {
             id: "status",
             header: "Status",
-            sortValue: (r) => r.status,
             cell: (r) => (
               <AdminStatusBadge
                 tone={r.status === "published" ? "success" : "neutral"}
@@ -48,16 +87,26 @@ export default async function AdminWebsitesPage({
             ),
           },
           {
-            id: "version",
-            header: "Ver",
-            sortValue: (r) => r.version,
-            cell: (r) => r.version,
+            id: "domain",
+            header: "Domain",
+            cell: (r) => r.domainHost ?? "—",
+          },
+          {
+            id: "views",
+            header: "Views",
+            sortValue: (r) => r.pageViews ?? 0,
+            cell: (r) => r.pageViews ?? 0,
+          },
+          {
+            id: "health",
+            header: isFa ? "سلامت" : "Health",
+            cell: (r) => <HealthBadge health={r.health} locale={locale} />,
           },
           {
             id: "updated",
-            header: locale === "fa" ? "به‌روز" : "Updated",
-            sortValue: (r) => r.updated_at,
-            cell: (r) => relativeTime(r.updated_at, locale),
+            header: isFa ? "به‌روز" : "Updated",
+            sortValue: (r) => r.updatedAt,
+            cell: (r) => relativeTime(r.updatedAt, locale),
           },
         ]}
       />

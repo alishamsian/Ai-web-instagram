@@ -6,6 +6,8 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { AdminLoadingState } from "@/components/admin/primitives";
 import { parseLocale } from "@/lib/i18n/paths";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({
   children,
   params,

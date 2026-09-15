@@ -17,6 +17,7 @@ import {
   resetRateLimits,
 } from "@/lib/auth/rate-limit";
 import { verifyTurnstile } from "@/lib/auth/turnstile";
+import { resolveAdminActor } from "@/lib/admin/rbac";
 
 // Local/dev: clear stale buckets whenever this module reloads.
 if (process.env.NODE_ENV !== "production") {
@@ -119,7 +120,11 @@ export async function POST(request: Request) {
         { status: result.code === "UNAUTHORIZED" ? 401 : 400 },
       );
     }
-    return NextResponse.json({ user: result.session.user });
+    const adminActor = await resolveAdminActor(result.session.user.id);
+    return NextResponse.json({
+      user: result.session.user,
+      isAdmin: Boolean(adminActor),
+    });
   }
 
   const email = body.email?.trim().toLowerCase();
@@ -190,7 +195,11 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
-    return NextResponse.json({ user: result.session.user });
+    const adminActor = await resolveAdminActor(result.session.user.id);
+    return NextResponse.json({
+      user: result.session.user,
+      isAdmin: Boolean(adminActor),
+    });
   } catch (error) {
     console.error("[auth] login", error);
     return NextResponse.json(

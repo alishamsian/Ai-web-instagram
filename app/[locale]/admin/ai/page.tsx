@@ -1,5 +1,6 @@
 import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminAIUsage, getAdminMetricSeries } from "@/lib/admin/queries";
+import { getAdminAIBreakdown } from "@/lib/admin/phase3-queries";
 import {
   AdminPageHeader,
   AdminSection,
@@ -19,9 +20,10 @@ export default async function AdminAIPage({
   const sp = await searchParams;
   const { locale, userId } = await requireAdminPage(raw, "ai.read");
   const preset = (sp.range as DateRangePreset) || "30d";
-  const [ai, series] = await Promise.all([
+  const [ai, series, breakdown] = await Promise.all([
     getAdminAIUsage({ userId, preset }),
     getAdminMetricSeries({ userId, preset, column: "ai_requests" }),
+    getAdminAIBreakdown({ userId, preset }),
   ]);
 
   return (
@@ -52,6 +54,9 @@ export default async function AdminAIPage({
             label={locale === "fa" ? "میانگین تأخیر (ms)" : "Avg Latency (ms)"}
             metric={ai.avgLatencyMs}
           />
+          <AdminMetricCard label="p50 latency" metric={breakdown.latency.p50} />
+          <AdminMetricCard label="p95 latency" metric={breakdown.latency.p95} />
+          <AdminMetricCard label="p99 latency" metric={breakdown.latency.p99} />
         </div>
       </AdminSection>
       <AdminLineChart

@@ -31,3 +31,26 @@ export function safeAuthNext(
   if (!allowed) return fallback;
   return value;
 }
+
+/** Default home for staff admins after login. */
+export function adminHomePath(locale: string): string {
+  return `/${locale}/admin/dashboard`;
+}
+
+/**
+ * Choose post-login destination.
+ * Honors an explicit `next` when present; otherwise admins land in Founder Console.
+ */
+export function resolvePostLoginPath(params: {
+  locale: string;
+  rawNext?: string | null;
+  isAdmin?: boolean;
+}): string {
+  const productHome = `/${params.locale}/dashboard`;
+  const hasExplicitNext = Boolean(params.rawNext?.trim());
+  const safe = safeAuthNext(params.rawNext, params.locale);
+
+  if (hasExplicitNext) return safe;
+  if (params.isAdmin) return adminHomePath(params.locale);
+  return productHome;
+}

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { adminHref } from "@/components/admin/nav";
+import { ADMIN_NAV, adminHref } from "@/components/admin/nav";
 import type { Locale } from "@/lib/config/env";
 
 type CmdItem = {
@@ -13,6 +13,14 @@ type CmdItem = {
   href: string;
   group: string;
   keywords?: string;
+};
+
+type SearchHit = {
+  type: string;
+  id: string;
+  title: string;
+  subtitle?: string;
+  href: string;
 };
 
 export function AdminCommandPalette({
@@ -28,91 +36,51 @@ export function AdminCommandPalette({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  const items = useMemo<CmdItem[]>(() => {
-    const g = (fa: string, en: string) => (isFa ? fa : en);
-    return [
-      {
-        id: "dash",
-        label: g("داشبورد", "Dashboard"),
-        href: adminHref(locale, "/dashboard"),
-        group: g("ناوبری", "Navigate"),
-        keywords: "home founder",
-      },
-      {
-        id: "users",
-        label: g("کاربران", "Users"),
-        href: adminHref(locale, "/users"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "workspaces",
-        label: g("ورک‌اسپیس‌ها", "Workspaces"),
-        href: adminHref(locale, "/workspaces"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "websites",
-        label: g("سایت‌ها", "Websites"),
-        href: adminHref(locale, "/websites"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "imports",
-        label: g("ایمپورت‌ها", "Imports"),
-        href: adminHref(locale, "/imports"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "jobs",
-        label: g("جاب‌ها", "Jobs"),
-        href: adminHref(locale, "/jobs"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "orders",
-        label: g("سفارش‌ها", "Orders"),
-        href: adminHref(locale, "/orders"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "ai",
-        label: g("هوش مصنوعی", "AI"),
-        href: adminHref(locale, "/ai"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "audit",
-        label: g("ممیزی", "Audit"),
-        href: adminHref(locale, "/audit"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "system",
-        label: g("سلامت سیستم", "System health"),
-        href: adminHref(locale, "/system"),
-        group: g("ناوبری", "Navigate"),
-      },
-      {
-        id: "export",
-        label: g("خروجی داده — فاز بعد", "Export data — later phase"),
-        href: adminHref(locale, "/settings"),
-        group: g("اقدامات", "Actions"),
-        keywords: "export",
-      },
-    ];
+  const navItems = useMemo<CmdItem[]>(() => {
+    return ADMIN_NAV.flatMap((group) =>
+      group.items
+        .filter((item) => !item.comingSoon)
+        .map((item) => ({
+          id: `nav-${item.id}`,
+          label: isFa ? item.label.fa : item.label.en,
+          href: adminHref(locale, item.href),
+          group: isFa ? group.label.fa : group.label.en,
+          keywords: item.id,
+        })),
+    );
   }, [isFa, locale]);
 
-  const filtered = useMemo(() => {
+  const filteredNav = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        item.keywords?.toLowerCase().includes(q) ||
-        item.group.toLowerCase().includes(q),
-    );
-  }, [items, query]);
+    if (!q) return navItems.slice(0, 12);
+    return navItems
+      .filter(
+        (item) =>
+          item.label.toLowerCase().includes(q) ||
+          item.keywords?.toLowerCase().includes(q) ||
+          item.group.toLowerCase().includes(q),
+      )
+      .slice(0, 10);
+  }, [navItems, query]);
+
+  const entityItems = useMemo<CmdItem[]>(
+    () =>
+      hits.map((h) => ({
+        id: `hit-${h.type}-${h.id}`,
+        label: h.subtitle ? `${h.title} — ${h.subtitle}` : h.title,
+        href: h.href,
+        group: h.type,
+      })),
+    [hits],
+  );
+
+  const filtered = useMemo(
+    () => [...entityItems, ...filteredNav],
+    [entityItems, filteredNav],
+  );
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -120,15 +88,60 @@ export function AdminCommandPalette({
         e.preventDefault();
         onOpenChange(!open);
       }
-      if (e.key === "Escape") onOpenChange(false);
+      if (e.key === "Escape" && open) onOpenChange(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onOpenChange]);
 
   useEffect(() => {
+    if (!open) return;
     setActive(0);
-  }, [query, open]);
+  }, [query, open, filtered.length]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const q = query.trim();
+    if (q.length < 2) {
+      setHits((prev) => (prev.length === 0 ? prev : []));
+      setSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await fetch(
+          `/api/admin/search?q=${encodeURIComponent(q)}&locale=${locale}`,
+        );
+        if (!res.ok) {
+          if (!cancelled) setHits((prev) => (prev.length === 0 ? prev : []));
+          return;
+        }
+        const payload = (await res.json()) as { hits?: SearchHit[] };
+        if (!cancelled) setHits(payload.hits ?? []);
+      } catch {
+        if (!cancelled) setHits((prev) => (prev.length === 0 ? prev : []));
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, open, locale]);
+
+  useEffect(() => {
+    if (open) return;
+    setQuery("");
+    setHits((prev) => (prev.length === 0 ? prev : []));
+    setSearching(false);
+    setActive(0);
+  }, [open]);
 
   if (!open) return null;
 
@@ -150,7 +163,7 @@ export function AdminCommandPalette({
     >
       <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-card)] shadow-[var(--admin-elevated)]">
         <div className="flex items-center gap-2 border-b border-[var(--admin-border)] px-3">
-          <Search className="size-4 text-[var(--admin-muted)]" />
+          <Search className="size-4 text-[var(--admin-muted)]" aria-hidden />
           <input
             autoFocus
             value={query}
@@ -158,7 +171,9 @@ export function AdminCommandPalette({
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setActive((a) => Math.min(a + 1, filtered.length - 1));
+                setActive((a) =>
+                  Math.min(a + 1, Math.max(filtered.length - 1, 0)),
+                );
               } else if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setActive((a) => Math.max(a - 1, 0));
@@ -168,12 +183,25 @@ export function AdminCommandPalette({
               }
             }}
             placeholder={
-              isFa ? "جستجوی کاربران، سایت‌ها، جاب‌ها…" : "Search users, sites, jobs…"
+              isFa
+                ? "جستجوی کاربران، سایت‌ها، جاب‌ها…"
+                : "Search users, sites, jobs…"
             }
             className="h-12 w-full bg-transparent text-sm text-[var(--admin-fg)] outline-none placeholder:text-[var(--admin-muted)]"
+            aria-autocomplete="list"
+            aria-controls="admin-command-results"
           />
         </div>
-        <ul className="max-h-80 overflow-y-auto p-2" role="listbox">
+        <ul
+          id="admin-command-results"
+          className="max-h-80 overflow-y-auto p-2"
+          role="listbox"
+        >
+          {searching ? (
+            <li className="px-3 py-4 text-center text-xs text-[var(--admin-muted)]">
+              {isFa ? "جستجو…" : "Searching…"}
+            </li>
+          ) : null}
           {filtered.length === 0 ? (
             <li className="px-3 py-6 text-center text-xs text-[var(--admin-muted)]">
               {isFa ? "نتیجه‌ای نیست" : "No results"}

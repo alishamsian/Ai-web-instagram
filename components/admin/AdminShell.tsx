@@ -27,11 +27,17 @@ export function AdminShell({
 
   useEffect(() => {
     const stored = window.localStorage.getItem("vitrin-admin-theme");
-    if (stored === "dark" || stored === "light") setTheme(stored);
+    if (stored === "dark" || stored === "light") {
+      setTheme(stored);
+    }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("vitrin-admin-theme", theme);
+    // Persist only after mount hydration so we don't overwrite stored preference.
+    const frame = window.requestAnimationFrame(() => {
+      window.localStorage.setItem("vitrin-admin-theme", theme);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [theme]);
 
   const freshnessLabel =
