@@ -1,15 +1,7 @@
 import { requireAdminPage } from "@/lib/admin/gate";
-import {
-  getAdminActivity,
-  getAdminAIUsage,
-  getAdminAlerts,
-  getAdminDashboardMetrics,
-  getAdminImportMetrics,
-  getAdminMetricSeries,
-  getAdminSystemHealth,
-} from "@/lib/admin/queries";
+import { getAdminDashboardKpisLite } from "@/lib/admin/dashboard-lite";
 import { getAdminDashboardSystemStrip } from "@/lib/admin/dashboard-strip";
-import { FounderDashboard } from "@/components/admin/FounderDashboard";
+import { FounderDashboardLite } from "@/components/admin/FounderDashboardLite";
 import type { DateRangePreset } from "@/lib/admin/dates";
 
 export default async function AdminDashboardPage({
@@ -23,57 +15,20 @@ export default async function AdminDashboardPage({
   const sp = await searchParams;
   const { actor, locale, userId } = await requireAdminPage(raw, "system.read");
   const preset = (sp.range as DateRangePreset) || "30d";
-  const rangeInput = { userId, preset };
 
-  // Keep the Founder home fast: head-counts + lightweight strip only.
-  // Heavy AI sample scans / anomaly engine live on /ops and /ai/*.
-  const [
-    kpis,
-    ai,
-    imports,
-    health,
-    alerts,
-    activity,
-    users,
-    websites,
-    published,
-    aiSeries,
-    importSeries,
-    infra,
-  ] = await Promise.all([
-    getAdminDashboardMetrics(rangeInput),
-    getAdminAIUsage(rangeInput),
-    getAdminImportMetrics(rangeInput),
-    getAdminSystemHealth({ userId }),
-    getAdminAlerts({ userId, limit: 20 }),
-    getAdminActivity({ ...rangeInput, limit: 30 }),
-    getAdminMetricSeries({ ...rangeInput, column: "new_users" }),
-    getAdminMetricSeries({ ...rangeInput, column: "websites_created" }),
-    getAdminMetricSeries({ ...rangeInput, column: "websites_published" }),
-    getAdminMetricSeries({ ...rangeInput, column: "ai_requests" }),
-    getAdminMetricSeries({ ...rangeInput, column: "imports" }),
+  // Founder home is intentionally bounded: two server queries only.
+  // Heavy AI/activity/series analytics live on their dedicated pages.
+  const [kpis, infra] = await Promise.all([
+    getAdminDashboardKpisLite({ userId, preset }),
     getAdminDashboardSystemStrip({ userId }),
   ]);
 
   return (
-    <FounderDashboard
+    <FounderDashboardLite
       locale={locale}
       role={actor.role}
       kpis={kpis}
-      ai={ai}
-      imports={imports}
-      health={health}
-      alerts={alerts}
-      activity={activity}
-      series={{
-        users,
-        websites,
-        published,
-        ai: aiSeries,
-        imports: importSeries,
-      }}
       infra={infra}
-      timeline={undefined}
     />
   );
 }
