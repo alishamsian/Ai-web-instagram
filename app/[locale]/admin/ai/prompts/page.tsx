@@ -1,16 +1,24 @@
 import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminAIBreakdown } from "@/lib/admin/phase3-queries";
+import { roleHasPermission } from "@/lib/admin/permissions";
 import {
   AdminPageHeader,
   AdminEmptyState,
   MetricUnavailable,
 } from "@/components/admin/primitives";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
+import { PromptRegistryClient } from "@/components/admin/phase4/PromptRegistryClient";
 
-export default async function AdminAIPromptsPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function AdminAIPromptsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
   const { locale: raw } = await params;
-  const { locale, userId } = await requireAdminPage(raw, "ai.read");
+  const { actor, locale, userId } = await requireAdminPage(raw, "ai.read");
+  const isFa = locale === "fa";
   const breakdown = await getAdminAIBreakdown({ userId });
+  const canManage = roleHasPermission(actor.role, "ai.manage");
   const rows = breakdown.prompts.map((p) => ({
     id: `${p.feature}-${p.version}`,
     feature: p.feature,
@@ -18,22 +26,32 @@ export default async function AdminAIPromptsPage({ params }: { params: Promise<{
     status: p.status,
     notes: p.notes ?? "",
   }));
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title={locale === "fa" ? "رجیستری پرامپت" : "Prompt Registry"}
-        description={locale === "fa" ? "فقط متادیتا — بدون متن خام پرامپت" : "Metadata only — no raw prompt bodies"}
+        title={isFa ? "رجیستری پرامپت" : "Prompt Registry"}
+        description={
+          isFa
+            ? "فقط متادیتا — بدون متن خام پرامپت"
+            : "Metadata only — no raw prompt bodies"
+        }
       />
+      {canManage ? <PromptRegistryClient locale={locale} /> : null}
       {breakdown.promptsUnavailableReason ? (
         <MetricUnavailable
-          label={locale === "fa" ? "رجیستری در دسترس نیست" : "Registry unavailable"}
+          label={isFa ? "رجیستری در دسترس نیست" : "Registry unavailable"}
           reason={breakdown.promptsUnavailableReason}
           compact
         />
       ) : !rows.length ? (
         <AdminEmptyState
-          title={locale === "fa" ? "رجیستری خالی است" : "Registry empty"}
-          body={locale === "fa" ? "هنوز پرامپتی ثبت نشده است." : "No prompt versions registered yet."}
+          title={isFa ? "رجیستری خالی است" : "Registry empty"}
+          body={
+            isFa
+              ? "هنوز پرامپتی ثبت نشده است."
+              : "No prompt versions registered yet."
+          }
         />
       ) : (
         <AdminDataTable

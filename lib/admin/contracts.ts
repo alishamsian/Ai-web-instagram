@@ -8,7 +8,9 @@ import type { DateRange, ComparisonPeriod } from "@/lib/admin/dates";
 export type MetricAvailability =
   | "available"
   | "unavailable"
-  | "partial";
+  | "partial"
+  | "error"
+  | "insufficient_sample";
 
 export type MetricResult<T> =
   | {
@@ -26,6 +28,17 @@ export type MetricResult<T> =
       value: T;
       source: string;
       warning: string;
+    }
+  | {
+      status: "error";
+      reason: string;
+      source?: string;
+    }
+  | {
+      status: "insufficient_sample";
+      reason: string;
+      sampleSize: number;
+      source?: string;
     };
 
 export type ComparableMetric<T extends number = number> = {
@@ -120,7 +133,7 @@ export type AlertSummary = {
   id: string;
   metric: string;
   severity: "info" | "warning" | "critical";
-  status: "open" | "acknowledged" | "resolved";
+  status: "open" | "acknowledged" | "investigating" | "resolved";
   value?: number | null;
   threshold?: number | null;
   message?: string | null;

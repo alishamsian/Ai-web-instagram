@@ -1,48 +1,108 @@
 import { requireAdminPage } from "@/lib/admin/gate";
-import { getAdminJobs, getAdminSystemHealth } from "@/lib/admin/queries";
-import { AdminPageHeader, AdminSection } from "@/components/admin/primitives";
+import { getAdminQueueMetrics } from "@/lib/admin/phase4-queries";
+import {
+  AdminPageHeader,
+  AdminSection,
+  AdminCard,
+} from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
-import { relativeTime } from "@/components/admin/format";
-
-export default async function AdminQueuesPage({ params }: { params: Promise<{ locale: string }> }) {
+import { MetricCell } from "@/components/admin/phase4/MetricCell";
+export default async function AdminQueuesPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
   const { locale: raw } = await params;
   const { locale, userId } = await requireAdminPage(raw, "jobs.read");
-  const [jobs, health] = await Promise.all([
-    getAdminJobs({ userId, limit: 100 }),
-    getAdminSystemHealth({ userId }),
-  ]);
   const isFa = locale === "fa";
-  const rows = jobs.map((j) => ({
-    id: j.id as string,
-    status: (j.status as string) ?? "",
-    stage: (j.stage as string) ?? "",
-    created_at: j.created_at as string,
-  }));
+  const queues = await getAdminQueueMetrics({ userId });
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
         title={isFa ? "صف‌ها" : "Queues"}
-        description={isFa ? "در حال حاضر فقط صف import_jobs وجود دارد — نه Redis/SQS." : "Currently only import_jobs queue exists — not Redis/SQS."}
+        description={
+          isFa
+            ? "فقط صف import_jobs — نه Redis/SQS یا صف‌های ساختگی"
+            : "Only import_jobs queue — not Redis/SQS or invented queues"
+        }
       />
-      <AdminSection>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <AdminMetricCard label={isFa ? "عمق صف" : "Queue depth"} metric={health.queueDepth} />
-          <AdminMetricCard label={isFa ? "ناموفق ۲۴س" : "Failed 24h"} metric={health.failedJobs24h} />
-        </div>
+      <AdminCard>
+        <p className="text-xs text-[var(--admin-muted)]">
+          {isFa
+            ? "در این مخزن فقط import_jobs به‌عنوان صف durable worker وجود دارد."
+            : "This repository only has import_jobs as a durable worker queue."}
+        </p>
+      </AdminCard>
+      {queues.map((q) => (
+        <AdminSection key={q.id} title={q.name}>
+          <p className="mb-3 text-[11px] text-[var(--admin-muted)]">
+            {q.source}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <AdminMetricCard label={isFa ? "عمق صف" : "Queue depth"} metric={q.depth} />
+            <AdminMetricCard
+              label={isFa ? "قدیمی‌ترین (ms)" : "Oldest age (ms)"}
+              metric={q.oldestAgeMs}
+            />
+            <AdminMetricCard
+              label={isFa ? "توان ۲۴س" : "Throughput 24h"}
+              metric={q.throughput24h}
+            />
+            <AdminMetricCard
+              label={isFa ? "نرخ موفقیت" : "Success rate"}
+              metric={q.successRate}
+              style="percent"
+            />
+            <AdminMetricCard
+              label={isFa ? "نرخ خطا" : "Failure rate"}
+              metric={q.failureRate}
+              style="percent"
+            />
+            <AdminMetricCard
+              label={isFa ? "نرخ retry" : "Retry rate"}
+              metric={q.retryRate}
+              style="percent"
+            />
+          </div>
+        </AdminSection>
+      ))}
+      <AdminSection title={isFa ? "صف‌های شناخته‌شده" : "Known queues"}>
+        <AdminDataTable
+          locale={locale}
+          rows={queues}
+          searchPlaceholder="queue…"
+          emptyTitle={isFa ? "صفی نیست" : "No queues"}
+          columns={[
+            { id: "name", header: isFa ? "نام" : "Name", cell: (r) => r.name },
+            {
+              id: "depth",
+              header: isFa ? "عمق" : "Depth",
+              cell: (r) => <MetricCell metric={r.depth} />,
+            },
+            {
+              id: "throughput",
+              header: isFa ? "توان ۲۴س" : "24h throughput",
+              cell: (r) => <MetricCell metric={r.throughput24h} />,
+            },
+            {
+              id: "success",
+              header: isFa ? "موفقیت" : "Success",
+              cell: (r) => <MetricCell metric={r.successRate} style="percent" />,
+            },
+            {
+              id: "source",
+              header: "Source",
+              cell: (r) => (
+                <span className="text-xs text-[var(--admin-muted)]">
+                  {r.source}
+                </span>
+              ),
+            },
+          ]}
+        />
       </AdminSection>
-      <AdminDataTable
-        locale={locale}
-        rows={rows}
-        searchPlaceholder="status…"
-        emptyTitle={isFa ? "جابی نیست" : "No jobs"}
-        columns={[
-          { id: "id", header: "ID", cell: (r) => <span className="font-mono text-[11px]">{r.id.slice(0, 8)}…</span> },
-          { id: "status", header: "Status", cell: (r) => r.status },
-          { id: "stage", header: "Stage", cell: (r) => r.stage || "—" },
-          { id: "created", header: isFa ? "ایجاد" : "Created", sortValue: (r) => r.created_at, cell: (r) => relativeTime(r.created_at, locale) },
-        ]}
-      />
     </div>
   );
 }

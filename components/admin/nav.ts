@@ -87,11 +87,15 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: { fa: "هوش مصنوعی", en: "AI" },
     items: [
       { id: "ai", href: "/ai", label: { fa: "نمای کلی", en: "Overview" }, icon: Bot },
+      { id: "ai-requests", href: "/ai/requests", label: { fa: "درخواست‌ها", en: "Requests" }, icon: ListTodo },
       { id: "ai-usage", href: "/ai/usage", label: { fa: "مصرف", en: "Usage" }, icon: Activity },
       { id: "ai-costs", href: "/ai/costs", label: { fa: "هزینه", en: "Costs" }, icon: CreditCard },
       { id: "ai-models", href: "/ai/models", label: { fa: "مدل‌ها", en: "Models" }, icon: Bot },
+      { id: "ai-providers", href: "/ai/providers", label: { fa: "ارائه‌دهنده", en: "Providers" }, icon: Radio },
       { id: "ai-prompts", href: "/ai/prompts", label: { fa: "پرامپت‌ها", en: "Prompts" }, icon: Newspaper },
       { id: "ai-failures", href: "/ai/failures", label: { fa: "خطاها", en: "Failures" }, icon: AlertTriangle },
+      { id: "ai-latency", href: "/ai/latency", label: { fa: "تأخیر", en: "Latency" }, icon: Clock },
+      { id: "ai-anomalies", href: "/ai/anomalies", label: { fa: "ناهنجاری", en: "Anomalies" }, icon: Siren },
     ],
   },
   {
@@ -119,11 +123,13 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     id: "ops",
     label: { fa: "عملیات", en: "Operations" },
     items: [
-      { id: "errors", href: "/errors", label: { fa: "خطاها", en: "Errors" }, icon: AlertTriangle },
+      { id: "ops-overview", href: "/ops", label: { fa: "نمای کلی", en: "Overview" }, icon: HardDrive },
+      { id: "errors", href: "/errors", label: { fa: "خطاها / هشدارها", en: "Errors / Alerts" }, icon: AlertTriangle },
       { id: "queues", href: "/queues", label: { fa: "صف‌ها", en: "Queues" }, icon: ListTodo },
+      { id: "jobs", href: "/jobs", label: { fa: "جاب‌ها", en: "Jobs" }, icon: Workflow },
       { id: "webhooks", href: "/webhooks", label: { fa: "وب‌هوک", en: "Webhooks" }, icon: Webhook },
       { id: "cron", href: "/cron", label: { fa: "Cron", en: "Cron" }, icon: Clock },
-      { id: "system", href: "/system", label: { fa: "زیرساخت", en: "Infrastructure" }, icon: HardDrive },
+      { id: "system", href: "/system", label: { fa: "وابستگی‌ها", en: "Dependencies" }, icon: HardDrive },
       { id: "incidents", href: "/incidents", label: { fa: "حوادث", en: "Incidents" }, icon: Siren },
     ],
   },
@@ -142,7 +148,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: { fa: "سیستم", en: "System" },
     items: [
       { id: "settings", href: "/settings", label: { fa: "تنظیمات", en: "Settings" }, icon: Settings },
-      { id: "infra", href: "/infra", label: { fa: "Infra", en: "Infra" }, icon: HardDrive, comingSoon: true },
+      { id: "infra", href: "/infra", label: { fa: "Infra", en: "Infra" }, icon: HardDrive },
     ],
   },
 ];

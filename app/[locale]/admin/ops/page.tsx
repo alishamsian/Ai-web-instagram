@@ -3,7 +3,7 @@ import { getAdminInfrastructureOverview } from "@/lib/admin/phase4-queries";
 import { AdminPageHeader } from "@/components/admin/primitives";
 import { InfrastructureOverviewPanel } from "@/components/admin/phase4/InfrastructureOverviewPanel";
 
-export default async function AdminInfraPage({
+export default async function AdminOpsPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -16,11 +16,11 @@ export default async function AdminInfraPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title={isFa ? "زیرساخت" : "Infrastructure"}
+        title={isFa ? "عملیات" : "Operations Overview"}
         description={
           isFa
-            ? "نمای کلی از ابزار واقعی — بدون uptime یا صف‌های جعلی"
-            : "Overview from real instrumentation — no fake uptime or queues"
+            ? "وضعیت سیستم از روی ابزار واقعی — بدون uptime جعلی"
+            : "System status from real instrumentation — no fake uptime"
         }
       />
       <InfrastructureOverviewPanel locale={locale} overview={overview} />

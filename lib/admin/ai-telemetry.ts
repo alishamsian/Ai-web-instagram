@@ -23,6 +23,8 @@ export type AiUsageInput = {
   status: AiUsageStatus;
   errorCode?: string | null;
   errorMessage?: string | null;
+  /** Optional correlation / request id for cross-system tracing. */
+  correlationId?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -83,9 +85,7 @@ export async function recordAiUsage(input: AiUsageInput): Promise<{ id: string |
         ? (input.inputTokens ?? 0) + (input.outputTokens ?? 0)
         : null);
 
-    const { data, error } = await admin
-      .from("ai_usage_logs")
-      .insert({
+    const payload: Record<string, unknown> = {
         workspace_id: input.workspaceId ?? null,
         user_id: input.userId ?? null,
         feature: input.feature,
@@ -102,10 +102,34 @@ export async function recordAiUsage(input: AiUsageInput): Promise<{ id: string |
         status: input.status,
         error_code: input.errorCode ?? null,
         error_message: input.errorMessage ?? null,
-        metadata: sanitizeEventMetadata(input.metadata),
-      })
+        metadata: sanitizeEventMetadata({
+          ...input.metadata,
+          ...(input.correlationId
+            ? { correlationId: input.correlationId }
+            : {}),
+        }),
+      };
+    if (input.correlationId) {
+      payload.correlation_id = input.correlationId;
+    }
+
+    let { data, error } = await admin
+      .from("ai_usage_logs")
+      .insert(payload)
       .select("id")
       .single();
+
+    // Pre-migration environments: retry without correlation_id column.
+    if (error && /correlation_id/i.test(error.message)) {
+      delete payload.correlation_id;
+      const retry = await admin
+        .from("ai_usage_logs")
+        .insert(payload)
+        .select("id")
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error("[ai-usage]", error.message);

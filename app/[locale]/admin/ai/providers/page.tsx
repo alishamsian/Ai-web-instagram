@@ -1,11 +1,11 @@
 import { requireAdminPage } from "@/lib/admin/gate";
-import { getAdminAIModelsIntelligence } from "@/lib/admin/phase4-queries";
+import { getAdminAIProvidersIntelligence } from "@/lib/admin/phase4-queries";
 import { AdminPageHeader, AdminSection } from "@/components/admin/primitives";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { MetricCell } from "@/components/admin/phase4/MetricCell";
 import type { DateRangePreset } from "@/lib/admin/dates";
 
-export default async function AdminAIModelsPage({
+export default async function AdminAIProvidersPage({
   params,
   searchParams,
 }: {
@@ -17,7 +17,7 @@ export default async function AdminAIModelsPage({
   const { locale, userId } = await requireAdminPage(raw, "ai.read");
   const isFa = locale === "fa";
   const preset = (sp.range as DateRangePreset) || "30d";
-  const { models, truncated, error } = await getAdminAIModelsIntelligence({
+  const { providers, truncated } = await getAdminAIProvidersIntelligence({
     userId,
     preset,
   });
@@ -25,16 +25,13 @@ export default async function AdminAIModelsPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title={isFa ? "مدل‌های AI" : "AI Models"}
+        title={isFa ? "ارائه‌دهندگان AI" : "AI Providers"}
         description={
           isFa
-            ? "اندازه‌گیری واقعی — percentiles با نمونه کافی"
-            : "Factual measurements — percentiles with sufficient samples"
+            ? "نرخ موفقیت مشاهده‌شده از تلمتری — نه uptime SLA"
+            : "Observed success rate from telemetry — not provider SLA uptime"
         }
       />
-      {error ? (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-      ) : null}
       {truncated ? (
         <p className="text-xs text-amber-700 dark:text-amber-300">
           {isFa
@@ -45,12 +42,16 @@ export default async function AdminAIModelsPage({
       <AdminSection>
         <AdminDataTable
           locale={locale}
-          rows={models}
-          searchPlaceholder="model…"
-          emptyTitle={isFa ? "مدلی نیست" : "No model usage"}
+          rows={providers}
+          searchPlaceholder="provider…"
+          emptyTitle={isFa ? "ارائه‌دهنده‌ای نیست" : "No providers"}
           columns={[
-            { id: "provider", header: "Provider", cell: (r) => r.provider },
-            { id: "model", header: "Model", cell: (r) => r.model },
+            {
+              id: "provider",
+              header: "Provider",
+              cell: (r) => r.provider,
+              sortValue: (r) => r.provider,
+            },
             {
               id: "requests",
               header: isFa ? "درخواست‌ها" : "Requests",
@@ -58,10 +59,10 @@ export default async function AdminAIModelsPage({
               cell: (r) => r.requests,
             },
             {
-              id: "successRate",
-              header: isFa ? "نرخ موفقیت" : "Success rate",
+              id: "observedSuccessRate",
+              header: isFa ? "نرخ موفقیت مشاهده‌شده" : "Observed success rate",
               cell: (r) => (
-                <MetricCell metric={r.successRate} style="percent" />
+                <MetricCell metric={r.observedSuccessRate} style="percent" />
               ),
             },
             {
@@ -70,29 +71,15 @@ export default async function AdminAIModelsPage({
               cell: (r) => <MetricCell metric={r.errorRate} style="percent" />,
             },
             {
-              id: "p50",
-              header: "p50",
-              cell: (r) => <MetricCell metric={r.p50} />,
-            },
-            {
               id: "p95",
-              header: "p95",
+              header: "p95 (ms)",
               cell: (r) => <MetricCell metric={r.p95} />,
             },
             {
-              id: "p99",
-              header: "p99",
-              cell: (r) => <MetricCell metric={r.p99} />,
-            },
-            {
-              id: "tokens",
-              header: "Tokens",
-              cell: (r) => <MetricCell metric={r.tokens} />,
-            },
-            {
-              id: "cost",
-              header: isFa ? "هزینه" : "Cost",
-              cell: (r) => <MetricCell metric={r.cost} style="currency" />,
+              id: "models",
+              header: isFa ? "مدل‌ها" : "Models",
+              cell: (r) =>
+                r.models.length ? r.models.join(", ") : "—",
             },
           ]}
         />

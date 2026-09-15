@@ -39,6 +39,9 @@ Until the Phase 3 migrations are applied, the Incidents, Prompt Registry and
 User-360 notes surfaces render an explicit **unavailable** notice naming the
 missing migration — they never fall back to a misleading empty list.
 
+Phase 4 (AI + Infrastructure Intelligence): see `docs/admin-phase4.md`.
+Migration: `supabase/migrations/20260916030000_admin_phase4.sql`.
+
 All privileged tables enable RLS and **revoke** `anon` / `authenticated`.
 Access is via **service_role** from Next.js server only.
 

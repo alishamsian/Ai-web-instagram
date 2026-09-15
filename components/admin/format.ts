@@ -46,8 +46,14 @@ export function metricDisplay(
   | { kind: "value"; text: string; source: string }
   | { kind: "unavailable"; reason: string }
   | { kind: "partial"; text: string; warning: string; source: string } {
-  if (metric.status === "unavailable") {
+  if (metric.status === "unavailable" || metric.status === "error") {
     return { kind: "unavailable", reason: metric.reason };
+  }
+  if (metric.status === "insufficient_sample") {
+    return {
+      kind: "unavailable",
+      reason: `${metric.reason} (n=${metric.sampleSize})`,
+    };
   }
   if (metric.status === "partial") {
     return {

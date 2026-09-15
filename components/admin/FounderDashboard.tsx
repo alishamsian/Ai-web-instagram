@@ -7,15 +7,26 @@ import type {
   SystemHealthMetrics,
 } from "@/lib/admin/contracts";
 import type { MetricSeriesResult } from "@/lib/admin/queries";
-import { AdminPageHeader, AdminSection } from "@/components/admin/primitives";
+import type {
+  InfrastructureOverview,
+  ObservabilityEvent,
+} from "@/lib/admin/phase4-contracts";
+import {
+  AdminPageHeader,
+  AdminSection,
+  AdminStatusBadge,
+} from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminLineChart } from "@/components/admin/AdminChart";
 import { AdminActivityFeed } from "@/components/admin/AdminActivityFeed";
 import { AdminAlertsPanel } from "@/components/admin/AdminAlertsPanel";
 import { AdminSystemHealthGrid } from "@/components/admin/AdminSystemHealth";
+import { MetricCell } from "@/components/admin/phase4/MetricCell";
 import { adminHref } from "@/components/admin/nav";
 import type { Locale } from "@/lib/config/env";
 import { roleHasPermission, type AdminRole } from "@/lib/admin/permissions";
+import Link from "next/link";
+import { relativeTime } from "@/components/admin/format";
 
 export function FounderDashboard({
   locale,
@@ -27,6 +38,8 @@ export function FounderDashboard({
   alerts,
   activity,
   series,
+  infra,
+  timeline,
 }: {
   locale: Locale;
   role: AdminRole;
@@ -43,6 +56,8 @@ export function FounderDashboard({
     ai: MetricSeriesResult;
     imports: MetricSeriesResult;
   };
+  infra?: InfrastructureOverview | null;
+  timeline?: ObservabilityEvent[];
 }) {
   const isFa = locale === "fa";
   const canManage = roleHasPermission(role, "system.manage");
@@ -51,6 +66,15 @@ export function FounderDashboard({
     imports.successRate.status === "available"
       ? imports.successRate
       : undefined;
+
+  const statusTone =
+    infra?.systemStatus === "critical"
+      ? "danger"
+      : infra?.systemStatus === "degraded"
+        ? "warning"
+        : infra?.systemStatus === "healthy"
+          ? "success"
+          : "neutral";
 
   return (
     <div className="space-y-8">
@@ -63,6 +87,26 @@ export function FounderDashboard({
             : "Real metrics from the Admin query layer — never invented."
         }
       />
+
+      {infra ? (
+        <AdminSection
+          title={isFa ? "وضعیت سیستم" : "System Status"}
+          description={infra.systemStatusReason}
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <AdminStatusBadge tone={statusTone}>
+              {infra.systemStatus}
+            </AdminStatusBadge>
+            <Link
+              href={adminHref(locale, "/ops")}
+              className="text-xs text-[var(--admin-muted)] underline-offset-2 hover:underline"
+              prefetch={false}
+            >
+              {isFa ? "نمای عملیات" : "Operations overview"}
+            </Link>
+          </div>
+        </AdminSection>
+      ) : null}
 
       <AdminSection
         title={isFa ? "شاخص‌های اصلی" : "Primary KPIs"}
@@ -95,6 +139,108 @@ export function FounderDashboard({
           />
         </div>
       </AdminSection>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminSection title={isFa ? "هوش مصنوعی" : "AI"}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AdminMetricCard
+              label={isFa ? "درخواست‌ها" : "Requests"}
+              comparable={ai.requests}
+              href={adminHref(locale, "/ai")}
+            />
+            <AdminMetricCard
+              label={isFa ? "کامل‌شده" : "Completed"}
+              metric={ai.completed}
+            />
+            <AdminMetricCard
+              label={isFa ? "ناموفق" : "Failed"}
+              metric={ai.failed}
+              href={adminHref(locale, "/ai/failures")}
+            />
+            <AdminMetricCard
+              label={isFa ? "هزینه تخمینی" : "Estimated Cost"}
+              comparable={ai.estimatedCost}
+              style="currency"
+              href={adminHref(locale, "/ai/costs")}
+            />
+            <AdminMetricCard
+              label={isFa ? "میانگین تأخیر" : "Avg Latency"}
+              metric={ai.avgLatencyMs}
+              href={adminHref(locale, "/ai/latency")}
+            />
+          </div>
+        </AdminSection>
+
+        <AdminSection title={isFa ? "زیرساخت" : "Infrastructure"}>
+          {infra ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] p-4">
+                <p className="text-[11px] text-[var(--admin-muted)]">
+                  {isFa ? "جاب‌های ناموفق" : "Failed jobs"}
+                </p>
+                <p className="mt-2 font-display text-2xl tabular-nums">
+                  <MetricCell metric={infra.failedJobs24h} />
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] p-4">
+                <p className="text-[11px] text-[var(--admin-muted)]">
+                  {isFa ? "جاب‌های stale" : "Stale jobs"}
+                </p>
+                <p className="mt-2 font-display text-2xl tabular-nums">
+                  <MetricCell metric={infra.staleJobs} />
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] p-4">
+                <p className="text-[11px] text-[var(--admin-muted)]">
+                  {isFa ? "عمق صف" : "Queue depth"}
+                </p>
+                <p className="mt-2 font-display text-2xl tabular-nums">
+                  <MetricCell metric={infra.queueDepth} />
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] p-4">
+                <p className="text-[11px] text-[var(--admin-muted)]">
+                  {isFa ? "هشدارهای بحرانی" : "Critical alerts"}
+                </p>
+                <p className="mt-2 font-display text-2xl tabular-nums">
+                  <MetricCell metric={infra.criticalAlerts} />
+                </p>
+              </div>
+            </div>
+          ) : (
+            <AdminSystemHealthGrid health={health} locale={locale} />
+          )}
+        </AdminSection>
+      </div>
+
+      {infra && infra.attention.length > 0 ? (
+        <AdminSection title={isFa ? "نیاز به توجه" : "Attention Required"}>
+          <ul className="space-y-2">
+            {infra.attention.map((a) => (
+              <li key={a.id}>
+                <Link
+                  href={adminHref(locale, a.href)}
+                  prefetch={false}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] px-4 py-3 text-sm hover:bg-[var(--admin-muted-bg)]/50"
+                >
+                  <span className="text-[var(--admin-fg)]">{a.title}</span>
+                  <AdminStatusBadge
+                    tone={
+                      a.severity === "critical"
+                        ? "danger"
+                        : a.severity === "warning"
+                          ? "warning"
+                          : "info"
+                    }
+                  >
+                    {a.severity}
+                  </AdminStatusBadge>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </AdminSection>
+      ) : null}
 
       <AdminSection title={isFa ? "شاخص‌های ثانویه" : "Secondary"}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -129,7 +275,11 @@ export function FounderDashboard({
       </AdminSection>
 
       <AdminSection
-        title={isFa ? "در دسترس نیست / نیاز به یکپارچه‌سازی" : "Unavailable / needs integration"}
+        title={
+          isFa
+            ? "در دسترس نیست / نیاز به یکپارچه‌سازی"
+            : "Unavailable / needs integration"
+        }
       >
         <div className="grid gap-3 sm:grid-cols-3">
           <AdminMetricCard label="MRR" metric={kpis.mrr} style="currency" />
@@ -218,86 +368,6 @@ export function FounderDashboard({
         </div>
       </AdminSection>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <AdminSection title={isFa ? "نمای AI" : "AI Snapshot"}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AdminMetricCard
-              label={isFa ? "درخواست‌ها" : "Requests"}
-              comparable={ai.requests}
-            />
-            <AdminMetricCard
-              label={isFa ? "کامل‌شده" : "Completed"}
-              metric={ai.completed}
-            />
-            <AdminMetricCard
-              label={isFa ? "ناموفق" : "Failed"}
-              metric={ai.failed}
-            />
-            <AdminMetricCard
-              label={isFa ? "هزینه تخمینی" : "Estimated Cost"}
-              comparable={ai.estimatedCost}
-              style="currency"
-            />
-            <AdminMetricCard
-              label={isFa ? "میانگین تأخیر" : "Avg Latency"}
-              metric={ai.avgLatencyMs}
-            />
-          </div>
-        </AdminSection>
-
-        <AdminSection title={isFa ? "سلامت ایمپورت" : "Import Health"}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AdminMetricCard
-              label={isFa ? "شروع‌شده" : "Started"}
-              comparable={imports.started}
-            />
-            <AdminMetricCard
-              label={isFa ? "موفق" : "Successful"}
-              comparable={imports.successful}
-            />
-            <AdminMetricCard
-              label={isFa ? "ناموفق" : "Failed"}
-              comparable={imports.failed}
-            />
-            <AdminMetricCard
-              label={isFa ? "نرخ موفقیت" : "Success Rate"}
-              metric={imports.successRate}
-              style="percent"
-            />
-          </div>
-          <p className="mt-3 text-[11px] text-[var(--admin-muted)]">
-            {isFa
-              ? "pipeline مرحله‌ای فقط وقتی دادهٔ stage موجود باشد نمایش داده می‌شود — فعلاً از متریک‌های تجمیعی استفاده می‌شود."
-              : "Stage pipeline shown only when stage telemetry exists — aggregate metrics used for now."}
-          </p>
-        </AdminSection>
-      </div>
-
-      <AdminSection title={isFa ? "قیف فعال‌سازی" : "Activation Funnel"}>
-        <div className="rounded-xl border border-dashed border-[var(--admin-border)] bg-[var(--admin-card)] px-5 py-6">
-          <ol className="space-y-2 text-sm text-[var(--admin-muted)]">
-            {[
-              isFa ? "ثبت‌نام" : "Signup",
-              isFa ? "اتصال اینستاگرام" : "Instagram Connected",
-              isFa ? "ایمپورت کامل" : "Import Completed",
-              isFa ? "ساخت سایت" : "Website Generated",
-              isFa ? "ویرایش سایت" : "Website Edited",
-              isFa ? "انتشار سایت" : "Website Published",
-            ].map((step, i) => (
-              <li key={step} className="flex items-center gap-3">
-                <span className="inline-flex size-6 items-center justify-center rounded-full bg-[var(--admin-muted-bg)] text-[11px] font-medium text-[var(--admin-fg)]">
-                  {i + 1}
-                </span>
-                <span className="text-[var(--admin-fg)]">{step}</span>
-                <span className="text-[11px]">
-                  {isFa ? "— ابزار دقیق هنوز نیست" : "— instrumentation pending"}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </AdminSection>
-
       <AdminSection title={isFa ? "سلامت سیستم" : "System Health"}>
         <AdminSystemHealthGrid health={health} locale={locale} />
       </AdminSection>
@@ -314,6 +384,31 @@ export function FounderDashboard({
           <AdminActivityFeed items={activity} locale={locale} />
         </AdminSection>
       </div>
+
+      {timeline && timeline.length > 0 ? (
+        <AdminSection
+          title={isFa ? "جدول زمانی عملیاتی" : "Recent Operational Timeline"}
+        >
+          <ul className="divide-y divide-[var(--admin-border)] rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)]">
+            {timeline.map((e) => (
+              <li
+                key={e.id}
+                className="flex flex-wrap items-start justify-between gap-2 px-4 py-3 text-sm"
+              >
+                <div>
+                  <p className="text-[var(--admin-fg)]">{e.message}</p>
+                  <p className="mt-1 text-[11px] text-[var(--admin-muted)]">
+                    {e.category} · {e.source}
+                  </p>
+                </div>
+                <span className="text-[11px] text-[var(--admin-muted)]">
+                  {relativeTime(e.occurredAt, locale)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </AdminSection>
+      ) : null}
     </div>
   );
 }
