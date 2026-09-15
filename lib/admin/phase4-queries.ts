@@ -21,6 +21,7 @@ import {
   type AnomalyWindowStats,
 } from "@/lib/admin/phase4-anomalies";
 import { normalizeJobStatus } from "@/lib/admin/jobs";
+import { OPS_THRESHOLDS_MS, staleThresholdMs } from "@/lib/admin/ops-thresholds";
 import type {
   AIAnomaly,
   AICostMetric,
@@ -46,9 +47,9 @@ const JOB_SAMPLE_CAP = 2000;
 
 /** Documented stale thresholds (ms) by normalized job status / type. */
 export const STALE_JOB_THRESHOLDS_MS = {
-  defaultRunning: 30 * 60 * 1000,
-  defaultQueued: 60 * 60 * 1000,
-  importAnalyze: 45 * 60 * 1000,
+  defaultRunning: OPS_THRESHOLDS_MS.defaultRunning,
+  defaultQueued: OPS_THRESHOLDS_MS.defaultQueued,
+  importAnalyze: OPS_THRESHOLDS_MS.importAnalyze,
 } as const;
 
 function available<T>(value: T, source: string): MetricResult<T> {
@@ -1008,12 +1009,7 @@ export async function getAdminAIAnomalies(input: {
 }
 
 export function staleThresholdForJob(jobType: string | null | undefined, status: string): number {
-  const norm = normalizeJobStatus(status);
-  if (norm === "queued") return STALE_JOB_THRESHOLDS_MS.defaultQueued;
-  if (jobType === "import" || jobType === "instagram_import") {
-    return STALE_JOB_THRESHOLDS_MS.importAnalyze;
-  }
-  return STALE_JOB_THRESHOLDS_MS.defaultRunning;
+  return staleThresholdMs({ jobType, status: String(normalizeJobStatus(status)) });
 }
 
 export async function getAdminJobHealth(input: {
@@ -1468,24 +1464,25 @@ export async function getAdminInfrastructureOverview(input: {
 }
 
 export function getConfiguredCronSchedules(): CronScheduleInfo[] {
+  // Keep names aligned with recordCronRun(jobName) in instrumented workers.
   return [
     {
-      id: "publishing-process-due",
-      name: "Publishing process-due",
-      path: "/api/publishing/process-due",
-      configuredSchedule: "Configured via deployment platform (Vercel cron / external scheduler)",
+      id: "jobs-process",
+      name: "import_jobs_process",
+      path: "/api/jobs/process",
+      configuredSchedule: "0 3 * * * (vercel.json) + on-demand worker wake",
       executionHistory: unavailable(
-        "No cron_runs table — cannot report successful execution history",
+        "See cron_runs when Phase 5 migration is applied",
         "cron",
       ),
     },
     {
-      id: "jobs-process",
-      name: "Import job worker",
-      path: "/api/jobs/process",
-      configuredSchedule: "Triggered by worker secret / external wake-up",
+      id: "publishing-process-due",
+      name: "publishing_process_due",
+      path: "/api/publishing/process-due",
+      configuredSchedule: "0 4 * * * (vercel.json)",
       executionHistory: unavailable(
-        "No cron_runs table — worker runs are not stored as cron executions",
+        "See cron_runs when Phase 5 migration is applied",
         "cron",
       ),
     },

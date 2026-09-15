@@ -1,11 +1,13 @@
 import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminDashboardKpisLite } from "@/lib/admin/dashboard-lite";
 import { getAdminDashboardSystemStrip } from "@/lib/admin/dashboard-strip";
+import { getAdminOpsDashboardSignals } from "@/lib/admin/phase5-queries";
 import { FounderDashboardLite } from "@/components/admin/FounderDashboardLite";
 import { settledValue } from "@/lib/admin/safe";
 import { resolveDateRange, resolveComparisonPeriod, type DateRangePreset } from "@/lib/admin/dates";
 import type { DashboardKpis, MetricResult, ComparableMetric } from "@/lib/admin/contracts";
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
+import type { OpsDashboardSignals } from "@/lib/admin/phase5-contracts";
 
 function u(reason = "Temporarily unavailable"): MetricResult<number> {
   return { status: "unavailable", reason };
@@ -53,6 +55,16 @@ function emptyInfra(): InfrastructureOverview {
   };
 }
 
+function emptyOps(): OpsDashboardSignals {
+  const m = u();
+  return {
+    openIncidents: m,
+    criticalErrorGroups: m,
+    securityEvents24h: m,
+    cronFailures24h: m,
+  };
+}
+
 export default async function AdminDashboardPage({
   params,
   searchParams,
@@ -65,7 +77,7 @@ export default async function AdminDashboardPage({
   const { actor, locale, userId } = await requireAdminPage(raw, "system.read");
   const preset = (sp.range as DateRangePreset) || "30d";
 
-  const [kpisSettled, infraSettled] = await Promise.allSettled([
+  const [kpisSettled, infraSettled, opsSettled] = await Promise.allSettled([
     settledValue(
       "dashboard.kpis",
       getAdminDashboardKpisLite({ userId, preset }),
@@ -76,12 +88,19 @@ export default async function AdminDashboardPage({
       getAdminDashboardSystemStrip({ userId }),
       emptyInfra(),
     ),
+    settledValue(
+      "dashboard.opsSignals",
+      getAdminOpsDashboardSignals({ userId }),
+      emptyOps(),
+    ),
   ]);
 
   const kpis =
     kpisSettled.status === "fulfilled" ? kpisSettled.value.value : emptyKpis(preset);
   const infra =
     infraSettled.status === "fulfilled" ? infraSettled.value.value : emptyInfra();
+  const ops =
+    opsSettled.status === "fulfilled" ? opsSettled.value.value : emptyOps();
 
   return (
     <FounderDashboardLite
@@ -89,6 +108,7 @@ export default async function AdminDashboardPage({
       role={actor.role}
       kpis={kpis}
       infra={infra}
+      ops={ops}
     />
   );
 }

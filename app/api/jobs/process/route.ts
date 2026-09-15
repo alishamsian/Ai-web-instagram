@@ -7,6 +7,11 @@ import { isSupabaseSchemaReady } from "@/lib/database/supabase-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { writeStore } from "@/lib/database/store";
 import { logInfo, logWarn } from "@/lib/observability/log";
+import {
+  newCorrelationId,
+  recordCronRun,
+  recordSystemFailure,
+} from "@/lib/admin/observability";
 
 export const maxDuration = 300;
 
@@ -75,24 +80,76 @@ async function runWorker(request: Request) {
   if (!assertJobWorkerAuthorized(request)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
-  let body: { jobId?: string; locale?: string; postsLimit?: number } = {};
-  if (request.method === "POST") {
-    body = (await request.json().catch(() => ({}))) as typeof body;
-  } else {
-    const url = new URL(request.url);
-    body = {
-      jobId: url.searchParams.get("jobId") ?? undefined,
-      locale: url.searchParams.get("locale") ?? undefined,
-    };
+  const correlationId = newCorrelationId();
+  const startedAt = Date.now();
+  const cronStart = await recordCronRun({
+    jobName: "import_jobs_process",
+    path: "/api/jobs/process",
+    status: "started",
+    correlationId,
+  });
+
+  try {
+    let body: { jobId?: string; locale?: string; postsLimit?: number } = {};
+    if (request.method === "POST") {
+      body = (await request.json().catch(() => ({}))) as typeof body;
+    } else {
+      const url = new URL(request.url);
+      body = {
+        jobId: url.searchParams.get("jobId") ?? undefined,
+        locale: url.searchParams.get("locale") ?? undefined,
+      };
+    }
+    const locale = parseLocale(body.locale);
+    let jobId = body.jobId;
+    const claimedFromQueue = !jobId;
+    if (!jobId) jobId = (await claimNextQueuedJob()) ?? undefined;
+    if (!jobId) {
+      await recordCronRun({
+        jobName: "import_jobs_process",
+        path: "/api/jobs/process",
+        status: "succeeded",
+        runId: cronStart.id,
+        durationMs: Date.now() - startedAt,
+        correlationId,
+        metadata: { processed: false },
+      });
+      return NextResponse.json({ ok: true, processed: false });
+    }
+    logInfo("job.worker_start", { jobId, claimedFromQueue, locale, correlationId });
+    await processImportJob(jobId, locale, body.postsLimit);
+    await recordCronRun({
+      jobName: "import_jobs_process",
+      path: "/api/jobs/process",
+      status: "succeeded",
+      runId: cronStart.id,
+      durationMs: Date.now() - startedAt,
+      correlationId,
+      metadata: { processed: true, jobId },
+    });
+    return NextResponse.json({ ok: true, processed: true, jobId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "worker failed";
+    await recordCronRun({
+      jobName: "import_jobs_process",
+      path: "/api/jobs/process",
+      status: "failed",
+      runId: cronStart.id,
+      durationMs: Date.now() - startedAt,
+      correlationId,
+      errorCode: "WORKER_ERROR",
+      errorMessage: message,
+    });
+    void recordSystemFailure({
+      source: "cron.import_jobs_process",
+      errorCode: "WORKER_ERROR",
+      message,
+      severity: "critical",
+      correlationId,
+      openIncidentIfCritical: true,
+    });
+    return NextResponse.json({ error: "ERROR" }, { status: 500 });
   }
-  const locale = parseLocale(body.locale);
-  let jobId = body.jobId;
-  const claimedFromQueue = !jobId;
-  if (!jobId) jobId = (await claimNextQueuedJob()) ?? undefined;
-  if (!jobId) return NextResponse.json({ ok: true, processed: false });
-  logInfo("job.worker_start", { jobId, claimedFromQueue, locale });
-  await processImportJob(jobId, locale, body.postsLimit);
-  return NextResponse.json({ ok: true, processed: true, jobId });
 }
 
 export async function POST(request: Request) {

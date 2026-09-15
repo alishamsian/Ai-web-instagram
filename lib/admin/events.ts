@@ -52,6 +52,12 @@ export type SystemEventInput = {
   message?: string | null;
   metadata?: Record<string, unknown>;
   occurredAt?: string | Date;
+  correlationId?: string | null;
+  fingerprint?: string | null;
+  resourceType?: string | null;
+  resourceId?: string | null;
+  workspaceId?: string | null;
+  userId?: string | null;
 };
 
 const memoryProduct: ProductEventInput[] = [];
@@ -126,15 +132,43 @@ export async function recordSystemEvent(input: SystemEventInput): Promise<void> 
 
   try {
     const admin = getSupabaseAdmin();
-    const { error } = await admin.from("system_events").insert({
+    const payload: Record<string, unknown> = {
       event_name: input.eventName,
       severity: input.severity ?? "info",
       source: input.source ?? null,
       error_code: input.errorCode ?? null,
       message: input.message ?? null,
-      metadata: sanitizeEventMetadata(input.metadata),
+      metadata: sanitizeEventMetadata({
+        ...input.metadata,
+        ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+        ...(input.fingerprint ? { fingerprint: input.fingerprint } : {}),
+      }),
       occurred_at: toIso(input.occurredAt),
-    });
+    };
+    if (input.correlationId) payload.correlation_id = input.correlationId;
+    if (input.fingerprint) payload.fingerprint = input.fingerprint;
+    if (input.resourceType) payload.resource_type = input.resourceType;
+    if (input.resourceId) payload.resource_id = input.resourceId;
+    if (input.workspaceId) payload.workspace_id = input.workspaceId;
+    if (input.userId) payload.user_id = input.userId;
+
+    let { error } = await admin.from("system_events").insert(payload);
+    // Pre-migration: retry without Phase 5 columns.
+    if (
+      error &&
+      /correlation_id|fingerprint|resource_type|workspace_id|user_id/i.test(
+        error.message,
+      )
+    ) {
+      delete payload.correlation_id;
+      delete payload.fingerprint;
+      delete payload.resource_type;
+      delete payload.resource_id;
+      delete payload.workspace_id;
+      delete payload.user_id;
+      const retry = await admin.from("system_events").insert(payload);
+      error = retry.error;
+    }
     if (error) console.error("[system-events]", error.message);
   } catch (error) {
     console.error("[system-events] unexpected", error);

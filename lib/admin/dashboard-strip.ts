@@ -4,13 +4,14 @@ import { supabaseConfigured, getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdminPermission } from "@/lib/admin/rbac";
 import type { MetricResult } from "@/lib/admin/contracts";
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
+import { OPS_THRESHOLDS_MS } from "@/lib/admin/ops-thresholds";
 import { normalizeJobStatus } from "@/lib/admin/jobs";
 
-/** Keep in sync with STALE_JOB_THRESHOLDS_MS in phase4-queries. */
+/** Keep in sync with STALE_JOB_THRESHOLDS_MS in phase4-queries via ops-thresholds. */
 const STALE_MS = {
-  defaultRunning: 30 * 60 * 1000,
-  defaultQueued: 60 * 60 * 1000,
-  importAnalyze: 45 * 60 * 1000,
+  defaultRunning: OPS_THRESHOLDS_MS.defaultRunning,
+  defaultQueued: OPS_THRESHOLDS_MS.defaultQueued,
+  importAnalyze: OPS_THRESHOLDS_MS.importAnalyze,
 } as const;
 
 function available(value: number, source: string): MetricResult<number> {

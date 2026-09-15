@@ -23,6 +23,7 @@ import { clampImportPosts, IMPORT_POSTS_HARD_MAX, importStaleMs } from "@/lib/co
 import { logError, logInfo, logWarn } from "@/lib/observability/log";
 import { publicError } from "@/lib/jobs/errors";
 import { recordProductEvent, recordSystemEvent } from "@/lib/admin/events";
+import { recordSystemFailure } from "@/lib/admin/observability";
 import { recordUsageEvent } from "@/lib/admin/usage";
 import { recordAiUsage } from "@/lib/admin/ai-telemetry";
 import { computeJobDurationMs } from "@/lib/admin/jobs";
@@ -588,6 +589,17 @@ export async function processImportJob(
         rendererVersion: "website_config.v1",
         errorMessage:
           error instanceof Error ? error.message.slice(0, 200) : "ai_error",
+      });
+      void recordSystemFailure({
+        source: "ai.import_analyze",
+        errorCode: "AI_ANALYZE_FAILED",
+        message:
+          error instanceof Error ? error.message.slice(0, 200) : "ai_error",
+        severity: "warning",
+        resourceType: "import_job",
+        resourceId: jobId,
+        workspaceId: job.workspaceId,
+        userId: job.userId,
       });
       logWarn("ai.failed_heuristic", {
         jobId,

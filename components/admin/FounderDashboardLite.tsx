@@ -1,5 +1,6 @@
 import type { DashboardKpis } from "@/lib/admin/contracts";
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
+import type { OpsDashboardSignals } from "@/lib/admin/phase5-contracts";
 import { AdminPageHeader, AdminSection, AdminStatusBadge } from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { MetricCell } from "@/components/admin/phase4/MetricCell";
@@ -13,11 +14,13 @@ export function FounderDashboardLite({
   role,
   kpis,
   infra,
+  ops,
 }: {
   locale: Locale;
   role: AdminRole;
   kpis: DashboardKpis;
   infra: InfrastructureOverview;
+  ops?: OpsDashboardSignals;
 }) {
   void role;
   const isFa = locale === "fa";
@@ -50,6 +53,25 @@ export function FounderDashboardLite({
           </Link>
         </div>
       </AdminSection>
+
+      {ops ? (
+        <AdminSection
+          title={isFa ? "سیگنال‌های عملیات و امنیت" : "Ops & security signals"}
+          description={isFa ? "فقط head-count — بدون اسکن سنگین" : "Head-counts only — no heavy scans"}
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricBox label={isFa ? "حوادث باز" : "Open incidents"} metric={ops.openIncidents} />
+            <MetricBox label={isFa ? "گروه خطای بحرانی" : "Critical error groups"} metric={ops.criticalErrorGroups} />
+            <MetricBox label={isFa ? "رویداد امنیتی ۲۴س" : "Security events 24h"} metric={ops.securityEvents24h} />
+            <MetricBox label={isFa ? "شکست cron ۲۴س" : "Cron failures 24h"} metric={ops.cronFailures24h} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <Link href={adminHref(locale, "/incidents")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "حوادث" : "Incidents"}</Link>
+            <Link href={adminHref(locale, "/errors")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "خطاها" : "Errors"}</Link>
+            <Link href={adminHref(locale, "/security")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "امنیت" : "Security"}</Link>
+          </div>
+        </AdminSection>
+      ) : null}
 
       <AdminSection title={isFa ? "شاخص‌های اصلی" : "Primary KPIs"} description={isFa ? "منابع واقعی؛ بدون اسکن سنگین AI" : "Real sources; no heavy AI scan"}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

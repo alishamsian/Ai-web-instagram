@@ -23,6 +23,7 @@ import {
   ScrollText,
   Send,
   Settings,
+  Shield,
   ShoppingBag,
   Siren,
   Users,
@@ -137,6 +138,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     id: "control",
     label: { fa: "کنترل", en: "Control" },
     items: [
+      { id: "security", href: "/security", label: { fa: "امنیت", en: "Security" }, icon: Shield },
       { id: "audit", href: "/audit", label: { fa: "ممیزی", en: "Audit" }, icon: ScrollText },
       { id: "flags", href: "/flags", label: { fa: "فلگ‌ها", en: "Feature Flags" }, icon: Flag, comingSoon: true },
       { id: "experiments", href: "/experiments", label: { fa: "آزمایش‌ها", en: "Experiments" }, icon: FlaskConical, comingSoon: true },

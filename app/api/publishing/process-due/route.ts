@@ -6,6 +6,11 @@ import {
 } from "@/lib/publishing/persist";
 import { getPublisher } from "@/lib/publishing/publishers";
 import { createInboxNotification } from "@/lib/notifications/inbox";
+import {
+  newCorrelationId,
+  recordCronRun,
+  recordSystemFailure,
+} from "@/lib/admin/observability";
 
 export const maxDuration = 120;
 
@@ -74,12 +79,57 @@ export async function GET(request: Request) {
   if (!assertJobWorkerAuthorized(request)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
-  return NextResponse.json(await run());
+  return NextResponse.json(await runInstrumented());
 }
 
 export async function POST(request: Request) {
   if (!assertJobWorkerAuthorized(request)) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
-  return NextResponse.json(await run());
+  return NextResponse.json(await runInstrumented());
+}
+
+async function runInstrumented() {
+  const correlationId = newCorrelationId();
+  const startedAt = Date.now();
+  const cronStart = await recordCronRun({
+    jobName: "publishing_process_due",
+    path: "/api/publishing/process-due",
+    status: "started",
+    correlationId,
+  });
+  try {
+    const result = await run();
+    await recordCronRun({
+      jobName: "publishing_process_due",
+      path: "/api/publishing/process-due",
+      status: "succeeded",
+      runId: cronStart.id,
+      durationMs: Date.now() - startedAt,
+      correlationId,
+      metadata: result,
+    });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "publish cron failed";
+    await recordCronRun({
+      jobName: "publishing_process_due",
+      path: "/api/publishing/process-due",
+      status: "failed",
+      runId: cronStart.id,
+      durationMs: Date.now() - startedAt,
+      correlationId,
+      errorCode: "PUBLISH_CRON_ERROR",
+      errorMessage: message,
+    });
+    void recordSystemFailure({
+      source: "cron.publishing_process_due",
+      errorCode: "PUBLISH_CRON_ERROR",
+      message,
+      severity: "critical",
+      correlationId,
+      openIncidentIfCritical: true,
+    });
+    return { ok: false, error: "ERROR" };
+  }
 }
