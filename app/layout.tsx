@@ -56,7 +56,11 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const headerLocale = (await headers()).get("x-locale") ?? DEFAULT_LOCALE;
   const locale = isLocale(headerLocale) ? headerLocale : DEFAULT_LOCALE;
 

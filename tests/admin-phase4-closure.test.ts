@@ -172,4 +172,16 @@ describe("Admin Phase 4 closure — crash / honesty hardening", () => {
     expect(gate).toMatch(/redirect/);
     expect(gate).toMatch(/\[admin:gate\]/);
   });
+
+  it("admin layout soft-fails resolveAdminActor infra errors", () => {
+    const layout = read("app/[locale]/admin/layout.tsx");
+    expect(layout).toMatch(/\[admin:layout\]/);
+    expect(layout).toMatch(/resolveAdminActor/);
+  });
+
+  it("queries never surface raw PostgREST messages in MetricResult", () => {
+    const src = read("lib/admin/queries.ts");
+    expect(src).not.toMatch(/unavailable\([^)]*error\.message/);
+    expect(src).not.toMatch(/unavailable<number>\(error\.message/);
+  });
 });

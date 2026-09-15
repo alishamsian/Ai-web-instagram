@@ -21,7 +21,18 @@ export default async function AdminLayout({
   if (!session) {
     redirect(`/${locale}/login?next=/${locale}/admin/dashboard`);
   }
-  const actor = await resolveAdminActor(session.user.id);
+
+  let actor;
+  try {
+    actor = await resolveAdminActor(session.user.id);
+  } catch (error) {
+    // Transient infra failure must not blank the entire Admin shell.
+    console.error(
+      "[admin:layout]",
+      error instanceof Error ? error.message.slice(0, 200) : "unknown",
+    );
+    redirect(`/${locale}/dashboard`);
+  }
   if (!actor) {
     redirect(`/${locale}/dashboard`);
   }

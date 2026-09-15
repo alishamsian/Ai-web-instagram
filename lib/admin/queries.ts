@@ -149,13 +149,14 @@ async function countTable(params: {
       q = q.is(col, null);
     }
     const { count, error } = await q;
-    if (error) return unavailable(error.message, params.table);
+    if (error) {
+      logAdminFailure("countTable", error.message, { table: params.table });
+      return unavailable("Count query failed", params.table);
+    }
     return available(count ?? 0, `${params.table}.${params.timeColumn}`);
   } catch (error) {
-    return unavailable(
-      error instanceof Error ? error.message : "count failed",
-      params.table,
-    );
+    logAdminFailure("countTable", error, { table: params.table });
+    return unavailable("Count query failed", params.table);
   }
 }
 
@@ -518,7 +519,8 @@ export async function getAdminAIUsage(
     .lt("created_at", range.end)
     .limit(AI_SAMPLE_LIMIT);
   if (error) {
-    const empty = unavailable<number>(error.message, "ai_usage_logs");
+    logAdminFailure("getAdminAIMetrics", error.message);
+    const empty = unavailable<number>("AI metrics query failed", "ai_usage_logs");
     return {
       range,
       requests: comparable(empty, empty),
@@ -803,7 +805,10 @@ export async function getAdminWebsiteMetrics(
               .from("websites")
               .select("id", { count: "exact", head: true })
               .not("deleted_at", "is", null);
-            if (error) return unavailable<number>(error.message, "websites");
+            if (error) {
+              logAdminFailure("getAdminWebsiteMetrics.softDeleted", error.message);
+              return unavailable<number>("Count query failed", "websites");
+            }
             return available(count ?? 0, "websites.deleted_at");
           })()
         : unavailable<number>("Supabase not configured", "websites"),
