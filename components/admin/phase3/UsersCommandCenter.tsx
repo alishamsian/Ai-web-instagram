@@ -173,8 +173,22 @@ export function UsersCommandCenter({
           {
             id: "ai",
             header: "AI",
-            sortValue: (r) => r.aiRequestCount,
-            cell: (r) => r.aiRequestCount,
+            sortValue: (r) => r.aiRequestCount ?? -1,
+            cell: (r) =>
+              r.aiRequestCount === null ? (
+                <span
+                  className="text-[var(--admin-muted)]"
+                  title={
+                    isFa
+                      ? "نمونه AI برای این صفحه ناقص است"
+                      : "AI sample truncated for this page"
+                  }
+                >
+                  —
+                </span>
+              ) : (
+                r.aiRequestCount
+              ),
           },
           {
             id: "health",
@@ -237,7 +251,7 @@ export function UsersCommandCenter({
                 Websites: {detail.user.websiteCount} · Published:{" "}
                 {detail.user.publishedCount}
               </p>
-              <p>AI requests: {detail.user.aiRequestCount}</p>
+              <p>AI requests: {detail.user.aiRequestCount ?? "—"}</p>
             </section>
             {detail.entitlements ? (
               <section>
@@ -326,7 +340,14 @@ export function UsersCommandCenter({
                     </span>
                   </li>
                 ))}
-                {!detail.notes.length ? (
+                {detail.notesUnavailableReason ? (
+                  <li
+                    role="status"
+                    className="rounded-lg border border-dashed border-[var(--admin-border)] px-2 py-1.5 text-[var(--admin-muted)]"
+                  >
+                    {detail.notesUnavailableReason}
+                  </li>
+                ) : !detail.notes.length ? (
                   <li className="text-[var(--admin-muted)]">—</li>
                 ) : null}
               </ul>

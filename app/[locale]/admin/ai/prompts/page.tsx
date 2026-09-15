@@ -1,6 +1,10 @@
 import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminAIBreakdown } from "@/lib/admin/phase3-queries";
-import { AdminPageHeader, AdminEmptyState } from "@/components/admin/primitives";
+import {
+  AdminPageHeader,
+  AdminEmptyState,
+  MetricUnavailable,
+} from "@/components/admin/primitives";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 
 export default async function AdminAIPromptsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -20,10 +24,16 @@ export default async function AdminAIPromptsPage({ params }: { params: Promise<{
         title={locale === "fa" ? "رجیستری پرامپت" : "Prompt Registry"}
         description={locale === "fa" ? "فقط متادیتا — بدون متن خام پرامپت" : "Metadata only — no raw prompt bodies"}
       />
-      {!rows.length ? (
+      {breakdown.promptsUnavailableReason ? (
+        <MetricUnavailable
+          label={locale === "fa" ? "رجیستری در دسترس نیست" : "Registry unavailable"}
+          reason={breakdown.promptsUnavailableReason}
+          compact
+        />
+      ) : !rows.length ? (
         <AdminEmptyState
           title={locale === "fa" ? "رجیستری خالی است" : "Registry empty"}
-          body={locale === "fa" ? "مایگریشن Phase 3 را اعمال کنید." : "Apply the Phase 3 migration."}
+          body={locale === "fa" ? "هنوز پرامپتی ثبت نشده است." : "No prompt versions registered yet."}
         />
       ) : (
         <AdminDataTable

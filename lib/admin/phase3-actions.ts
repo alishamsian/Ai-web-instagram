@@ -8,6 +8,7 @@ import { getSupabaseAdmin, supabaseConfigured } from "@/lib/supabase/admin";
 import {
   buildImportJobObservabilityUpdate,
 } from "@/lib/admin/jobs";
+import { triggerImportWorker } from "@/lib/jobs/queue";
 
 export type AdminActionResult =
   | { ok: true; id?: string }
@@ -15,6 +16,14 @@ export type AdminActionResult =
 
 function fail(code: string, message: string): AdminActionResult {
   return { ok: false, code, message };
+}
+
+function revalidateAdmin(...paths: string[]) {
+  for (const path of paths) {
+    revalidatePath(path);
+    revalidatePath(`/fa${path}`);
+    revalidatePath(`/en${path}`);
+  }
 }
 
 export async function createAdminSupportNote(input: {
@@ -47,7 +56,7 @@ export async function createAdminSupportNote(input: {
     if (error) return fail("DB_ERROR", "Could not save note.");
     await writeAdminAuditLog({
       actor,
-      action: "SETTING_CHANGED",
+      action: "SUPPORT_NOTE_CREATED",
       resourceType: "support_note",
       resourceId: data.id as string,
       targetUserId: input.targetUserId,
@@ -55,7 +64,7 @@ export async function createAdminSupportNote(input: {
       afterState: { body: body.slice(0, 120) },
       reason: "create_support_note",
     });
-    revalidatePath("/admin");
+    revalidateAdmin("/admin");
     return { ok: true, id: data.id as string };
   } catch (error) {
     if (error instanceof AdminAuthError) return fail(error.code, error.message);
@@ -97,13 +106,13 @@ export async function createAdminIncident(input: {
     if (error) return fail("DB_ERROR", "Could not create incident.");
     await writeAdminAuditLog({
       actor,
-      action: "SETTING_CHANGED",
+      action: "INCIDENT_CREATED",
       resourceType: "incident",
       resourceId: data.id as string,
       afterState: { title: input.title, severity: input.severity },
       reason: "create_incident",
     });
-    revalidatePath("/admin/incidents");
+    revalidateAdmin("/admin/incidents", "/admin");
     return { ok: true, id: data.id as string };
   } catch (error) {
     if (error instanceof AdminAuthError) return fail(error.code, error.message);
@@ -135,13 +144,13 @@ export async function updateAdminIncidentStatus(input: {
     if (error) return fail("DB_ERROR", "Could not update incident.");
     await writeAdminAuditLog({
       actor,
-      action: "SETTING_CHANGED",
+      action: "INCIDENT_UPDATED",
       resourceType: "incident",
       resourceId: input.incidentId,
       afterState: { status: input.status },
       reason: "update_incident_status",
     });
-    revalidatePath("/admin/incidents");
+    revalidateAdmin("/admin/incidents", "/admin");
     return { ok: true };
   } catch (error) {
     if (error instanceof AdminAuthError) return fail(error.code, error.message);
@@ -181,6 +190,8 @@ export async function retryAdminImportJob(input: {
       attempt: retryCount + 1,
       errorCode: null,
       errorMessage: null,
+      completedAt: null,
+      durationMs: null,
       metadata: { retriedBy: actor.userId },
     });
 
@@ -191,6 +202,7 @@ export async function retryAdminImportJob(input: {
       .update(patch)
       .eq("id", input.jobId)
       .eq("status", "failed")
+      .lt("retry_count", maxAttempts)
       .select("id")
       .maybeSingle();
     if (error) return fail("DB_ERROR", "Could not retry job.");
@@ -205,7 +217,10 @@ export async function retryAdminImportJob(input: {
       afterState: { status: "queued", attempt: retryCount + 1 },
       reason: "admin_retry",
     });
-    revalidatePath("/admin/jobs");
+
+    void triggerImportWorker(input.jobId, "fa").catch(() => {});
+
+    revalidateAdmin("/admin/jobs", "/admin");
     return { ok: true };
   } catch (error) {
     if (error instanceof AdminAuthError) return fail(error.code, error.message);

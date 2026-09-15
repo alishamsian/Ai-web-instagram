@@ -27,6 +27,33 @@ function available<T>(value: T, source: string): MetricResult<T> {
   return { status: "available", value, source };
 }
 
+function partial<T>(value: T, source: string, warning: string): MetricResult<T> {
+  return { status: "partial", value, source, warning };
+}
+
+/**
+ * Convert a PostgREST head-count response into a MetricResult.
+ * A failed query or missing count is `unavailable`, never a silent zero.
+ */
+function countMetric(
+  res: { count: number | null; error: { message: string } | null },
+  source: string,
+): MetricResult<number> {
+  if (res.error) return unavailable("Count query failed", source);
+  if (res.count == null) return unavailable("Count not returned", source);
+  return available(res.count, source);
+}
+
+/** Strip PostgREST / ilike special characters from user search input. */
+function sanitizeIlikeTerm(raw: string): string {
+  return raw.replace(/[%_,)(]/g, "").trim();
+}
+
+/** More aggressive sanitize for global search (also strips dots / commas). */
+function sanitizeSearchTerm(raw: string): string {
+  return raw.replace(/[%_,)(.]/g, "").trim();
+}
+
 export type AdminUserListItem = {
   id: string;
   email: string;
@@ -39,7 +66,8 @@ export type AdminUserListItem = {
   websiteCount: number;
   publishedCount: number;
   importCount: number;
-  aiRequestCount: number;
+  /** null = AI sample truncated for this page; count would be a silent lower bound. */
+  aiRequestCount: number | null;
   health: HealthAssessment | null;
 };
 
@@ -63,6 +91,11 @@ export async function getAdminUsersEnriched(input: {
   const limit = Math.min(input.limit ?? 100, 200);
   const range = resolveDateRange({ preset: input.preset ?? "30d" });
 
+  const lastActivity = unavailable<number>(
+    "Last activity requires reliable session/product activity instrumentation",
+    "product_events",
+  );
+
   if (!supabaseConfigured()) {
     return {
       metrics: {
@@ -72,162 +105,256 @@ export async function getAdminUsersEnriched(input: {
         withWebsite: unavailable("Supabase not configured"),
         publishedUsers: unavailable("Supabase not configured"),
         planDistribution: unavailable("Supabase not configured"),
-        lastActivity: unavailable(
-          "Last activity requires session/activity instrumentation",
-          "product_events",
-        ),
+        lastActivity,
       },
       rows: [],
     };
   }
 
   const db = getSupabaseAdmin();
-  const profilesQ = db
+  const qRaw = input.q?.trim() ?? "";
+  const qSafe = qRaw ? sanitizeIlikeTerm(qRaw) : "";
+  const like = qSafe ? `%${qSafe}%` : null;
+
+  // Exact head counts + plan sample + website sample for secondary metrics
+  const [
+    totalRes,
+    newUsersRes,
+    wsCountRes,
+    planRes,
+    siteSampleRes,
+  ] = await Promise.all([
+    db.from("profiles").select("id", { count: "exact", head: true }),
+    db
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", range.start)
+      .lt("created_at", range.end),
+    db
+      .from("workspaces")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null),
+    db
+      .from("workspaces")
+      .select("plan")
+      .is("deleted_at", null)
+      .limit(2000),
+    db
+      .from("websites")
+      .select("workspace_id, status")
+      .is("deleted_at", null)
+      .limit(5000),
+  ]);
+
+  let profilesQuery = db
     .from("profiles")
     .select("id, email, name, avatar_url, created_at")
     .order("created_at", { ascending: false })
-    .limit(Math.min(limit * 3, 500));
+    .limit(limit);
 
-  const [profilesRes, workspacesRes, websitesRes, importsRes, aiRes] =
-    await Promise.all([
-      profilesQ,
-      db
-        .from("workspaces")
-        .select("id, owner_id, name, plan")
-        .is("deleted_at", null),
-      db
-        .from("websites")
-        .select("id, workspace_id, status")
-        .is("deleted_at", null),
-      db.from("instagram_imports").select("id, workspace_id"),
-      db.from("ai_usage_logs").select("id, user_id").limit(5000),
-    ]);
+  if (like) {
+    profilesQuery = profilesQuery.or(
+      `email.ilike."${like}",name.ilike."${like}"`,
+    );
+  }
 
-  const profilesRaw = profilesRes.data ?? [];
-  const q = input.q?.trim().toLowerCase();
-  const profiles = (
-    q
-      ? profilesRaw.filter(
-          (p) =>
-            String(p.email ?? "")
-              .toLowerCase()
-              .includes(q) ||
-            String(p.name ?? "")
-              .toLowerCase()
-              .includes(q),
-        )
-      : profilesRaw
-  ).slice(0, limit);
-  const workspaces = workspacesRes.data ?? [];
-  const websites = websitesRes.data ?? [];
-  const imports = importsRes.data ?? [];
-  const aiLogs = aiRes.data ?? [];
+  const profilesRes = await profilesQuery;
+  const profiles = profilesRes.data ?? [];
+  const profileIds = profiles.map((p) => p.id as string);
 
-  const wsByOwner = new Map<string, (typeof workspaces)[0]>();
+  type WsRow = {
+    id: string;
+    owner_id: string;
+    name: string;
+    plan: string | null;
+  };
+  type SiteRow = { id: string; workspace_id: string; status: string };
+  type ImportRow = { id: string; workspace_id: string };
+  type JobRow = { id: string; workspace_id: string };
+  type DomainRow = { id: string; website_id: string };
+  type AiRow = { id: string; user_id: string | null };
+
+  let workspaces: WsRow[] = [];
+  let websites: SiteRow[] = [];
+  let imports: ImportRow[] = [];
+  let failedJobs: JobRow[] = [];
+  let domains: DomainRow[] = [];
+  let aiLogs: AiRow[] = [];
+  const AI_SAMPLE_CAP = 2000;
+  let aiSampleReliable = true;
+
+  if (profileIds.length > 0) {
+    const wsRes = await db
+      .from("workspaces")
+      .select("id, owner_id, name, plan")
+      .in("owner_id", profileIds)
+      .is("deleted_at", null);
+    workspaces = (wsRes.data ?? []) as WsRow[];
+    const workspaceIds = workspaces.map((w) => w.id);
+
+    if (workspaceIds.length > 0) {
+      const [sitesRes, importsRes, jobsRes] = await Promise.all([
+        db
+          .from("websites")
+          .select("id, workspace_id, status")
+          .in("workspace_id", workspaceIds)
+          .is("deleted_at", null),
+        db
+          .from("instagram_imports")
+          .select("id, workspace_id")
+          .in("workspace_id", workspaceIds),
+        db
+          .from("import_jobs")
+          .select("id, workspace_id")
+          .in("workspace_id", workspaceIds)
+          .eq("status", "failed")
+          .limit(2000),
+      ]);
+      websites = (sitesRes.data ?? []) as SiteRow[];
+      imports = (importsRes.data ?? []) as ImportRow[];
+      failedJobs = (jobsRes.data ?? []) as JobRow[];
+
+      const websiteIds = websites.map((s) => s.id);
+      if (websiteIds.length > 0) {
+        const domainsRes = await db
+          .from("domains")
+          .select("id, website_id")
+          .in("website_id", websiteIds);
+        domains = (domainsRes.data ?? []) as DomainRow[];
+      }
+    }
+
+    const aiRes = await db
+      .from("ai_usage_logs")
+      .select("id, user_id")
+      .in("user_id", profileIds)
+      .limit(AI_SAMPLE_CAP);
+    aiLogs = (aiRes.data ?? []) as AiRow[];
+    aiSampleReliable = !aiRes.error && aiLogs.length < AI_SAMPLE_CAP;
+  }
+
+  const wsByOwner = new Map<string, WsRow>();
   for (const ws of workspaces) {
-    if (!wsByOwner.has(ws.owner_id as string)) {
-      wsByOwner.set(ws.owner_id as string, ws);
+    if (!wsByOwner.has(ws.owner_id)) {
+      wsByOwner.set(ws.owner_id, ws);
     }
   }
 
-  const sitesByWs = new Map<string, typeof websites>();
+  const sitesByWs = new Map<string, SiteRow[]>();
   for (const site of websites) {
-    const wid = site.workspace_id as string;
-    const list = sitesByWs.get(wid) ?? [];
+    const list = sitesByWs.get(site.workspace_id) ?? [];
     list.push(site);
-    sitesByWs.set(wid, list);
+    sitesByWs.set(site.workspace_id, list);
   }
 
   const importsByWs = new Map<string, number>();
   for (const item of imports) {
-    const wid = item.workspace_id as string;
-    importsByWs.set(wid, (importsByWs.get(wid) ?? 0) + 1);
+    importsByWs.set(
+      item.workspace_id,
+      (importsByWs.get(item.workspace_id) ?? 0) + 1,
+    );
+  }
+
+  const failedByWs = new Map<string, number>();
+  for (const job of failedJobs) {
+    failedByWs.set(
+      job.workspace_id,
+      (failedByWs.get(job.workspace_id) ?? 0) + 1,
+    );
+  }
+
+  const siteIdToWs = new Map(websites.map((s) => [s.id, s.workspace_id]));
+  const domainByWs = new Map<string, number>();
+  for (const d of domains) {
+    const wid = siteIdToWs.get(d.website_id);
+    if (!wid) continue;
+    domainByWs.set(wid, (domainByWs.get(wid) ?? 0) + 1);
   }
 
   const aiByUser = new Map<string, number>();
   for (const log of aiLogs) {
-    const uid = log.user_id as string | null;
-    if (!uid) continue;
-    aiByUser.set(uid, (aiByUser.get(uid) ?? 0) + 1);
+    if (!log.user_id) continue;
+    aiByUser.set(log.user_id, (aiByUser.get(log.user_id) ?? 0) + 1);
   }
 
   const rows: AdminUserListItem[] = profiles.map((p) => {
-    const ws = wsByOwner.get(p.id as string) ?? null;
-    const sites = ws ? sitesByWs.get(ws.id as string) ?? [] : [];
+    const id = p.id as string;
+    const ws = wsByOwner.get(id) ?? null;
+    const sites = ws ? sitesByWs.get(ws.id) ?? [] : [];
     const published = sites.filter((s) => s.status === "published").length;
     const health = ws
       ? assessWorkspaceHealth({
           websiteCount: sites.length,
           publishedCount: published,
-          failedImportJobs: 0,
-          successfulImports: importsByWs.get(ws.id as string) ?? 0,
-          domainCount: 0,
+          failedImportJobs: failedByWs.get(ws.id) ?? 0,
+          successfulImports: importsByWs.get(ws.id) ?? 0,
+          domainCount: domainByWs.get(ws.id) ?? 0,
           plan: String(ws.plan ?? "free"),
         })
       : null;
 
     return {
-      id: p.id as string,
+      id,
       email: (p.email as string) ?? "",
       name: (p.name as string | null) ?? null,
       avatarUrl: (p.avatar_url as string | null) ?? null,
       createdAt: p.created_at as string,
-      workspaceId: ws ? (ws.id as string) : null,
-      workspaceName: ws ? (ws.name as string) : null,
+      workspaceId: ws ? ws.id : null,
+      workspaceName: ws ? ws.name : null,
       plan: ws ? normalizePlanId(String(ws.plan)) : null,
       websiteCount: sites.length,
       publishedCount: published,
-      importCount: ws ? importsByWs.get(ws.id as string) ?? 0 : 0,
-      aiRequestCount: aiByUser.get(p.id as string) ?? 0,
+      importCount: ws ? importsByWs.get(ws.id) ?? 0 : 0,
+      // Never show a silent lower bound: null when the page sample was truncated.
+      aiRequestCount: aiSampleReliable ? (aiByUser.get(id) ?? 0) : null,
       health,
     };
   });
 
+  const planRows = planRes.data ?? [];
   const planDist: Record<string, number> = {};
-  for (const ws of workspaces) {
+  for (const ws of planRows) {
     const plan = normalizePlanId(String(ws.plan));
     planDist[plan] = (planDist[plan] ?? 0) + 1;
   }
+  const planDistribution: MetricResult<Record<string, number>> =
+    planRows.length === 2000
+      ? partial(planDist, "workspaces.plan", "Plan sample truncated at 2000 rows")
+      : available(planDist, "workspaces.plan");
 
-  const withWebsiteOwners = new Set(
-    websites.map((s) => {
-      const ws = workspaces.find((w) => w.id === s.workspace_id);
-      return ws?.owner_id as string | undefined;
-    }).filter(Boolean) as string[],
-  );
-  const publishedOwners = new Set(
-    websites
-      .filter((s) => s.status === "published")
-      .map((s) => {
-        const ws = workspaces.find((w) => w.id === s.workspace_id);
-        return ws?.owner_id as string | undefined;
-      })
-      .filter(Boolean) as string[],
-  );
-
-  const newUsers = profiles.filter(
-    (p) =>
-      Date.parse(p.created_at as string) >= Date.parse(range.start) &&
-      Date.parse(p.created_at as string) < Date.parse(range.end),
-  ).length;
-
-  // Total users — recount without search filter
-  const { count: totalCount } = await db
-    .from("profiles")
-    .select("id", { count: "exact", head: true });
+  const siteSample = siteSampleRes.data ?? [];
+  const wsWithSite = new Set<string>();
+  const wsPublished = new Set<string>();
+  for (const s of siteSample) {
+    const wid = s.workspace_id as string;
+    wsWithSite.add(wid);
+    if (s.status === "published") wsPublished.add(wid);
+  }
+  const siteSamplePartial = siteSample.length === 5000;
+  const withWebsite: MetricResult<number> = siteSamplePartial
+    ? partial(
+        wsWithSite.size,
+        "websites.workspace_id",
+        "Website sample truncated at 5000 rows",
+      )
+    : available(wsWithSite.size, "websites.workspace_id");
+  const publishedUsers: MetricResult<number> = siteSamplePartial
+    ? partial(
+        wsPublished.size,
+        "websites.status",
+        "Website sample truncated at 5000 rows",
+      )
+    : available(wsPublished.size, "websites.status");
 
   return {
     metrics: {
-      totalUsers: available(totalCount ?? profiles.length, "profiles"),
-      newUsers: available(newUsers, "profiles.created_at"),
-      withWorkspace: available(wsByOwner.size, "workspaces.owner_id"),
-      withWebsite: available(withWebsiteOwners.size, "websites"),
-      publishedUsers: available(publishedOwners.size, "websites.status"),
-      planDistribution: available(planDist, "workspaces.plan"),
-      lastActivity: unavailable(
-        "Last activity requires reliable session/product activity instrumentation",
-        "product_events",
-      ),
+      totalUsers: countMetric(totalRes, "profiles"),
+      newUsers: countMetric(newUsersRes, "profiles.created_at"),
+      withWorkspace: countMetric(wsCountRes, "workspaces"),
+      withWebsite,
+      publishedUsers,
+      planDistribution,
+      lastActivity,
     },
     rows,
   };
@@ -237,6 +364,8 @@ export type AdminUser360 = {
   user: AdminUserListItem;
   entitlements: ReturnType<typeof getWorkspaceEntitlements> | null;
   notes: Array<{ id: string; body: string; createdAt: string; authorUserId: string | null }>;
+  /** Non-null when notes could not be loaded (e.g. Phase 3 migration missing). */
+  notesUnavailableReason: string | null;
   recentActivity: Array<{
     id: string;
     kind: string;
@@ -257,59 +386,138 @@ export async function getAdminUser360(input: {
 }): Promise<AdminUser360 | null> {
   await authorize(input.userId, "users.read");
   if (!supabaseConfigured()) return null;
-  const { rows } = await getAdminUsersEnriched({
-    userId: input.userId,
-    limit: 200,
-  });
-  const user = rows.find((r) => r.id === input.targetUserId);
-  if (!user) return null;
 
   const db = getSupabaseAdmin();
-  const [notesRes, eventsRes, sitesRes] = await Promise.all([
-    db
-      .from("admin_support_notes")
-      .select("id, body, created_at, author_user_id")
-      .eq("target_user_id", input.targetUserId)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    db
-      .from("product_events")
-      .select("id, event_name, occurred_at")
-      .eq("user_id", input.targetUserId)
-      .order("occurred_at", { ascending: false })
-      .limit(30),
-    user.workspaceId
-      ? db
-          .from("websites")
-          .select("id, slug, status, updated_at")
-          .eq("workspace_id", user.workspaceId)
-          .is("deleted_at", null)
-          .order("updated_at", { ascending: false })
-          .limit(50)
-      : Promise.resolve({ data: [] as unknown[], error: null }),
-  ]);
+  const { data: profile, error: profileError } = await db
+    .from("profiles")
+    .select("id, email, name, avatar_url, created_at")
+    .eq("id", input.targetUserId)
+    .maybeSingle();
+  if (profileError || !profile) return null;
+
+  const { data: workspace } = await db
+    .from("workspaces")
+    .select("id, owner_id, name, plan")
+    .eq("owner_id", input.targetUserId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const workspaceId = workspace ? (workspace.id as string) : null;
+
+  const [notesRes, eventsRes, sitesRes, importsRes, jobsRes, aiRes] =
+    await Promise.all([
+      db
+        .from("admin_support_notes")
+        .select("id, body, created_at, author_user_id")
+        .eq("target_user_id", input.targetUserId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      db
+        .from("product_events")
+        .select("id, event_name, occurred_at")
+        .eq("user_id", input.targetUserId)
+        .order("occurred_at", { ascending: false })
+        .limit(30),
+      workspaceId
+        ? db
+            .from("websites")
+            .select("id, slug, status, updated_at")
+            .eq("workspace_id", workspaceId)
+            .is("deleted_at", null)
+            .order("updated_at", { ascending: false })
+            .limit(50)
+        : Promise.resolve({ data: [] as unknown[], error: null }),
+      workspaceId
+        ? db
+            .from("instagram_imports")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", workspaceId)
+        : Promise.resolve({ count: 0, error: null }),
+      workspaceId
+        ? db
+            .from("import_jobs")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", workspaceId)
+            .eq("status", "failed")
+        : Promise.resolve({ count: 0, error: null }),
+      db
+        .from("ai_usage_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", input.targetUserId),
+    ]);
+
+  const sites = (sitesRes.data ?? []) as Array<{
+    id: string;
+    slug: string;
+    status: string;
+    updated_at: string;
+  }>;
+  const published = sites.filter((s) => s.status === "published").length;
+
+  let domainCount = 0;
+  if (sites.length > 0) {
+    const { count } = await db
+      .from("domains")
+      .select("id", { count: "exact", head: true })
+      .in(
+        "website_id",
+        sites.map((s) => s.id),
+      );
+    domainCount = count ?? 0;
+  }
+
+  const plan = workspace ? normalizePlanId(String(workspace.plan)) : null;
+  const importCount = importsRes.count ?? 0;
+  const failedImportJobs = jobsRes.count ?? 0;
+
+  const user: AdminUserListItem = {
+    id: profile.id as string,
+    email: (profile.email as string) ?? "",
+    name: (profile.name as string | null) ?? null,
+    avatarUrl: (profile.avatar_url as string | null) ?? null,
+    createdAt: profile.created_at as string,
+    workspaceId,
+    workspaceName: workspace ? (workspace.name as string) : null,
+    plan,
+    websiteCount: sites.length,
+    publishedCount: published,
+    importCount,
+    aiRequestCount: aiRes.error ? null : (aiRes.count ?? 0),
+    health: workspace
+      ? assessWorkspaceHealth({
+          websiteCount: sites.length,
+          publishedCount: published,
+          failedImportJobs,
+          successfulImports: importCount,
+          domainCount,
+          plan: String(workspace.plan ?? "free"),
+        })
+      : null,
+  };
 
   return {
     user,
-    entitlements: user.plan ? getWorkspaceEntitlements(user.plan) : null,
+    entitlements: plan ? getWorkspaceEntitlements(plan) : null,
     notes: (notesRes.data ?? []).map((n) => ({
       id: n.id as string,
       body: n.body as string,
       createdAt: n.created_at as string,
       authorUserId: (n.author_user_id as string | null) ?? null,
     })),
+    notesUnavailableReason: notesRes.error
+      ? isMissingRelation(notesRes.error)
+        ? "admin_support_notes table missing — apply migration 20260916010000_admin_phase3.sql"
+        : `Notes query failed (${notesRes.error.code ?? "unknown"})`
+      : null,
     recentActivity: (eventsRes.data ?? []).map((e) => ({
       id: e.id as string,
       kind: "product",
       action: e.event_name as string,
       occurredAt: e.occurred_at as string,
     })),
-    websites: ((sitesRes.data ?? []) as Array<{
-      id: string;
-      slug: string;
-      status: string;
-      updated_at: string;
-    }>).map((s) => ({
+    websites: sites.map((s) => ({
       id: s.id,
       slug: s.slug,
       status: s.status,
@@ -360,58 +568,125 @@ export async function getAdminWorkspacesEnriched(input: {
 
   const db = getSupabaseAdmin();
   const limit = Math.min(input.limit ?? 100, 200);
-  const [wsRes, sitesRes, importsRes, domainsRes, ordersRes, jobsRes] =
-    await Promise.all([
-      db
-        .from("workspaces")
-        .select("id, owner_id, name, plan, created_at")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(limit),
+
+  const [totalRes, wsRes, siteSampleRes, planRes] = await Promise.all([
+    db
+      .from("workspaces")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null),
+    db
+      .from("workspaces")
+      .select("id, owner_id, name, plan, created_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    db
+      .from("websites")
+      .select("workspace_id, status")
+      .is("deleted_at", null)
+      .limit(5000),
+    db
+      .from("workspaces")
+      .select("plan")
+      .is("deleted_at", null)
+      .limit(2000),
+  ]);
+
+  const workspaces = wsRes.data ?? [];
+  const workspaceIds = workspaces.map((w) => w.id as string);
+
+  type SiteRow = { id: string; workspace_id: string; status: string };
+  let websites: SiteRow[] = [];
+  let imports: Array<{ id: string; workspace_id: string }> = [];
+  let orders: Array<{ id: string; workspace_id: string }> = [];
+  let failedJobs: Array<{ id: string; workspace_id: string }> = [];
+  let domains: Array<{ id: string; website_id: string }> = [];
+
+  if (workspaceIds.length > 0) {
+    const [sitesRes, importsRes, ordersRes, jobsRes] = await Promise.all([
       db
         .from("websites")
         .select("id, workspace_id, status")
+        .in("workspace_id", workspaceIds)
         .is("deleted_at", null),
-      db.from("instagram_imports").select("id, workspace_id"),
-      db.from("domains").select("id, website_id"),
-      db.from("store_orders").select("id, workspace_id"),
+      db
+        .from("instagram_imports")
+        .select("id, workspace_id")
+        .in("workspace_id", workspaceIds),
+      db
+        .from("store_orders")
+        .select("id, workspace_id")
+        .in("workspace_id", workspaceIds),
       db
         .from("import_jobs")
-        .select("id, workspace_id, status")
+        .select("id, workspace_id")
+        .in("workspace_id", workspaceIds)
         .eq("status", "failed")
         .limit(2000),
     ]);
+    websites = (sitesRes.data ?? []) as SiteRow[];
+    imports = importsRes.data ?? [];
+    orders = ordersRes.data ?? [];
+    failedJobs = jobsRes.data ?? [];
 
-  const workspaces = wsRes.data ?? [];
-  const websites = sitesRes.data ?? [];
-  const siteIdToWs = new Map(
-    websites.map((s) => [s.id as string, s.workspace_id as string]),
-  );
+    const websiteIds = websites.map((s) => s.id);
+    if (websiteIds.length > 0) {
+      const domainsRes = await db
+        .from("domains")
+        .select("id, website_id")
+        .in("website_id", websiteIds);
+      domains = domainsRes.data ?? [];
+    }
+  }
 
+  const siteIdToWs = new Map(websites.map((s) => [s.id, s.workspace_id]));
   const domainByWs = new Map<string, number>();
-  for (const d of domainsRes.data ?? []) {
-    const wid = siteIdToWs.get(d.website_id as string);
+  for (const d of domains) {
+    const wid = siteIdToWs.get(d.website_id);
     if (!wid) continue;
     domainByWs.set(wid, (domainByWs.get(wid) ?? 0) + 1);
   }
 
+  const sitesByWs = new Map<string, SiteRow[]>();
+  for (const site of websites) {
+    const list = sitesByWs.get(site.workspace_id) ?? [];
+    list.push(site);
+    sitesByWs.set(site.workspace_id, list);
+  }
+
+  const importsByWs = new Map<string, number>();
+  for (const item of imports) {
+    importsByWs.set(
+      item.workspace_id,
+      (importsByWs.get(item.workspace_id) ?? 0) + 1,
+    );
+  }
+  const ordersByWs = new Map<string, number>();
+  for (const item of orders) {
+    ordersByWs.set(
+      item.workspace_id,
+      (ordersByWs.get(item.workspace_id) ?? 0) + 1,
+    );
+  }
+  const failedByWs = new Map<string, number>();
+  for (const job of failedJobs) {
+    failedByWs.set(
+      job.workspace_id,
+      (failedByWs.get(job.workspace_id) ?? 0) + 1,
+    );
+  }
+
   const rows: AdminWorkspaceListItem[] = workspaces.map((ws) => {
     const wid = ws.id as string;
-    const sites = websites.filter((s) => s.workspace_id === wid);
+    const sites = sitesByWs.get(wid) ?? [];
     const published = sites.filter((s) => s.status === "published").length;
-    const importCount = (importsRes.data ?? []).filter(
-      (i) => i.workspace_id === wid,
-    ).length;
-    const orderCount = (ordersRes.data ?? []).filter(
-      (o) => o.workspace_id === wid,
-    ).length;
-    const failedJobs = (jobsRes.data ?? []).filter(
-      (j) => j.workspace_id === wid,
-    ).length;
+    const importCount = importsByWs.get(wid) ?? 0;
+    const orderCount = ordersByWs.get(wid) ?? 0;
+    const failedJobCount = failedByWs.get(wid) ?? 0;
     const health = assessWorkspaceHealth({
       websiteCount: sites.length,
       publishedCount: published,
-      failedImportJobs: failedJobs,
+      failedImportJobs: failedJobCount,
       successfulImports: importCount,
       domainCount: domainByWs.get(wid) ?? 0,
       plan: String(ws.plan ?? "free"),
@@ -431,23 +706,48 @@ export async function getAdminWorkspacesEnriched(input: {
     };
   });
 
+  const planRows = planRes.data ?? [];
   const planDist: Record<string, number> = {};
-  for (const r of rows) {
-    planDist[r.plan] = (planDist[r.plan] ?? 0) + 1;
+  for (const w of planRows) {
+    const plan = normalizePlanId(String(w.plan));
+    planDist[plan] = (planDist[plan] ?? 0) + 1;
   }
+
+  const siteSample = siteSampleRes.data ?? [];
+  const wsWithSite = new Set<string>();
+  const wsPublished = new Set<string>();
+  for (const s of siteSample) {
+    const wid = s.workspace_id as string;
+    wsWithSite.add(wid);
+    if (s.status === "published") wsPublished.add(wid);
+  }
+  const sitePartial = siteSample.length === 5000;
 
   return {
     metrics: {
-      total: available(rows.length, "workspaces"),
-      withWebsites: available(
-        rows.filter((r) => r.websiteCount > 0).length,
-        "websites",
-      ),
-      published: available(
-        rows.filter((r) => r.publishedCount > 0).length,
-        "websites.status",
-      ),
-      planDistribution: available(planDist, "workspaces.plan"),
+      total: countMetric(totalRes, "workspaces"),
+      withWebsites: sitePartial
+        ? partial(
+            wsWithSite.size,
+            "websites.workspace_id",
+            "Website sample truncated at 5000 rows",
+          )
+        : available(wsWithSite.size, "websites.workspace_id"),
+      published: sitePartial
+        ? partial(
+            wsPublished.size,
+            "websites.status",
+            "Website sample truncated at 5000 rows",
+          )
+        : available(wsPublished.size, "websites.status"),
+      planDistribution:
+        planRows.length === 2000
+          ? partial(
+              planDist,
+              "workspaces.plan",
+              "Plan sample truncated at 2000 rows",
+            )
+          : available(planDist, "workspaces.plan"),
     },
     rows,
   };
@@ -495,34 +795,72 @@ export async function getAdminWebsitesEnriched(input: {
 
   const db = getSupabaseAdmin();
   const limit = Math.min(input.limit ?? 100, 200);
-  const [sitesRes, domainsRes, viewsRes] = await Promise.all([
-    db
-      .from("websites")
-      .select(
-        "id, workspace_id, slug, status, version, created_at, updated_at, published_at",
-      )
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(limit),
-    db.from("domains").select("id, website_id, host"),
-    db.from("page_views").select("website_id").limit(10000),
-  ]);
 
-  const domains = domainsRes.data ?? [];
+  const [totalRes, publishedRes, unpublishedRes, domainRes, sitesRes] =
+    await Promise.all([
+      db
+        .from("websites")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null),
+      db
+        .from("websites")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .eq("status", "published"),
+      db
+        .from("websites")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .neq("status", "published"),
+      db.from("domains").select("id", { count: "exact", head: true }),
+      db
+        .from("websites")
+        .select(
+          "id, workspace_id, slug, status, version, created_at, updated_at, published_at",
+        )
+        .is("deleted_at", null)
+        .order("updated_at", { ascending: false })
+        .limit(limit),
+    ]);
+
+  const sites = sitesRes.data ?? [];
+  const pageIds = sites.map((s) => s.id as string);
+
   const domainBySite = new Map<string, string>();
-  for (const d of domains) {
-    if (!domainBySite.has(d.website_id as string)) {
-      domainBySite.set(d.website_id as string, d.host as string);
+  const viewsBySite = new Map<string, number>();
+  let pageViewsReliable = true;
+
+  if (pageIds.length > 0) {
+    const [domainsRes, viewsRes] = await Promise.all([
+      db
+        .from("domains")
+        .select("id, website_id, host")
+        .in("website_id", pageIds),
+      db
+        .from("page_views")
+        .select("website_id")
+        .in("website_id", pageIds)
+        .limit(5000),
+    ]);
+
+    for (const d of domainsRes.data ?? []) {
+      if (!domainBySite.has(d.website_id as string)) {
+        domainBySite.set(d.website_id as string, d.host as string);
+      }
+    }
+
+    const viewRows = viewsRes.data ?? [];
+    if (viewsRes.error || viewRows.length === 5000) {
+      pageViewsReliable = false;
+    } else {
+      for (const v of viewRows) {
+        const sid = v.website_id as string;
+        viewsBySite.set(sid, (viewsBySite.get(sid) ?? 0) + 1);
+      }
     }
   }
 
-  const viewsBySite = new Map<string, number>();
-  for (const v of viewsRes.data ?? []) {
-    const sid = v.website_id as string;
-    viewsBySite.set(sid, (viewsBySite.get(sid) ?? 0) + 1);
-  }
-
-  const rows: AdminWebsiteListItem[] = (sitesRes.data ?? []).map((s) => {
+  const rows: AdminWebsiteListItem[] = sites.map((s) => {
     const id = s.id as string;
     const host = domainBySite.get(id) ?? null;
     return {
@@ -535,7 +873,7 @@ export async function getAdminWebsitesEnriched(input: {
       updatedAt: s.updated_at as string,
       publishedAt: (s.published_at as string | null) ?? null,
       domainHost: host,
-      pageViews: viewsBySite.get(id) ?? 0,
+      pageViews: pageViewsReliable ? (viewsBySite.get(id) ?? 0) : null,
       health: assessWebsiteHealth({
         status: s.status as string,
         hasDomain: Boolean(host),
@@ -545,16 +883,12 @@ export async function getAdminWebsitesEnriched(input: {
     };
   });
 
-  const published = rows.filter((r) => r.status === "published").length;
   return {
     metrics: {
-      total: available(rows.length, "websites"),
-      published: available(published, "websites.status"),
-      unpublished: available(rows.length - published, "websites.status"),
-      withDomain: available(
-        rows.filter((r) => r.domainHost).length,
-        "domains",
-      ),
+      total: countMetric(totalRes, "websites"),
+      published: countMetric(publishedRes, "websites.status"),
+      unpublished: countMetric(unpublishedRes, "websites.status"),
+      withDomain: countMetric(domainRes, "domains"),
     },
     rows,
   };
@@ -569,16 +903,24 @@ export async function getAdminDomainsList(input: {
   const db = getSupabaseAdmin();
   const { data } = await db
     .from("domains")
-    .select("id, website_id, host, created_at, websites!inner(slug, workspace_id, status)")
+    .select(
+      "id, website_id, host, created_at, websites!inner(slug, workspace_id, status, deleted_at)",
+    )
     .order("created_at", { ascending: false })
     .limit(Math.min(input.limit ?? 100, 200));
-  return (data ?? []).map((row) => {
-    const site = row.websites as unknown as {
-      slug: string;
-      workspace_id: string;
-      status: string;
-    };
-    return {
+
+  return (data ?? [])
+    .map((row) => {
+      const site = row.websites as unknown as {
+        slug: string;
+        workspace_id: string;
+        status: string;
+        deleted_at: string | null;
+      };
+      return { row, site };
+    })
+    .filter(({ site }) => site.deleted_at == null)
+    .map(({ row, site }) => ({
       id: row.id as string,
       host: row.host as string,
       websiteId: row.website_id as string,
@@ -587,8 +929,7 @@ export async function getAdminDomainsList(input: {
       websiteStatus: site.status,
       createdAt: row.created_at as string,
       health: site.status === "published" ? "connected" : "unknown",
-    };
-  });
+    }));
 }
 
 export async function getAdminMediaList(input: {
@@ -760,6 +1101,7 @@ export async function getAdminAIBreakdown(input: {
   }
 
   const db = getSupabaseAdmin();
+  const AI_LIMIT = 2000;
   const { data } = await db
     .from("ai_usage_logs")
     .select(
@@ -768,7 +1110,7 @@ export async function getAdminAIBreakdown(input: {
     .gte("created_at", range.start)
     .lt("created_at", range.end)
     .order("created_at", { ascending: false })
-    .limit(2000);
+    .limit(AI_LIMIT);
 
   const rows = data ?? [];
   const modelMap = new Map<
@@ -826,6 +1168,12 @@ export async function getAdminAIBreakdown(input: {
     if (!latencies.length) {
       return unavailable("no latency samples", "ai_usage_logs.latency_ms");
     }
+    if ((p === 95 || p === 99) && latencies.length < 20) {
+      return unavailable(
+        "Insufficient latency samples (need ≥20)",
+        "ai_usage_logs.latency_ms",
+      );
+    }
     const idx = Math.min(
       latencies.length - 1,
       Math.max(0, Math.ceil((p / 100) * latencies.length) - 1),
@@ -833,10 +1181,15 @@ export async function getAdminAIBreakdown(input: {
     return available(latencies[idx]!, "ai_usage_logs.latency_ms");
   };
 
-  const { data: prompts } = await db
+  const { data: prompts, error: promptsError } = await db
     .from("ai_prompt_registry")
     .select("feature, version, status, notes")
     .order("feature");
+  const promptsUnavailableReason = promptsError
+    ? isMissingRelation(promptsError)
+      ? "ai_prompt_registry table missing — apply migration 20260916010000_admin_phase3.sql"
+      : `Query failed (${promptsError.code ?? "unknown"})`
+    : null;
 
   return {
     byModel: [...modelMap.values()].map((m) => ({
@@ -870,6 +1223,7 @@ export async function getAdminAIBreakdown(input: {
       status: p.status as string,
       notes: (p.notes as string | null) ?? null,
     })),
+    promptsUnavailableReason,
   };
 }
 
@@ -894,12 +1248,13 @@ export async function getAdminProductAnalytics(input: {
     };
   }
   const db = getSupabaseAdmin();
+  const EVENT_LIMIT = 5000;
   const { data } = await db
     .from("product_events")
     .select("id, event_name, occurred_at")
     .gte("occurred_at", range.start)
     .lt("occurred_at", range.end)
-    .limit(5000);
+    .limit(EVENT_LIMIT);
 
   const rows = data ?? [];
   const byEvent = new Map<string, number>();
@@ -911,8 +1266,17 @@ export async function getAdminProductAnalytics(input: {
     byDay.set(day, (byDay.get(day) ?? 0) + 1);
   }
 
+  const eventVolume: MetricResult<number> =
+    rows.length === EVENT_LIMIT
+      ? partial(
+          rows.length,
+          "product_events",
+          "Event sample truncated at 5000 rows",
+        )
+      : available(rows.length, "product_events");
+
   return {
-    eventVolume: available(rows.length, "product_events"),
+    eventVolume,
     byEvent: [...byEvent.entries()]
       .map(([event, count]) => ({ event, count }))
       .sort((a, b) => b.count - a.count),
@@ -996,9 +1360,29 @@ export async function getAdminFunnelView(input: { userId: string }) {
   };
 }
 
-export async function getAdminIncidents(input: { userId: string }) {
+/** PostgREST error codes meaning "table not in schema" (migration not applied). */
+function isMissingRelation(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  return (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    /schema cache|does not exist/i.test(error.message ?? "")
+  );
+}
+
+export type AdminIncidentsResult = {
+  rows: Array<Record<string, unknown>>;
+  /** Non-null when the list could not be trusted (e.g. migration missing). */
+  unavailableReason: string | null;
+};
+
+export async function getAdminIncidents(input: {
+  userId: string;
+}): Promise<AdminIncidentsResult> {
   await authorize(input.userId, "system.read");
-  if (!supabaseConfigured()) return [];
+  if (!supabaseConfigured()) {
+    return { rows: [], unavailableReason: "Supabase not configured" };
+  }
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("admin_incidents")
@@ -1007,8 +1391,15 @@ export async function getAdminIncidents(input: { userId: string }) {
     )
     .order("started_at", { ascending: false })
     .limit(100);
-  if (error) return [];
-  return data ?? [];
+  if (error) {
+    return {
+      rows: [],
+      unavailableReason: isMissingRelation(error)
+        ? "admin_incidents table missing — apply migration 20260916010000_admin_phase3.sql"
+        : `Query failed (${error.code ?? "unknown"})`,
+    };
+  }
+  return { rows: data ?? [], unavailableReason: null };
 }
 
 export async function getAdminAtRiskWorkspaces(input: { userId: string }) {
@@ -1042,18 +1433,29 @@ export async function searchAdminEntities(input: {
   const q = input.q.trim();
   if (!q || !supabaseConfigured()) return [];
   const db = getSupabaseAdmin();
-  const like = `%${q.replace(/[%_,]/g, "")}%`;
+  const qSafe = sanitizeSearchTerm(q);
+  const like = `%${qSafe}%`;
   const locale = input.locale;
-  if (like.length < 3) return [];
+  if (qSafe.length < 1 || like.length < 3) return [];
 
   const [users, workspaces, websites, jobs, orders, domains] = await Promise.all([
     db
       .from("profiles")
       .select("id, email, name")
-      .or(`email.ilike.${like},name.ilike.${like}`)
+      .or(`email.ilike."${like}",name.ilike."${like}"`)
       .limit(8),
-    db.from("workspaces").select("id, name").ilike("name", like).limit(8),
-    db.from("websites").select("id, slug").ilike("slug", like).limit(8),
+    db
+      .from("workspaces")
+      .select("id, name")
+      .ilike("name", like)
+      .is("deleted_at", null)
+      .limit(8),
+    db
+      .from("websites")
+      .select("id, slug")
+      .ilike("slug", like)
+      .is("deleted_at", null)
+      .limit(8),
     db
       .from("import_jobs")
       .select("id, status")

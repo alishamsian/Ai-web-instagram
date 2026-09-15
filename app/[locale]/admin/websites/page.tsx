@@ -94,8 +94,15 @@ export default async function AdminWebsitesPage({
           {
             id: "views",
             header: "Views",
-            sortValue: (r) => r.pageViews ?? 0,
-            cell: (r) => r.pageViews ?? 0,
+            sortValue: (r) => r.pageViews ?? -1,
+            cell: (r) =>
+              r.pageViews == null ? (
+                <span className="text-[var(--admin-muted)]" title="Exact page-view total unavailable for this sample">
+                  —
+                </span>
+              ) : (
+                r.pageViews
+              ),
           },
           {
             id: "health",

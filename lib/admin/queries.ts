@@ -46,6 +46,10 @@ function available<T>(value: T, source: string): MetricResult<T> {
   return { status: "available", value, source };
 }
 
+function partial<T>(value: T, source: string, warning: string): MetricResult<T> {
+  return { status: "partial", value, source, warning };
+}
+
 function deltaRatio(
   current: MetricResult<number>,
   previous: MetricResult<number>,
@@ -94,7 +98,13 @@ async function sumDailyMetric(
       .gte("date", startDay)
       .lte("date", endDay);
     if (error) return unavailable(error.message, "daily_metrics");
-    const total = (data ?? []).reduce(
+    if (!data || data.length === 0) {
+      return unavailable(
+        "No daily_metrics rows for selected period",
+        "daily_metrics",
+      );
+    }
+    const total = data.reduce(
       (sum, row) =>
         sum + Number((row as unknown as Record<string, unknown>)[column] ?? 0),
       0,
@@ -197,38 +207,100 @@ export async function getAdminDashboardMetrics(
     sumDailyMetric("subscriptions_started", comparison.previous),
   ]);
 
-  // Fallbacks when daily_metrics empty — real table counts, never invented.
-  const websitesCreated =
-    websitesCreatedC.status === "available" && websitesCreatedC.value === 0
-      ? await countTable({
-          table: "websites",
-          timeColumn: "created_at",
-          range,
-          isNull: ["deleted_at"],
-        })
-      : websitesCreatedC;
+  // Fallbacks when daily_metrics empty/unavailable — real table counts, never invented.
+  async function withTableFallback(
+    metric: MetricResult<number>,
+    fallback: () => Promise<MetricResult<number>>,
+  ): Promise<MetricResult<number>> {
+    if (metric.status === "unavailable") return fallback();
+    if (metric.status === "available" && metric.value === 0) return fallback();
+    return metric;
+  }
 
-  const websitesCreatedPrev =
-    websitesCreatedP.status === "available" && websitesCreatedP.value === 0
-      ? await countTable({
-          table: "websites",
-          timeColumn: "created_at",
-          range: comparison.previous,
-          isNull: ["deleted_at"],
-        })
-      : websitesCreatedP;
+  const [
+    websitesCreated,
+    websitesCreatedPrev,
+    newUsersResolved,
+    newUsersPrevResolved,
+    importsResolved,
+    importsPrevResolved,
+    websitesPublishedResolved,
+    websitesPublishedPrevResolved,
+  ] = await Promise.all([
+    withTableFallback(websitesCreatedC, () =>
+      countTable({
+        table: "websites",
+        timeColumn: "created_at",
+        range,
+        isNull: ["deleted_at"],
+      }),
+    ),
+    withTableFallback(websitesCreatedP, () =>
+      countTable({
+        table: "websites",
+        timeColumn: "created_at",
+        range: comparison.previous,
+        isNull: ["deleted_at"],
+      }),
+    ),
+    withTableFallback(newUsersC, () =>
+      countTable({ table: "profiles", timeColumn: "created_at", range }),
+    ),
+    withTableFallback(newUsersP, () =>
+      countTable({
+        table: "profiles",
+        timeColumn: "created_at",
+        range: comparison.previous,
+      }),
+    ),
+    withTableFallback(importsC, () =>
+      countTable({
+        table: "instagram_imports",
+        timeColumn: "created_at",
+        range,
+      }),
+    ),
+    withTableFallback(importsP, () =>
+      countTable({
+        table: "instagram_imports",
+        timeColumn: "created_at",
+        range: comparison.previous,
+      }),
+    ),
+    withTableFallback(websitesPublishedC, () =>
+      countTable({
+        table: "websites",
+        timeColumn: "published_at",
+        range,
+        eq: { status: "published" },
+        isNull: ["deleted_at"],
+      }),
+    ),
+    withTableFallback(websitesPublishedP, () =>
+      countTable({
+        table: "websites",
+        timeColumn: "published_at",
+        range: comparison.previous,
+        eq: { status: "published" },
+        isNull: ["deleted_at"],
+      }),
+    ),
+  ]);
 
   return {
     range,
     comparison,
-    newUsers: comparable(newUsersC, newUsersP),
+    newUsers: comparable(newUsersResolved, newUsersPrevResolved),
     activeUsers: comparable(
       unavailable("active_users requires session/activity instrumentation"),
       unavailable("active_users requires session/activity instrumentation"),
     ),
     websitesCreated: comparable(websitesCreated, websitesCreatedPrev),
-    websitesPublished: comparable(websitesPublishedC, websitesPublishedP),
-    imports: comparable(importsC, importsP),
+    websitesPublished: comparable(
+      websitesPublishedResolved,
+      websitesPublishedPrevResolved,
+    ),
+    imports: comparable(importsResolved, importsPrevResolved),
     successfulImports: comparable(okImportsC, okImportsP),
     failedImports: comparable(failImportsC, failImportsP),
     aiRequests: comparable(aiC, aiP),
@@ -373,11 +445,12 @@ export async function getAdminOrders(
   if (!supabaseConfigured()) return [];
   const range = rangeFromInput(input);
   const db = getSupabaseAdmin();
+  // Deliberately excludes customer_contact / customer_note / items:
+  // the admin list needs no customer PII, and the column is added by a
+  // later migration that may not be applied on every environment.
   const { data, error } = await db
     .from("store_orders")
-    .select(
-      "id, website_id, workspace_id, channel, status, created_at, customer_contact",
-    )
+    .select("id, website_id, workspace_id, channel, status, created_at")
     .gte("created_at", range.start)
     .lt("created_at", range.end)
     .order("created_at", { ascending: false })
@@ -406,11 +479,13 @@ export async function getAdminAIUsage(
   }
 
   const db = getSupabaseAdmin();
+  const AI_SAMPLE_LIMIT = 2000;
   const { data, error } = await db
     .from("ai_usage_logs")
     .select("status, estimated_cost, latency_ms, created_at")
     .gte("created_at", range.start)
-    .lt("created_at", range.end);
+    .lt("created_at", range.end)
+    .limit(AI_SAMPLE_LIMIT);
   if (error) {
     const empty = unavailable<number>(error.message, "ai_usage_logs");
     return {
@@ -424,6 +499,11 @@ export async function getAdminAIUsage(
   }
 
   const rows = data ?? [];
+  const truncated = rows.length === AI_SAMPLE_LIMIT;
+  const warn = "Sample truncated at 2000 rows";
+  const metric = (value: number, source: string): MetricResult<number> =>
+    truncated ? partial(value, source, warn) : available(value, source);
+
   const completed = rows.filter((r) => r.status === "completed").length;
   const failed = rows.filter((r) => r.status === "failed").length;
   const cost = rows.reduce(
@@ -436,23 +516,29 @@ export async function getAdminAIUsage(
   const avgLatency =
     latencies.length === 0
       ? unavailable<number>("no latency samples", "ai_usage_logs")
-      : available(
-          Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length),
-          "ai_usage_logs.latency_ms",
-        );
+      : truncated
+        ? partial(
+            Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length),
+            "ai_usage_logs.latency_ms",
+            warn,
+          )
+        : available(
+            Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length),
+            "ai_usage_logs.latency_ms",
+          );
 
   const prev = await sumDailyMetric("ai_requests", comparison.previous);
   const prevCost = await sumDailyMetric("ai_cost", comparison.previous);
 
   return {
     range,
-    requests: comparable(
-      available(rows.length, "ai_usage_logs"),
-      prev,
+    requests: comparable(metric(rows.length, "ai_usage_logs"), prev),
+    completed: metric(completed, "ai_usage_logs"),
+    failed: metric(failed, "ai_usage_logs"),
+    estimatedCost: comparable(
+      metric(cost, "ai_usage_logs.estimated_cost"),
+      prevCost,
     ),
-    completed: available(completed, "ai_usage_logs"),
-    failed: available(failed, "ai_usage_logs"),
-    estimatedCost: comparable(available(cost, "ai_usage_logs.estimated_cost"), prevCost),
     avgLatencyMs: avgLatency,
   };
 }
@@ -501,12 +587,21 @@ export async function getAdminSystemHealth(
         .eq("status", "queued"),
     ]);
 
+  const countMetric = (
+    res: { count: number | null; error: { message: string } | null },
+    source: string,
+  ): MetricResult<number> => {
+    if (res.error) return unavailable("Count query failed", source);
+    if (res.count == null) return unavailable("Count not returned", source);
+    return available(res.count, source);
+  };
+
   return {
-    openAlerts: available(openAlerts.count ?? 0, "alerts"),
-    criticalAlerts: available(criticalAlerts.count ?? 0, "alerts"),
-    recentSystemEvents: available(systemEvents.count ?? 0, "system_events"),
-    failedJobs24h: available(failedJobs.count ?? 0, "import_jobs"),
-    queueDepth: available(queued.count ?? 0, "import_jobs"),
+    openAlerts: countMetric(openAlerts, "alerts"),
+    criticalAlerts: countMetric(criticalAlerts, "alerts"),
+    recentSystemEvents: countMetric(systemEvents, "system_events"),
+    failedJobs24h: countMetric(failedJobs, "import_jobs"),
+    queueDepth: countMetric(queued, "import_jobs"),
   };
 }
 

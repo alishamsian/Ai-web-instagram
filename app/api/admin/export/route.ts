@@ -54,59 +54,77 @@ export async function GET(request: Request) {
 
     if (entity === "users") {
       headers = ["id", "email", "name", "created_at"];
-      const { data } = await db
+      const { data, error } = await db
         .from("profiles")
         .select("id, email, name, created_at")
         .order("created_at", { ascending: false })
         .limit(EXPORT_LIMIT);
+      if (error) {
+        return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+      }
       rows = (data ?? []) as Record<string, unknown>[];
     } else if (entity === "workspaces") {
-      headers = ["id", "name", "plan", "owner_user_id", "created_at"];
-      const { data } = await db
+      headers = ["id", "name", "plan", "owner_id", "created_at"];
+      const { data, error } = await db
         .from("workspaces")
-        .select("id, name, plan, owner_user_id, created_at")
+        .select("id, name, plan, owner_id, created_at")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(EXPORT_LIMIT);
+      if (error) {
+        return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+      }
       rows = (data ?? []) as Record<string, unknown>[];
     } else if (entity === "websites") {
       headers = ["id", "slug", "status", "workspace_id", "created_at"];
-      const { data } = await db
+      const { data, error } = await db
         .from("websites")
         .select("id, slug, status, workspace_id, created_at")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(EXPORT_LIMIT);
+      if (error) {
+        return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+      }
       rows = (data ?? []) as Record<string, unknown>[];
     } else if (entity === "orders") {
       headers = ["id", "status", "channel", "workspace_id", "created_at"];
-      const { data } = await db
+      const { data, error } = await db
         .from("store_orders")
         .select("id, status, channel, workspace_id, created_at")
         .order("created_at", { ascending: false })
         .limit(EXPORT_LIMIT);
+      if (error) {
+        return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+      }
       rows = (data ?? []) as Record<string, unknown>[];
     } else if (entity === "jobs") {
       headers = ["id", "status", "stage", "retry_count", "created_at"];
-      const { data } = await db
+      const { data, error } = await db
         .from("import_jobs")
         .select("id, status, stage, retry_count, created_at")
         .order("created_at", { ascending: false })
         .limit(EXPORT_LIMIT);
+      if (error) {
+        return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+      }
       rows = (data ?? []) as Record<string, unknown>[];
     } else if (entity === "imports") {
       headers = ["id", "username", "scrape_status", "collector", "updated_at"];
-      const { data } = await db
+      const { data, error } = await db
         .from("instagram_imports")
         .select("id, username, scrape_status, collector, updated_at")
         .order("updated_at", { ascending: false })
         .limit(EXPORT_LIMIT);
+      if (error) {
+        return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+      }
       rows = (data ?? []) as Record<string, unknown>[];
     }
 
     await writeAdminAuditLog({
       actor,
-      action: "SETTING_CHANGED",
+      action: "DATA_EXPORTED",
       resourceType: "export",
       resourceId: entity,
       afterState: { rows: rows.length, limit: EXPORT_LIMIT },

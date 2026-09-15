@@ -1,6 +1,11 @@
 import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminIncidents } from "@/lib/admin/phase3-queries";
-import { AdminPageHeader, AdminEmptyState, AdminStatusBadge } from "@/components/admin/primitives";
+import {
+  AdminPageHeader,
+  AdminEmptyState,
+  AdminStatusBadge,
+  MetricUnavailable,
+} from "@/components/admin/primitives";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { IncidentsClient } from "@/components/admin/phase3/IncidentsClient";
 import { relativeTime } from "@/components/admin/format";
@@ -9,7 +14,7 @@ import { roleHasPermission } from "@/lib/admin/permissions";
 export default async function AdminIncidentsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params;
   const { actor, locale, userId } = await requireAdminPage(raw, "system.read");
-  const incidents = await getAdminIncidents({ userId });
+  const { rows: incidents, unavailableReason } = await getAdminIncidents({ userId });
   const rows = incidents.map((i) => ({
     id: i.id as string,
     title: i.title as string,
@@ -22,11 +27,18 @@ export default async function AdminIncidentsPage({ params }: { params: Promise<{
   return (
     <div className="space-y-6">
       <AdminPageHeader title={locale === "fa" ? "مدیریت حوادث" : "Incident Management"} />
-      {canManage ? <IncidentsClient locale={locale} /> : null}
-      {!rows.length ? (
+      {unavailableReason ? (
+        <MetricUnavailable
+          label={locale === "fa" ? "فهرست حوادث در دسترس نیست" : "Incident list unavailable"}
+          reason={unavailableReason}
+          compact
+        />
+      ) : null}
+      {canManage && !unavailableReason ? <IncidentsClient locale={locale} /> : null}
+      {unavailableReason ? null : !rows.length ? (
         <AdminEmptyState
           title={locale === "fa" ? "حادثه‌ای نیست" : "No incidents"}
-          body={locale === "fa" ? "مایگریشن Phase 3 را اعمال کنید یا حادثه جدید بسازید." : "Apply Phase 3 migration or create an incident."}
+          body={locale === "fa" ? "حادثه‌ای ثبت نشده است." : "No incidents recorded."}
         />
       ) : (
         <AdminDataTable

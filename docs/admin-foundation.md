@@ -30,6 +30,14 @@ Database migrations:
 
 - `supabase/migrations/20260915030000_admin_foundation.sql` — Phase 1 tables
 - `supabase/migrations/20260915040000_admin_foundation_hardening.sql` — Phase 1.5 indexes
+- `supabase/migrations/20260916010000_admin_phase3.sql` — Phase 3 tables
+  (`admin_support_notes`, `admin_incidents`, `ai_prompt_registry`)
+- `supabase/migrations/20260916020000_admin_phase3_indexes.sql` — Phase 3 indexes
+  for admin list/search/aggregation queries (additive, `if not exists`)
+
+Until the Phase 3 migrations are applied, the Incidents, Prompt Registry and
+User-360 notes surfaces render an explicit **unavailable** notice naming the
+missing migration — they never fall back to a misleading empty list.
 
 All privileged tables enable RLS and **revoke** `anon` / `authenticated`.
 Access is via **service_role** from Next.js server only.

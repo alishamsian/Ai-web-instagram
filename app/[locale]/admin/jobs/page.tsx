@@ -2,10 +2,19 @@ import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminJobs, getAdminSystemHealth } from "@/lib/admin/queries";
 import { JobsCommandCenter } from "@/components/admin/phase3/JobsCommandCenter";
 import { roleHasPermission } from "@/lib/admin/permissions";
+import { normalizeJobStatus } from "@/lib/admin/jobs";
 import type { MetricResult } from "@/lib/admin/contracts";
 
 function available(value: number, source: string): MetricResult<number> {
   return { status: "available", value, source };
+}
+
+function partial(
+  value: number,
+  source: string,
+  warning: string,
+): MetricResult<number> {
+  return { status: "partial", value, source, warning };
 }
 
 export default async function AdminJobsPage({
@@ -34,23 +43,27 @@ export default async function AdminJobsPage({
     workspace_id: (j.workspace_id as string | null) ?? null,
   }));
 
-  const queued = rows.filter((r) =>
-    ["queued", "pending", "waiting"].includes(r.status),
-  ).length;
-  const running = rows.filter((r) =>
-    ["running", "processing", "claimed"].includes(r.status),
-  ).length;
-  const failed = rows.filter((r) => r.status === "failed").length;
-  const completed = rows.filter((r) => r.status === "completed").length;
+  const normalized = rows.map((r) => ({
+    ...r,
+    norm: normalizeJobStatus(r.status),
+  }));
+  const queued = normalized.filter((r) => r.norm === "queued").length;
+  const running = normalized.filter((r) => r.norm === "running").length;
+  const failed = normalized.filter((r) => r.norm === "failed").length;
+  const completed = normalized.filter((r) => r.norm === "completed").length;
   const finished = completed + failed;
   const successRate: MetricResult<number> =
     finished === 0
       ? {
           status: "unavailable",
-          reason: "No finished jobs in current sample",
+          reason: "No finished jobs in current sample (last 100)",
           source: "import_jobs",
         }
-      : available(completed / finished, "import_jobs");
+      : partial(
+          completed / finished,
+          "import_jobs",
+          "Success rate from latest 100 jobs sample only",
+        );
 
   return (
     <JobsCommandCenter

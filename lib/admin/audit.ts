@@ -22,7 +22,11 @@ export type AuditAction =
   | "ADMIN_ROLE_GRANTED"
   | "ADMIN_ROLE_REVOKED"
   | "SOFT_DELETE"
-  | "SOFT_RESTORE";
+  | "SOFT_RESTORE"
+  | "DATA_EXPORTED"
+  | "SUPPORT_NOTE_CREATED"
+  | "INCIDENT_CREATED"
+  | "INCIDENT_UPDATED";
 
 export type AuditEntryInput = {
   actor: AdminActor;
