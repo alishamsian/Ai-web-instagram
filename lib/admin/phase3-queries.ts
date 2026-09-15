@@ -827,35 +827,18 @@ export async function getAdminWebsitesEnriched(input: {
   const pageIds = sites.map((s) => s.id as string);
 
   const domainBySite = new Map<string, string>();
-  const viewsBySite = new Map<string, number>();
-  let pageViewsReliable = true;
+  // Per-site page view totals require a dedicated aggregate table.
+  // Do not scan thousands of page_views rows on the admin list path.
 
   if (pageIds.length > 0) {
-    const [domainsRes, viewsRes] = await Promise.all([
-      db
-        .from("domains")
-        .select("id, website_id, host")
-        .in("website_id", pageIds),
-      db
-        .from("page_views")
-        .select("website_id")
-        .in("website_id", pageIds)
-        .limit(5000),
-    ]);
+    const domainsRes = await db
+      .from("domains")
+      .select("id, website_id, host")
+      .in("website_id", pageIds);
 
     for (const d of domainsRes.data ?? []) {
       if (!domainBySite.has(d.website_id as string)) {
         domainBySite.set(d.website_id as string, d.host as string);
-      }
-    }
-
-    const viewRows = viewsRes.data ?? [];
-    if (viewsRes.error || viewRows.length === 5000) {
-      pageViewsReliable = false;
-    } else {
-      for (const v of viewRows) {
-        const sid = v.website_id as string;
-        viewsBySite.set(sid, (viewsBySite.get(sid) ?? 0) + 1);
       }
     }
   }
@@ -873,7 +856,7 @@ export async function getAdminWebsitesEnriched(input: {
       updatedAt: s.updated_at as string,
       publishedAt: (s.published_at as string | null) ?? null,
       domainHost: host,
-      pageViews: pageViewsReliable ? (viewsBySite.get(id) ?? 0) : null,
+      pageViews: null,
       health: assessWebsiteHealth({
         status: s.status as string,
         hasDomain: Boolean(host),

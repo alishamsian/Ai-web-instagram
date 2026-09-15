@@ -3,6 +3,7 @@ import { getAdminOrders } from "@/lib/admin/queries";
 import {
   AdminPageHeader,
   AdminStatusBadge,
+  MetricUnavailable,
 } from "@/components/admin/primitives";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import type { DateRangePreset } from "@/lib/admin/dates";
@@ -21,11 +22,12 @@ export default async function AdminOrdersPage({
   const { locale: raw } = await params;
   const sp = await searchParams;
   const { locale, userId } = await requireAdminPage(raw, "orders.read");
-  const orders = await getAdminOrders({
-    userId,
-    preset: (sp.range as DateRangePreset) || "30d",
-    limit: 100,
-  });
+  const { rows: orders, unavailableReason: ordersUnavailable } =
+    await getAdminOrders({
+      userId,
+      preset: (sp.range as DateRangePreset) || "30d",
+      limit: 100,
+    });
   const isFa = locale === "fa";
   const rows = orders.map((o) => ({
     id: o.id as string,
@@ -47,6 +49,13 @@ export default async function AdminOrdersPage({
         }
         actions={<AdminExportLink entity="orders" />}
       />
+      {ordersUnavailable ? (
+        <MetricUnavailable
+          label={isFa ? "فهرست سفارش‌ها در دسترس نیست" : "Order list unavailable"}
+          reason={ordersUnavailable}
+          compact
+        />
+      ) : null}
       <AdminDataTable
         locale={locale}
         rows={rows}

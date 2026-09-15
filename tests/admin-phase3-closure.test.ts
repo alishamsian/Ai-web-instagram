@@ -36,8 +36,9 @@ describe("Admin Phase 3 production closure", () => {
     expect(p3).toMatch(/function countMetric\(/);
     expect(p3).not.toMatch(/available\(\w+Res\.count \?\? 0/);
     expect(q).not.toMatch(/available\(\w+\.count \?\? 0, "(alerts|system_events|import_jobs)"\)/);
-    // page_views errors mark the column unreliable instead of showing 0.
-    expect(p3).toMatch(/viewsRes\.error \|\| viewRows\.length === 5000/);
+    // page_views are not scanned on list paths — column stays null (unavailable).
+    expect(p3).toMatch(/pageViews: null/);
+    expect(p3).not.toMatch(/page_views[\s\S]{0,120}limit\(5000\)/);
   });
 
   it("AdminDataTable can be rendered from Server Components without passing functions to the client", () => {
@@ -107,7 +108,7 @@ describe("Admin Phase 3 production closure", () => {
     const src = read("lib/admin/phase3-queries.ts");
     expect(src).toMatch(/countMetric\(totalRes, "workspaces"\)/);
     expect(src).toMatch(/countMetric\(totalRes, "websites"\)/);
-    expect(src).toMatch(/pageViewsReliable/);
+    expect(src).toMatch(/pageViews: null/);
   });
 
   it("export allowlist uses owner_id and fails closed on DB errors", () => {

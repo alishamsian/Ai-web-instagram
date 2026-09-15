@@ -22,6 +22,12 @@ import type {
   UserMetrics,
   WebsiteMetrics,
 } from "@/lib/admin/contracts";
+import {
+  logAdminFailure,
+  listOk,
+  listUnavailable,
+  type AdminListResult,
+} from "@/lib/admin/safe";
 
 export type AdminQueryRangeInput = {
   userId: string;
@@ -97,7 +103,10 @@ async function sumDailyMetric(
       .select(column)
       .gte("date", startDay)
       .lte("date", endDay);
-    if (error) return unavailable(error.message, "daily_metrics");
+    if (error) {
+      logAdminFailure("sumDailyMetric", error.message, { column });
+      return unavailable("daily_metrics query failed", "daily_metrics");
+    }
     if (!data || data.length === 0) {
       return unavailable(
         "No daily_metrics rows for selected period",
@@ -111,10 +120,8 @@ async function sumDailyMetric(
     );
     return available(total, `daily_metrics.${column}`);
   } catch (error) {
-    return unavailable(
-      error instanceof Error ? error.message : "daily_metrics failed",
-      "daily_metrics",
-    );
+    logAdminFailure("sumDailyMetric", error, { column });
+    return unavailable("daily_metrics query failed", "daily_metrics");
   }
 }
 
@@ -329,7 +336,10 @@ export async function getAdminUsers(input: AdminQueryRangeInput & { limit?: numb
     .select("id, email, name, avatar_url, created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (error) throw error;
+  if (error) {
+    logAdminFailure("getAdminUsers", error);
+    return [];
+  }
   return data ?? [];
 }
 
@@ -347,7 +357,10 @@ export async function getAdminWorkspaces(
     .limit(limit);
   if (!input.includeDeleted) q = q.is("deleted_at", null);
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) {
+    logAdminFailure("getAdminWorkspaces", error);
+    return [];
+  }
   return data ?? [];
 }
 
@@ -367,16 +380,21 @@ export async function getAdminWebsites(
     .limit(limit);
   if (!input.includeDeleted) q = q.is("deleted_at", null);
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) {
+    logAdminFailure("getAdminWebsites", error);
+    return [];
+  }
   return data ?? [];
 }
 
 export async function getAdminImports(
   input: AdminQueryRangeInput & { limit?: number },
-) {
+): Promise<AdminListResult<Record<string, unknown>>> {
   await authorize(input.userId, "imports.read");
   const limit = Math.min(input.limit ?? 50, 200);
-  if (!supabaseConfigured()) return [];
+  if (!supabaseConfigured()) {
+    return listUnavailable("Supabase not configured");
+  }
   const range = rangeFromInput(input);
   const db = getSupabaseAdmin();
   const { data, error } = await db
@@ -388,16 +406,21 @@ export async function getAdminImports(
     .lt("created_at", range.end)
     .order("updated_at", { ascending: false })
     .limit(limit);
-  if (error) throw error;
-  return data ?? [];
+  if (error) {
+    logAdminFailure("getAdminImports", error);
+    return listUnavailable("Import list query failed");
+  }
+  return listOk((data ?? []) as Record<string, unknown>[]);
 }
 
 export async function getAdminJobs(
   input: AdminQueryRangeInput & { limit?: number; status?: string },
-) {
+): Promise<AdminListResult<Record<string, unknown>>> {
   await authorize(input.userId, "jobs.read");
   const limit = Math.min(input.limit ?? 50, 200);
-  if (!supabaseConfigured()) return [];
+  if (!supabaseConfigured()) {
+    return listUnavailable("Supabase not configured");
+  }
   const db = getSupabaseAdmin();
   let q = db
     .from("import_jobs")
@@ -408,8 +431,11 @@ export async function getAdminJobs(
     .limit(limit);
   if (input.status) q = q.eq("status", input.status);
   const { data, error } = await q;
-  if (error) throw error;
-  return data ?? [];
+  if (error) {
+    logAdminFailure("getAdminJobs", error);
+    return listUnavailable("Job list query failed");
+  }
+  return listOk((data ?? []) as Record<string, unknown>[]);
 }
 
 export async function getAdminRevenue(
@@ -439,10 +465,12 @@ export async function getAdminRevenue(
 
 export async function getAdminOrders(
   input: AdminQueryRangeInput & { limit?: number },
-) {
+): Promise<AdminListResult<Record<string, unknown>>> {
   await authorize(input.userId, "orders.read");
   const limit = Math.min(input.limit ?? 50, 200);
-  if (!supabaseConfigured()) return [];
+  if (!supabaseConfigured()) {
+    return listUnavailable("Supabase not configured");
+  }
   const range = rangeFromInput(input);
   const db = getSupabaseAdmin();
   // Deliberately excludes customer_contact / customer_note / items:
@@ -455,8 +483,11 @@ export async function getAdminOrders(
     .lt("created_at", range.end)
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (error) throw error;
-  return data ?? [];
+  if (error) {
+    logAdminFailure("getAdminOrders", error);
+    return listUnavailable("Order list query failed");
+  }
+  return listOk((data ?? []) as Record<string, unknown>[]);
 }
 
 export async function getAdminAIUsage(
@@ -607,9 +638,11 @@ export async function getAdminSystemHealth(
 
 export async function getAdminAlerts(
   input: { userId: string; limit?: number },
-): Promise<AlertSummary[]> {
+): Promise<AdminListResult<AlertSummary>> {
   await authorize(input.userId, "system.read");
-  if (!supabaseConfigured()) return [];
+  if (!supabaseConfigured()) {
+    return listUnavailable("Supabase not configured");
+  }
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("alerts")
@@ -618,17 +651,22 @@ export async function getAdminAlerts(
     )
     .order("created_at", { ascending: false })
     .limit(Math.min(input.limit ?? 50, 200));
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    metric: row.metric as string,
-    severity: row.severity as AlertSummary["severity"],
-    status: row.status as AlertSummary["status"],
-    value: row.value == null ? null : Number(row.value),
-    threshold: row.threshold == null ? null : Number(row.threshold),
-    message: (row.message as string | null) ?? null,
-    createdAt: row.created_at as string,
-  }));
+  if (error) {
+    logAdminFailure("getAdminAlerts", error);
+    return listUnavailable("Alerts query failed");
+  }
+  return listOk(
+    (data ?? []).map((row) => ({
+      id: row.id as string,
+      metric: row.metric as string,
+      severity: row.severity as AlertSummary["severity"],
+      status: row.status as AlertSummary["status"],
+      value: row.value == null ? null : Number(row.value),
+      threshold: row.threshold == null ? null : Number(row.threshold),
+      message: (row.message as string | null) ?? null,
+      createdAt: row.created_at as string,
+    })),
+  );
 }
 
 export async function getAdminActivity(
@@ -862,11 +900,14 @@ export async function getAdminMetricSeries(
       .lte("date", endDay)
       .order("date", { ascending: true });
     if (error) {
+      logAdminFailure("getAdminMetricSeries", error.message, {
+        column: input.column,
+      });
       return {
         status: "unavailable",
         points: [],
         source: "daily_metrics",
-        reason: error.message,
+        reason: "daily_metrics query failed",
       };
     }
     const points = (data ?? []).map((row) => ({
@@ -881,11 +922,12 @@ export async function getAdminMetricSeries(
       source: `daily_metrics.${input.column}`,
     };
   } catch (error) {
+    logAdminFailure("getAdminMetricSeries", error, { column: input.column });
     return {
       status: "unavailable",
       points: [],
       source: "daily_metrics",
-      reason: error instanceof Error ? error.message : "series failed",
+      reason: "daily_metrics query failed",
     };
   }
 }

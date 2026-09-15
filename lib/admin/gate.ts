@@ -35,7 +35,9 @@ export async function requireAdminPage(
       }
       redirect(`/${locale}/dashboard`);
     }
-    throw error;
+    // Transient infra failures during permission lookup must not blank Admin.
+    console.error("[admin:gate]", error instanceof Error ? error.message : "unknown");
+    redirect(`/${locale}/dashboard`);
   }
 }
 

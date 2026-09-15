@@ -60,6 +60,14 @@ function unavailable<T = number>(reason: string, source?: string): MetricResult<
 function metricError<T = number>(reason: string, source?: string): MetricResult<T> {
   return { status: "error", reason, source };
 }
+
+/** Never surface raw Postgres / PostgREST messages to MetricResult consumers. */
+function safeQueryFailure(scope: string, error: { message?: string } | null | undefined): string {
+  if (error?.message) {
+    console.error(`[admin:${scope}]`, error.message.slice(0, 300));
+  }
+  return "Query failed";
+}
 function insufficientSample<T = number>(
   reason: string,
   sampleSize: number,
@@ -254,12 +262,12 @@ async function fetchAiSample(input: {
       if (input.workspaceId) q2 = q2.eq("workspace_id", input.workspaceId);
       const retry = await q2;
       if (retry.error) {
-        return { rows: [], error: retry.error.message, truncated: false };
+        return { rows: [], error: safeQueryFailure("ai.sample.retry", retry.error), truncated: false };
       }
       const rows = (retry.data ?? []) as AiRow[];
       return { rows, error: null, truncated: rows.length === limit };
     }
-    return { rows: [], error: error.message, truncated: false };
+    return { rows: [], error: safeQueryFailure("ai.sample", error), truncated: false };
   }
   const rows = (data ?? []) as AiRow[];
   return { rows, error: null, truncated: rows.length === limit };
@@ -1045,7 +1053,7 @@ export async function getAdminJobHealth(input: {
     .limit(JOB_SAMPLE_CAP);
 
   if (error) {
-    const e = metricError<number>(error.message, "import_jobs");
+    const e = metricError<number>(safeQueryFailure("jobs.health", error), "import_jobs");
     return {
       health: {
         queued: e,
@@ -1204,7 +1212,7 @@ export async function getAdminQueueMetrics(input: {
       name: "Import job queue",
       depth:
         depthRes.error
-          ? metricError(depthRes.error.message, "import_jobs")
+          ? metricError(safeQueryFailure("queues.depth", depthRes.error), "import_jobs")
           : available(depthRes.count ?? 0, "import_jobs.status"),
       oldestAgeMs:
         oldest == null
@@ -1377,10 +1385,10 @@ export async function getAdminInfrastructureOverview(input: {
         .eq("severity", "critical"),
     ]);
     openAlerts = open.error
-      ? metricError(open.error.message, "alerts")
+      ? metricError(safeQueryFailure("infra.openAlerts", open.error), "alerts")
       : available(open.count ?? 0, "alerts");
     criticalAlerts = critical.error
-      ? metricError(critical.error.message, "alerts")
+      ? metricError(safeQueryFailure("infra.criticalAlerts", critical.error), "alerts")
       : available(critical.count ?? 0, "alerts");
   }
 
@@ -1603,7 +1611,8 @@ export async function getAdminAlertRules(input: {
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) {
-    return { rules: [], unavailableReason: error.message };
+    console.error("[admin:alert_rules]", error.message.slice(0, 300));
+    return { rules: [], unavailableReason: "Alert rules query failed" };
   }
   return {
     rules: (data ?? []).map((r) => ({

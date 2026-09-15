@@ -4,7 +4,7 @@ import { getAdminJobHealth } from "@/lib/admin/phase4-queries";
 import { JobsCommandCenter } from "@/components/admin/phase3/JobsCommandCenter";
 import { roleHasPermission } from "@/lib/admin/permissions";
 import { normalizeJobStatus } from "@/lib/admin/jobs";
-import { AdminSection } from "@/components/admin/primitives";
+import { AdminSection, MetricUnavailable } from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import type { MetricResult } from "@/lib/admin/contracts";
 
@@ -31,10 +31,11 @@ export default async function AdminJobsPage({
   const sp = await searchParams;
   const { actor, locale, userId } = await requireAdminPage(raw, "jobs.read");
   const isFa = locale === "fa";
-  const [jobs, jobHealth] = await Promise.all([
-    getAdminJobs({ userId, limit: 100 }),
-    getAdminJobHealth({ userId }),
-  ]);
+  const [{ rows: jobs, unavailableReason: jobsUnavailable }, jobHealth] =
+    await Promise.all([
+      getAdminJobs({ userId, limit: 100 }),
+      getAdminJobHealth({ userId }),
+    ]);
 
   const rows = jobs.map((j) => ({
     id: j.id as string,
@@ -100,6 +101,13 @@ export default async function AdminJobsPage({
           />
         </div>
       </AdminSection>
+      {jobsUnavailable ? (
+        <MetricUnavailable
+          label={isFa ? "فهرست جاب‌ها در دسترس نیست" : "Job list unavailable"}
+          reason={jobsUnavailable}
+          compact
+        />
+      ) : null}
       <JobsCommandCenter
         locale={locale}
         rows={rows}

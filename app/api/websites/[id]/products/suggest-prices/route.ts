@@ -39,6 +39,9 @@ export async function POST(
     })
     .filter((row) => products[row.index]?.price == null);
 
-  const suggestions = await suggestProductPrices(targets, locale);
+  const suggestions = await suggestProductPrices(targets, locale, {
+    workspaceId: session.workspace.id,
+    userId: session.user.id,
+  });
   return NextResponse.json({ suggestions });
 }

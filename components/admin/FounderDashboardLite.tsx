@@ -10,7 +10,7 @@ import Link from "next/link";
 
 export function FounderDashboardLite({
   locale,
-  role: _role,
+  role,
   kpis,
   infra,
 }: {
@@ -19,6 +19,7 @@ export function FounderDashboardLite({
   kpis: DashboardKpis;
   infra: InfrastructureOverview;
 }) {
+  void role;
   const isFa = locale === "fa";
   const tone =
     infra.systemStatus === "critical"

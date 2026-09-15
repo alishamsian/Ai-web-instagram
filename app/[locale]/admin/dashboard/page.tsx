@@ -2,7 +2,56 @@ import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminDashboardKpisLite } from "@/lib/admin/dashboard-lite";
 import { getAdminDashboardSystemStrip } from "@/lib/admin/dashboard-strip";
 import { FounderDashboardLite } from "@/components/admin/FounderDashboardLite";
-import type { DateRangePreset } from "@/lib/admin/dates";
+import { settledValue } from "@/lib/admin/safe";
+import { resolveDateRange, resolveComparisonPeriod, type DateRangePreset } from "@/lib/admin/dates";
+import type { DashboardKpis, MetricResult, ComparableMetric } from "@/lib/admin/contracts";
+import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
+
+function u(reason = "Temporarily unavailable"): MetricResult<number> {
+  return { status: "unavailable", reason };
+}
+function c(reason = "Temporarily unavailable"): ComparableMetric {
+  const m = u(reason);
+  return { current: m, previous: m, deltaRatio: m };
+}
+
+function emptyKpis(preset: DateRangePreset): DashboardKpis {
+  const range = resolveDateRange({ preset });
+  return {
+    range,
+    comparison: resolveComparisonPeriod(range),
+    newUsers: c(),
+    activeUsers: c(),
+    websitesCreated: c(),
+    websitesPublished: c(),
+    imports: c(),
+    successfulImports: c(),
+    failedImports: c(),
+    aiRequests: c(),
+    aiCost: c(),
+    orders: c(),
+    mrr: u(),
+    revenue: u(),
+    pageViews: c(),
+    subscriptionsStarted: c(),
+  };
+}
+
+function emptyInfra(): InfrastructureOverview {
+  const m = u();
+  return {
+    systemStatus: "unknown",
+    systemStatusReason: "System strip temporarily unavailable",
+    failedJobs24h: m,
+    staleJobs: m,
+    queueDepth: m,
+    openAlerts: m,
+    criticalAlerts: m,
+    aiErrorRate: m,
+    dependencies: [],
+    attention: [],
+  };
+}
 
 export default async function AdminDashboardPage({
   params,
@@ -16,12 +65,23 @@ export default async function AdminDashboardPage({
   const { actor, locale, userId } = await requireAdminPage(raw, "system.read");
   const preset = (sp.range as DateRangePreset) || "30d";
 
-  // Founder home is intentionally bounded: two server queries only.
-  // Heavy AI/activity/series analytics live on their dedicated pages.
-  const [kpis, infra] = await Promise.all([
-    getAdminDashboardKpisLite({ userId, preset }),
-    getAdminDashboardSystemStrip({ userId }),
+  const [kpisSettled, infraSettled] = await Promise.allSettled([
+    settledValue(
+      "dashboard.kpis",
+      getAdminDashboardKpisLite({ userId, preset }),
+      emptyKpis(preset),
+    ),
+    settledValue(
+      "dashboard.strip",
+      getAdminDashboardSystemStrip({ userId }),
+      emptyInfra(),
+    ),
   ]);
+
+  const kpis =
+    kpisSettled.status === "fulfilled" ? kpisSettled.value.value : emptyKpis(preset);
+  const infra =
+    infraSettled.status === "fulfilled" ? infraSettled.value.value : emptyInfra();
 
   return (
     <FounderDashboardLite

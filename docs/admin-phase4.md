@@ -119,8 +119,9 @@ OPERATIONS → Overview (/ops), Errors/Alerts, Queues, Jobs, Webhooks, Cron, Dep
 ## Known limitations
 
 1. Token/cost often unavailable until AI callers populate usage + verified pricing.
-2. Only `import_analyze` is fully instrumented today (`price-suggest` still lacks `recordAiUsage`).
+2. Instrumented AI callers: `import_analyze` (job path) and `price_suggest` (catalog suggest). Website config generation remains deterministic/local (no LLM call) — no `ai_usage_logs` rows expected.
 3. Webhook / email / R2 / deployment probes are `not_instrumented`.
 4. Cron shows configuration only — no `cron_runs` history table.
 5. Alert rules exist; a scheduled evaluator cron is not shipped (idempotent helper is ready).
 6. Phase 3/4 tables must be applied on production Supabase for incidents/prompts/correlation_id.
+7. Per-website page-view counts on `/admin/websites` are unavailable until a dedicated aggregate exists (no unbounded `page_views` scans).

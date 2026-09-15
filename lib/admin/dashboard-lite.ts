@@ -4,6 +4,7 @@ import { supabaseConfigured, getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdminPermission } from "@/lib/admin/rbac";
 import { resolveDateRange, resolveComparisonPeriod, type DateRangePreset } from "@/lib/admin/dates";
 import type { DashboardKpis, MetricResult, ComparableMetric } from "@/lib/admin/contracts";
+import { logAdminFailure } from "@/lib/admin/safe";
 
 function unavailable<T = number>(reason: string, source?: string): MetricResult<T> {
   return { status: "unavailable", reason, source };
@@ -34,10 +35,14 @@ async function count(
     let q = db.from(table).select("id", { count: "exact", head: true }).gte(column, range.start).lt(column, range.end);
     if (options?.isNull) q = q.is(options.isNull, null);
     const { count: value, error } = await q;
-    if (error) return unavailable("Count query failed", table);
+    if (error) {
+      logAdminFailure(`dashboard-lite.count.${table}`, error.message);
+      return unavailable("Count query failed", table);
+    }
     if (value == null) return unavailable("Count not returned", table);
     return available(value, `${table}.${column}`);
-  } catch {
+  } catch (error) {
+    logAdminFailure(`dashboard-lite.count.${table}`, error);
     return unavailable("Count query failed", table);
   }
 }

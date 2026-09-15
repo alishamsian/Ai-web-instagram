@@ -100,7 +100,10 @@ export async function getAdminDashboardSystemStrip(input: {
     res: { count: number | null; error: { message: string } | null },
     source: string,
   ): MetricResult<number> => {
-    if (res.error) return metricError(res.error.message, source);
+    if (res.error) {
+      console.error(`[admin:dashboard-strip:${source}]`, res.error.message.slice(0, 200));
+      return metricError("Query failed", source);
+    }
     return available(res.count ?? 0, source);
   };
 
@@ -109,7 +112,13 @@ export async function getAdminDashboardSystemStrip(input: {
   const openM = countOrErr(openAlerts, "alerts");
   const critM = countOrErr(criticalAlerts, "alerts");
   const staleM = activeJobs.error
-    ? metricError(activeJobs.error.message, "import_jobs")
+    ? (() => {
+        console.error(
+          "[admin:dashboard-strip:stale]",
+          activeJobs.error.message.slice(0, 200),
+        );
+        return metricError("Query failed", "import_jobs");
+      })()
     : available(staleCount, "import_jobs.updated_at");
 
   const attention: InfrastructureOverview["attention"] = [];

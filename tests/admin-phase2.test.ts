@@ -19,7 +19,7 @@ describe("Admin Phase 2 UI foundation", () => {
   it("exposes admin routes under locale", () => {
     expect(read("app/[locale]/admin/layout.tsx")).toMatch(/resolveAdminActor|getSession/);
     expect(read("app/[locale]/admin/dashboard/page.tsx")).toMatch(
-      /getAdminDashboardMetrics/,
+      /getAdminDashboardKpisLite|getAdminDashboardMetrics/,
     );
     expect(read("app/[locale]/admin/dashboard/page.tsx")).toMatch(
       /requireAdminPage/,

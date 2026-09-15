@@ -7,6 +7,7 @@ import {
   AdminPageHeader,
   AdminSection,
   AdminStatusBadge,
+  MetricUnavailable,
 } from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
@@ -27,10 +28,11 @@ export default async function AdminImportsPage({
   const sp = await searchParams;
   const { locale, userId } = await requireAdminPage(raw, "imports.read");
   const preset = (sp.range as DateRangePreset) || "30d";
-  const [imports, metrics] = await Promise.all([
-    getAdminImports({ userId, preset, limit: 100 }),
-    getAdminImportMetrics({ userId, preset }),
-  ]);
+  const [{ rows: imports, unavailableReason: importsUnavailable }, metrics] =
+    await Promise.all([
+      getAdminImports({ userId, preset, limit: 100 }),
+      getAdminImportMetrics({ userId, preset }),
+    ]);
   const isFa = locale === "fa";
   const rows = imports.map((item) => ({
     id: item.id as string,
@@ -74,6 +76,13 @@ export default async function AdminImportsPage({
           />
         </div>
       </AdminSection>
+      {importsUnavailable ? (
+        <MetricUnavailable
+          label={isFa ? "فهرست ایمپورت‌ها در دسترس نیست" : "Import list unavailable"}
+          reason={importsUnavailable}
+          compact
+        />
+      ) : null}
       <AdminDataTable
         locale={locale}
         rows={rows}
