@@ -158,32 +158,51 @@ export async function retryAdminImportJob(input: {
     const actor = await requireAdminPermission(session.user.id, "jobs.retry");
     if (!supabaseConfigured()) return fail("UNAVAILABLE", "Supabase not configured.");
     const db = getSupabaseAdmin();
-    const { data: job } = await db
+    const { data: job, error: readError } = await db
       .from("import_jobs")
       .select("id, status, retry_count, max_attempts")
       .eq("id", input.jobId)
       .maybeSingle();
+    if (readError) return fail("DB_ERROR", "Could not read job.");
     if (!job) return fail("NOT_FOUND", "Job not found.");
     if (job.status !== "failed") {
       return fail("INVALID", "Only failed jobs can be retried.");
     }
+
+    const retryCount = Math.max(0, Number(job.retry_count ?? 0));
+    const maxAttempts = Math.max(1, Number(job.max_attempts ?? 1));
+    if (retryCount >= maxAttempts) {
+      return fail("INVALID", "Job has reached its maximum retry attempts.");
+    }
+
     const patch = buildImportJobObservabilityUpdate({
       status: "queued",
       stage: "retry_requested",
-      attempt: Number(job.retry_count ?? 0) + 1,
+      attempt: retryCount + 1,
       errorCode: null,
       errorMessage: null,
       metadata: { retriedBy: actor.userId },
     });
-    const { error } = await db.from("import_jobs").update(patch).eq("id", input.jobId);
+
+    // Keep the transition conditional on the observed failed state so two
+    // concurrent admin clicks cannot both move the same failed job to queued.
+    const { data: updated, error } = await db
+      .from("import_jobs")
+      .update(patch)
+      .eq("id", input.jobId)
+      .eq("status", "failed")
+      .select("id")
+      .maybeSingle();
     if (error) return fail("DB_ERROR", "Could not retry job.");
+    if (!updated) return fail("CONFLICT", "Job changed before retry could be applied.");
+
     await writeAdminAuditLog({
       actor,
       action: "JOB_RETRIED",
       resourceType: "import_job",
       resourceId: input.jobId,
-      beforeState: { status: job.status },
-      afterState: { status: "queued" },
+      beforeState: { status: job.status, retryCount, maxAttempts },
+      afterState: { status: "queued", attempt: retryCount + 1 },
       reason: "admin_retry",
     });
     revalidatePath("/admin/jobs");
