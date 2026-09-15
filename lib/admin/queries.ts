@@ -717,3 +717,80 @@ export async function getAdminImportMetrics(
     successRate,
   };
 }
+
+export type MetricSeriesPoint = {
+  date: string;
+  value: number;
+};
+
+export type MetricSeriesResult = {
+  status: "available" | "unavailable";
+  points: MetricSeriesPoint[];
+  source: string;
+  reason?: string;
+};
+
+/** Daily series for dashboard charts — never invents points. */
+export async function getAdminMetricSeries(
+  input: AdminQueryRangeInput & {
+    column:
+      | "new_users"
+      | "websites_created"
+      | "websites_published"
+      | "imports"
+      | "ai_requests"
+      | "ai_cost"
+      | "orders"
+      | "page_views"
+      | "successful_imports"
+      | "failed_imports";
+  },
+): Promise<MetricSeriesResult> {
+  await authorize(input.userId, "system.read");
+  const range = rangeFromInput(input);
+  if (!supabaseConfigured()) {
+    return {
+      status: "unavailable",
+      points: [],
+      source: "daily_metrics",
+      reason: "Supabase not configured",
+    };
+  }
+  try {
+    const db = getSupabaseAdmin();
+    const startDay = range.start.slice(0, 10);
+    const endDay = new Date(Date.parse(range.end) - 1).toISOString().slice(0, 10);
+    const { data, error } = await db
+      .from("daily_metrics")
+      .select(`date, ${input.column}`)
+      .gte("date", startDay)
+      .lte("date", endDay)
+      .order("date", { ascending: true });
+    if (error) {
+      return {
+        status: "unavailable",
+        points: [],
+        source: "daily_metrics",
+        reason: error.message,
+      };
+    }
+    const points = (data ?? []).map((row) => ({
+      date: String((row as { date: string }).date),
+      value: Number(
+        (row as unknown as Record<string, unknown>)[input.column] ?? 0,
+      ),
+    }));
+    return {
+      status: "available",
+      points,
+      source: `daily_metrics.${input.column}`,
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      points: [],
+      source: "daily_metrics",
+      reason: error instanceof Error ? error.message : "series failed",
+    };
+  }
+}

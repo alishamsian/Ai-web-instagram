@@ -2332,3 +2332,40 @@ html[lang="fa"] .auth-surface {
 .vitrin-editor-canvas .vitrin-hero--editorial-plain {
   min-height: min(52svh, 420px);
 }
+
+/* ─── Admin Founder Console ─── */
+.admin-console {
+  --admin-bg: #f7f7f5;
+  --admin-fg: #111111;
+  --admin-muted: #6b6b6b;
+  --admin-muted-bg: #efefec;
+  --admin-border: #e4e4e0;
+  --admin-card: #ffffff;
+  --admin-sidebar: #fafaf8;
+  --admin-accent-soft: rgba(17, 17, 17, 0.06);
+  --admin-elevated: 0 16px 48px rgba(0, 0, 0, 0.12);
+  color-scheme: light;
+}
+
+.admin-console[data-admin-theme="dark"] {
+  --admin-bg: #0c0c0d;
+  --admin-fg: #f4f4f5;
+  --admin-muted: #a1a1aa;
+  --admin-muted-bg: #18181b;
+  --admin-border: rgba(255, 255, 255, 0.1);
+  --admin-card: #121214;
+  --admin-sidebar: #0f0f10;
+  --admin-accent-soft: rgba(255, 255, 255, 0.08);
+  --admin-elevated: 0 16px 48px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-console *,
+  .admin-console *::before,
+  .admin-console *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

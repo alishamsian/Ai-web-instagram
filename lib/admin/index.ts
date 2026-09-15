@@ -136,4 +136,6 @@ export {
   getAdminUserMetrics,
   getAdminWebsiteMetrics,
   getAdminImportMetrics,
+  getAdminMetricSeries,
 } from "@/lib/admin/queries";
+export { requireAdminPage, getAdminPageActor } from "@/lib/admin/gate";

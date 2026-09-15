@@ -247,8 +247,7 @@ supabase db push
 # or run the migration SQL in the dashboard
 ```
 
-## Next step (Phase 2)
+## Next step (Phase 2+)
 
-Build the **Admin Console UI** on top of `lib/admin/queries.ts` —
-read-only dashboards first, then gated mutations with audit logging.
+Phase 2 UI lives at `/{locale}/admin/*` and consumes `lib/admin/queries.ts`.
 Do not invent client-side metrics; consume `MetricResult` contracts.
