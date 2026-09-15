@@ -20,12 +20,19 @@ function comparable(current: MetricResult<number>, previous: MetricResult<number
   return { current, previous, deltaRatio: delta(current, previous) };
 }
 
-async function count(table: string, column: string, range: { start: string; end: string }, extra?: (q: any) => any): Promise<MetricResult<number>> {
+type CountOptions = { isNull?: string };
+
+async function count(
+  table: string,
+  column: string,
+  range: { start: string; end: string },
+  options?: CountOptions,
+): Promise<MetricResult<number>> {
   if (!supabaseConfigured()) return unavailable("Supabase not configured", table);
   try {
     const db = getSupabaseAdmin();
     let q = db.from(table).select("id", { count: "exact", head: true }).gte(column, range.start).lt(column, range.end);
-    if (extra) q = extra(q);
+    if (options?.isNull) q = q.is(options.isNull, null);
     const { count: value, error } = await q;
     if (error) return unavailable("Count query failed", table);
     if (value == null) return unavailable("Count not returned", table);
@@ -45,8 +52,8 @@ export async function getAdminDashboardKpisLite(input: {
 
   const [newUsers, newUsersPrev, websites, websitesPrev, published, publishedPrev, imports, importsPrev, orders, ordersPrev] = await Promise.all([
     count("profiles", "created_at", range), count("profiles", "created_at", comparison.previous),
-    count("websites", "created_at", range, (q) => q.is("deleted_at", null)), count("websites", "created_at", comparison.previous, (q) => q.is("deleted_at", null)),
-    count("websites", "published_at", range, (q) => q.is("deleted_at", null)), count("websites", "published_at", comparison.previous, (q) => q.is("deleted_at", null)),
+    count("websites", "created_at", range, { isNull: "deleted_at" }), count("websites", "created_at", comparison.previous, { isNull: "deleted_at" }),
+    count("websites", "published_at", range, { isNull: "deleted_at" }), count("websites", "published_at", comparison.previous, { isNull: "deleted_at" }),
     count("instagram_imports", "created_at", range), count("instagram_imports", "created_at", comparison.previous),
     count("store_orders", "created_at", range), count("store_orders", "created_at", comparison.previous),
   ]);
