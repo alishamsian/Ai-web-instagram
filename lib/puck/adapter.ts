@@ -110,7 +110,11 @@ export function websiteConfigToPuck(config: WebsiteConfig): PuckWebsiteData {
 
 /**
  * Convert Puck Data back into canonical WebsiteConfig.
- * Missing root fields fall back to `fallback` when provided.
+ *
+ * Structure (section order / add / remove) comes from Puck `content`.
+ * When `fallback` is provided (live editor WebsiteConfig), brand / content /
+ * seo / settings / media prefer fallback — inspector owns those fields and
+ * must not be clobbered by a stale Puck root projection.
  */
 export function puckToWebsiteConfig(
   data: PuckWebsiteData,
@@ -129,23 +133,26 @@ export function puckToWebsiteConfig(
   const ordered = [...body, ...footers];
 
   return {
-    template: rootProps.template ?? fallback?.template ?? "store",
-    brand: cloneJson(rootProps.brand ?? fallback?.brand ?? emptyBrand()),
-    content: cloneJson(rootProps.content ?? fallback?.content ?? emptyContent()),
+    template: fallback?.template ?? rootProps.template ?? "store",
+    brand: cloneJson(fallback?.brand ?? rootProps.brand ?? emptyBrand()),
+    content: cloneJson(
+      fallback?.content ?? rootProps.content ?? emptyContent(),
+    ),
     sections: ordered,
     seo: cloneJson(
-      rootProps.seo ?? fallback?.seo ?? { title: "", description: "", keywords: [] },
+      fallback?.seo ??
+        rootProps.seo ?? { title: "", description: "", keywords: [] },
     ),
     settings: cloneJson(
-      rootProps.settings ??
-        fallback?.settings ?? {
+      fallback?.settings ??
+        rootProps.settings ?? {
           language: "fa",
           direction: "rtl",
           showBranding: true,
           published: false,
         },
     ),
-    media: cloneJson(rootProps.media ?? fallback?.media ?? {}),
+    media: cloneJson(fallback?.media ?? rootProps.media ?? {}),
   };
 }
 

@@ -13,11 +13,13 @@ import {
 } from "@/lib/store/registry";
 import { SECTION_CATEGORIES } from "@/lib/store/registry/categories";
 import { renderRegisteredStoreSection } from "@/components/store/section-renderers";
+import { PuckUnsupportedSection } from "@/components/editor/puck/PuckUnsupportedSection";
 import {
   buildStoreSectionContext,
   usePuckWebsiteOptional,
 } from "@/lib/puck/website-context";
 import { cn } from "@/lib/utils";
+import { hasSectionRenderer, resolveSectionRenderer } from "@/lib/store/registry";
 
 function SectionCanvasPreview(props: PuckSectionProps) {
   const ctx = usePuckWebsiteOptional();
@@ -41,19 +43,23 @@ function SectionCanvasPreview(props: PuckSectionProps) {
     );
   }
 
-  // Prefer live section from config (keeps content.* binding) when id matches
+  // Prefer live WebsiteConfig as source of truth (content + structure).
   const live =
     ctx.config.sections.find((s) => s.id === section.id) ?? section;
   const merged = {
-    ...live,
-    visible: section.visible,
-    variant: section.variant ?? live.variant,
-    settings: section.settings ?? live.settings,
+    id: live.id,
+    type: live.type,
+    visible: live.visible !== false,
+    variant: live.variant,
+    settings: live.settings,
   };
 
   const storeCtx = buildStoreSectionContext(ctx.config, merged);
   const def = getSectionDefinition(merged.type);
   const label = def?.label[ctx.locale] ?? merged.type;
+  const hasRenderer =
+    hasSectionRenderer(merged.type) ||
+    Boolean(resolveSectionRenderer(merged.type, merged.variant));
 
   return (
     <div
@@ -69,7 +75,11 @@ function SectionCanvasPreview(props: PuckSectionProps) {
           Hidden · {label}
         </div>
       ) : null}
-      {renderRegisteredStoreSection(storeCtx)}
+      {hasRenderer ? (
+        renderRegisteredStoreSection(storeCtx)
+      ) : (
+        <PuckUnsupportedSection section={merged} locale={ctx.locale} />
+      )}
     </div>
   );
 }
@@ -139,9 +149,40 @@ export type VitrinPuckConfig = Config;
  * Build Puck Config from the existing Section Registry.
  * Does not invent sections — registry is the source of truth.
  */
+function buildUnsupportedComponentConfig(
+  type: string,
+): ComponentConfig<PuckSectionProps> {
+  return {
+    label: `Unsupported: ${type}`,
+    defaultProps: {
+      id: `${type}-unknown`,
+      sectionId: `${type}-unknown`,
+      sectionType: type as WebsiteSectionType,
+      visible: true,
+      variant: "",
+      settings: {},
+    },
+    fields: {
+      sectionId: { type: "text", label: "Section ID" },
+      sectionType: { type: "text", label: "Type" },
+      visible: {
+        type: "select",
+        label: "Visibility",
+        options: [
+          { label: "Visible", value: true },
+          { label: "Hidden", value: false },
+        ],
+      },
+    },
+    render: (props: PuckSectionProps) => <SectionCanvasPreview {...props} />,
+  } as unknown as ComponentConfig<PuckSectionProps>;
+}
+
 export function buildPuckConfig(options?: {
   vertical?: string | null;
   locale?: "fa" | "en";
+  /** Extra section types present in WebsiteConfig but missing from registry. */
+  extraSectionTypes?: string[];
 }): VitrinPuckConfig {
   const locale = options?.locale ?? "en";
   const defs =
@@ -160,6 +201,11 @@ export function buildPuckConfig(options?: {
   const components: Record<string, ComponentConfig> = {};
   for (const def of allDefs) {
     components[def.type] = buildComponentConfig(def) as ComponentConfig;
+  }
+
+  for (const type of options?.extraSectionTypes ?? []) {
+    if (!type || components[type]) continue;
+    components[type] = buildUnsupportedComponentConfig(type) as ComponentConfig;
   }
 
   const categories: NonNullable<Config["categories"]> = {};

@@ -21,3 +21,16 @@ export {
   usePuckWebsiteOptional,
   buildStoreSectionContext,
 } from "@/lib/puck/website-context";
+export {
+  bindSetSchemaField,
+  bindSetContentPath,
+  bindSetBrandColor,
+  bindSetSeoField,
+  bindSetSectionVariant,
+  bindToggleSectionVisibility,
+  bindPatchSectionSettings,
+  bindUpdateSiteSettings,
+  syncPuckDataFromConfig,
+  findSection,
+  humanSectionLabel,
+} from "@/lib/puck/binding";
