@@ -69,3 +69,66 @@ Unchanged: debounced `PATCH /api/websites/[id]` with `expectedVersion`.
 ## Classic editor
 
 Intact. Deterministic `proposeEditorActions` still powers classic restyle event.
+
+---
+
+## Phase 3.1 Hardening
+
+### Server-authoritative AI context
+
+- Canonical config is loaded from the database via `getWebsiteForWorkspace`.
+- Full client `WebsiteConfig` is **ignored** (never trusted).
+- Optional `draftHints` overlay only allowlisted content paths + brand colors via existing commands.
+- Propose endpoint never persists config.
+
+### Selection-aware routing
+
+Precedence: explicit section mention → selected section type → generic → deterministic only if unambiguous → else LLM/clarify.
+
+`"کوتاه‌ترش کن"` with Services selected does **not** run `shorten_hero`.
+
+### Proposal version protection
+
+- Each proposal stores `baseVersion` (server) + `localRevision` (client).
+- Apply uses `assertProposalFresh` — stale manual edits / version conflicts reject Apply.
+- Propose / Cancel do not mutate WebsiteConfig.
+
+### Action validation
+
+- Stronger checks in `applyEditorAction`: section existence, preset registry, settings allowlist (scalars only), fabricated claims, SEO length/HTML, reorder bounds, unknown section types.
+
+### Product / business protection
+
+- Product items, prices, SKU/inventory settings patches rejected.
+- Fabricated social proof / awards rejected in content and SEO.
+
+### Security boundaries
+
+- Auth + workspace ownership required.
+- Stable error codes (`UNAUTHORIZED`, `VERSION_CONFLICT`, `AI_ACTION_REJECTED`, …).
+- No API keys / raw provider errors in UI.
+
+### Persistence / versioning
+
+Still `PATCH /api/websites/[id]` with `expectedVersion`. No second save system.
+
+### History behavior
+
+One AI Apply = one `"AI Edit: …"` history entry. Undo/redo restores the full batch.
+
+### Puck native internal history
+
+**Puck native internal history is not fully merged with application history.**
+
+App-level `lib/editor/history` owns AI + WebsiteConfig undo. Puck may keep transient DnD internals separately.
+
+### Test coverage
+
+`tests/puck-ai-phase31.test.ts` — routing, draft authority, freshness races, product protection, history transaction, edge cases.
+
+### Known limitations
+
+- No token streaming.
+- LLM path still depends on `AI_API_KEY`.
+- Unsaved *structural* section order is not fully represented in draftHints (content/brand only).
+- Puck native history remains unmerged (documented above).
