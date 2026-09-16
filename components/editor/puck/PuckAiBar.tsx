@@ -77,6 +77,7 @@ export function PuckAiBar({
   version,
   localRevision,
   onApplyProposal,
+  layout = "bar",
 }: {
   locale: Locale;
   websiteId: string;
@@ -100,12 +101,15 @@ export function PuckAiBar({
             message?: string;
           }
       >;
+  /** `sidebar` = left plugin rail; `bar` = legacy bottom strip */
+  layout?: "sidebar" | "bar";
 }) {
   const isFa = locale === "fa";
   const inputId = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const { selectedItem, appState } = usePuck();
+  const sidebar = layout === "sidebar";
 
   const [prompt, setPrompt] = useState("");
   const [phase, setPhase] = useState<AiBarPhase>("idle");
@@ -122,6 +126,7 @@ export function PuckAiBar({
   }, []);
 
   useEffect(() => {
+    if (sidebar) return;
     const onKey = (event: KeyboardEvent) => {
       const mod = event.metaKey || event.ctrlKey;
       if (mod && event.key.toLowerCase() === "k") {
@@ -131,7 +136,7 @@ export function PuckAiBar({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [focusInput]);
+  }, [focusInput, sidebar]);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();
@@ -286,142 +291,206 @@ export function PuckAiBar({
   const examples = isFa ? EXAMPLES_FA : EXAMPLES_EN;
   const busy = phase === "thinking" || phase === "applying";
 
-  return (
-    <div
-      className="puck-ai-bar shrink-0 border-t border-zinc-200 bg-white"
-      data-puck-ai-bar
-      dir={isFa ? "rtl" : "ltr"}
-    >
-      {proposal && phase === "ready" ? (
-        <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-zinc-900">
-                {isFa ? "تغییرات پیشنهادی" : "Proposed changes"}
-                <span className="ms-2 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
-                  {proposal.mode === "deterministic"
-                    ? isFa
-                      ? "قطعی · رایگان"
-                      : "Deterministic · $0"
-                    : "LLM"}
-                </span>
-              </p>
-              <p className="mt-0.5 text-[11px] text-zinc-500">
-                {proposal.summary}
-              </p>
-              <ul className="mt-2 space-y-1">
-                {proposal.summaries.map((line, i) => (
-                  <li
-                    key={`${line}-${i}`}
-                    className="flex gap-2 text-xs text-zinc-700"
-                  >
-                    <span className="text-zinc-400" aria-hidden>
-                      •
-                    </span>
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <button
-                type="button"
-                onClick={cancel}
-                className="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50"
-              >
-                <X className="size-3.5" />
-                {isFa ? "لغو" : "Cancel"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void apply()}
-                className="inline-flex items-center gap-1 rounded-md bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
-              >
-                <Check className="size-3.5" />
-                {proposal.actions.length > 1
-                  ? isFa
-                    ? "اعمال همه"
-                    : "Apply all"
-                  : isFa
-                    ? "اعمال"
-                    : "Apply"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {(phase === "error" || phase === "stale" || error) &&
-      phase !== "ready" ? (
+  const proposalBlock =
+    proposal && phase === "ready" ? (
+      <div
+        className={cn(
+          "border-zinc-100 bg-zinc-50",
+          sidebar ? "rounded-lg border p-3" : "border-b px-4 py-3",
+        )}
+      >
         <div
-          role="alert"
           className={cn(
-            "flex items-start gap-2 border-b px-4 py-2 text-xs",
-            phase === "stale"
-              ? "border-amber-100 bg-amber-50 text-amber-900"
-              : "border-red-100 bg-red-50 text-red-800",
+            "flex gap-3",
+            sidebar ? "flex-col" : "items-start justify-between",
           )}
         >
-          <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-          <span className="flex-1">{error}</span>
-          <button
-            type="button"
-            className="underline"
-            onClick={cancel}
-          >
-            {isFa ? "بستن" : "Dismiss"}
-          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-zinc-900">
+              {isFa ? "تغییرات پیشنهادی" : "Proposed changes"}
+              <span className="ms-2 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
+                {proposal.mode === "deterministic"
+                  ? isFa
+                    ? "قطعی · رایگان"
+                    : "Deterministic · $0"
+                  : "LLM"}
+              </span>
+            </p>
+            <p className="mt-0.5 text-[11px] text-zinc-500">{proposal.summary}</p>
+            <ul className="mt-2 space-y-1">
+              {proposal.summaries.map((line, i) => (
+                <li
+                  key={`${line}-${i}`}
+                  className="flex gap-2 text-xs text-zinc-700"
+                >
+                  <span className="text-zinc-400" aria-hidden>
+                    •
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className={cn("flex gap-2", sidebar && "w-full")}>
+            <button
+              type="button"
+              onClick={cancel}
+              className={cn(
+                "inline-flex items-center justify-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50",
+                sidebar && "flex-1",
+              )}
+            >
+              <X className="size-3.5" />
+              {isFa ? "لغو" : "Cancel"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void apply()}
+              className={cn(
+                "inline-flex items-center justify-center gap-1 rounded-md bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800",
+                sidebar && "flex-1",
+              )}
+            >
+              <Check className="size-3.5" />
+              {proposal.actions.length > 1
+                ? isFa
+                  ? "اعمال همه"
+                  : "Apply all"
+                : isFa
+                  ? "اعمال"
+                  : "Apply"}
+            </button>
+          </div>
         </div>
-      ) : null}
+      </div>
+    ) : null;
 
-      <div className="px-4 py-2.5">
-        <label htmlFor={inputId} className="sr-only">
-          {isFa ? "دستور AI" : "AI command"}
-        </label>
-        <div className="flex items-center gap-2 rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2 focus-within:border-zinc-900 focus-within:ring-1 focus-within:ring-zinc-900">
+  const errorBlock =
+    (phase === "error" || phase === "stale" || error) && phase !== "ready" ? (
+      <div
+        role="alert"
+        className={cn(
+          "flex items-start gap-2 text-xs",
+          sidebar ? "rounded-lg border px-3 py-2" : "border-b px-4 py-2",
+          phase === "stale"
+            ? "border-amber-100 bg-amber-50 text-amber-900"
+            : "border-red-100 bg-red-50 text-red-800",
+        )}
+      >
+        <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+        <span className="flex-1">{error}</span>
+        <button type="button" className="underline" onClick={cancel}>
+          {isFa ? "بستن" : "Dismiss"}
+        </button>
+      </div>
+    ) : null;
+
+  const inputBlock = (
+    <div className={cn(!sidebar && "px-4 py-2.5")}>
+      <label htmlFor={inputId} className="sr-only">
+        {isFa ? "دستور AI" : "AI command"}
+      </label>
+      <div
+        className={cn(
+          "border border-zinc-300 bg-zinc-50 focus-within:border-zinc-900 focus-within:ring-1 focus-within:ring-zinc-900",
+          sidebar
+            ? "flex flex-col gap-2 rounded-xl p-3"
+            : "flex items-center gap-2 rounded-xl px-3 py-2",
+        )}
+      >
+        <div className={cn("flex items-start gap-2", sidebar && "w-full")}>
           <Sparkles
             className={cn(
-              "size-4 shrink-0",
+              "mt-0.5 size-4 shrink-0",
               phase === "success" ? "text-emerald-600" : "text-zinc-400",
             )}
             aria-hidden
           />
-          <input
-            ref={inputRef}
-            id={inputId}
-            value={prompt}
-            disabled={busy}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                cancel();
-                return;
-              }
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault();
-                void submit();
-              }
-            }}
-            placeholder={
-              phase === "thinking"
-                ? isFa
-                  ? "در حال بررسی درخواست…"
-                  : "Reviewing your request…"
-                : selectedSectionId
+          {sidebar ? (
+            <textarea
+              ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+              id={inputId}
+              value={prompt}
+              disabled={busy}
+              rows={4}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancel();
+                  return;
+                }
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
+              placeholder={
+                phase === "thinking"
                   ? isFa
-                    ? "چه تغییری روی سکشن انتخاب‌شده؟ (⌘K)"
-                    : "What should change on the selected section? (⌘K)"
-                  : isFa
-                    ? "چه تغییری می‌خواهی؟ (⌘K)"
-                    : "What do you want to change? (⌘K)"
-            }
-            className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 disabled:opacity-60"
-            dir="auto"
-            autoComplete="off"
-          />
+                    ? "در حال بررسی درخواست…"
+                    : "Reviewing your request…"
+                  : selectedSectionId
+                    ? isFa
+                      ? "چه تغییری روی سکشن انتخاب‌شده؟"
+                      : "What should change on the selected section?"
+                    : isFa
+                      ? "چه تغییری می‌خواهی؟"
+                      : "What do you want to change?"
+              }
+              className="min-h-[88px] min-w-0 flex-1 resize-y bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 disabled:opacity-60"
+              dir="auto"
+              autoComplete="off"
+            />
+          ) : (
+            <input
+              ref={inputRef as React.RefObject<HTMLInputElement>}
+              id={inputId}
+              value={prompt}
+              disabled={busy}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancel();
+                  return;
+                }
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
+              placeholder={
+                phase === "thinking"
+                  ? isFa
+                    ? "در حال بررسی درخواست…"
+                    : "Reviewing your request…"
+                  : selectedSectionId
+                    ? isFa
+                      ? "چه تغییری روی سکشن انتخاب‌شده؟ (⌘K)"
+                      : "What should change on the selected section? (⌘K)"
+                    : isFa
+                      ? "چه تغییری می‌خواهی؟ (⌘K)"
+                      : "What do you want to change? (⌘K)"
+              }
+              className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 disabled:opacity-60"
+              dir="auto"
+              autoComplete="off"
+            />
+          )}
+        </div>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            sidebar ? "w-full justify-between" : "shrink-0",
+          )}
+        >
           {busy ? (
             <Loader2 className="size-4 shrink-0 animate-spin text-zinc-500" />
+          ) : sidebar ? (
+            <span className="text-[10px] text-zinc-400">
+              {isFa ? "⌘↵ پیشنهاد · ⌘K فوکوس" : "⌘↵ propose · ⌘K focus"}
+            </span>
           ) : null}
           {phase === "thinking" ? (
             <button
@@ -436,35 +505,84 @@ export function PuckAiBar({
               type="button"
               disabled={!prompt.trim() || busy}
               onClick={() => void submit()}
-              className="shrink-0 rounded-md bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-zinc-800 disabled:opacity-40"
+              className={cn(
+                "shrink-0 rounded-md bg-zinc-900 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-zinc-800 disabled:opacity-40",
+                sidebar && "ms-auto",
+              )}
             >
               {isFa ? "پیشنهاد" : "Propose"}
             </button>
           )}
         </div>
-        {phase === "idle" && !proposal ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {examples.map((ex) => (
-              <button
-                key={ex}
-                type="button"
-                onClick={() => {
-                  setPrompt(ex);
-                  focusInput();
-                }}
-                className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {phase === "success" ? (
-          <p className="mt-2 text-[11px] text-emerald-700">
-            {isFa ? "اعمال شد. با ⌘Z می‌توانید برگردانید." : "Applied. Undo with ⌘Z."}
-          </p>
-        ) : null}
       </div>
+      {phase === "idle" && !proposal ? (
+        <div className={cn("flex flex-wrap gap-1.5", sidebar ? "mt-3" : "mt-2")}>
+          {examples.map((ex) => (
+            <button
+              key={ex}
+              type="button"
+              onClick={() => {
+                setPrompt(ex);
+                focusInput();
+              }}
+              className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {phase === "success" ? (
+        <p className="mt-2 text-[11px] text-emerald-700">
+          {isFa
+            ? "اعمال شد. با ⌘Z می‌توانید برگردانید."
+            : "Applied. Undo with ⌘Z."}
+        </p>
+      ) : null}
+    </div>
+  );
+
+  if (sidebar) {
+    return (
+      <div
+        className="flex h-full min-h-0 flex-col bg-white text-zinc-900"
+        data-puck-ai-bar
+        dir={isFa ? "rtl" : "ltr"}
+      >
+        <div className="shrink-0 border-b border-zinc-100 px-3 py-3">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
+            <Sparkles className="size-4 text-zinc-500" />
+            {isFa ? "طراح هوشمند" : "AI Co-Designer"}
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+            {isFa
+              ? "تغییر را بنویس؛ پیشنهاد را ببین و اعمال کن."
+              : "Describe a change, review the proposal, then apply."}
+          </p>
+          {selectedSectionId ? (
+            <p className="mt-2 rounded-md bg-zinc-100 px-2 py-1 text-[10px] font-medium text-zinc-600">
+              {isFa ? "هدف: سکشن انتخاب‌شده" : "Target: selected section"}
+            </p>
+          ) : null}
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+          {inputBlock}
+          {errorBlock}
+          {proposalBlock}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="puck-ai-bar shrink-0 border-t border-zinc-200 bg-white"
+      data-puck-ai-bar
+      dir={isFa ? "rtl" : "ltr"}
+    >
+      {proposalBlock}
+      {errorBlock}
+      {inputBlock}
     </div>
   );
 }
