@@ -6,9 +6,7 @@ import { requireAdminPermission, AdminAuthError } from "@/lib/admin/rbac";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getSupabaseAdmin, supabaseConfigured } from "@/lib/supabase/admin";
 import { recordSecurityEvent } from "@/lib/admin/observability";
-import {
-  buildImportJobObservabilityUpdate,
-} from "@/lib/admin/jobs";
+import { buildImportJobObservabilityUpdate } from "@/lib/admin/jobs";
 
 export type AdminActionResult =
   | { ok: true; id?: string }
@@ -57,12 +55,24 @@ export async function transitionAdminIncident(input: {
     if (readErr) return fail("DB_ERROR", "Could not read incident.");
     if (!current) return fail("NOT_FOUND", "Incident not found.");
 
+    if (input.assignTo) {
+      if (!UUID_RE.test(input.assignTo)) return fail("INVALID", "Invalid assignee.");
+      const { data: assignee, error: assigneeError } = await db
+        .from("admin_profiles")
+        .select("user_id")
+        .eq("user_id", input.assignTo)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (assigneeError) return fail("DB_ERROR", "Could not validate assignee.");
+      if (!assignee) return fail("INVALID", "Assignee must be an active admin.");
+    }
+
     const now = new Date().toISOString();
     const timeline = Array.isArray(current.timeline) ? [...current.timeline] : [];
     timeline.push({
       at: now,
       actor: actor.userId,
-      text: `Status → ${input.status}${input.note ? `: ${input.note.slice(0, 200)}` : ""}`,
+      text: `Status → ${input.status}${input.note ? `: ${input.note.slice(0, 200)}` : ""}${input.assignTo ? `; assigned → ${input.assignTo}` : ""}`,
     });
 
     const patch: Record<string, unknown> = {
@@ -78,13 +88,8 @@ export async function transitionAdminIncident(input: {
       patch.resolved_at = now;
       if (input.note) patch.resolution_note = input.note.slice(0, 2000);
     }
-    if (input.status === "open") {
-      patch.resolved_at = null;
-    }
-    if (input.assignTo) {
-      if (!UUID_RE.test(input.assignTo)) return fail("INVALID", "Invalid assignee.");
-      patch.assigned_to = input.assignTo;
-    }
+    if (input.status === "open") patch.resolved_at = null;
+    if (input.assignTo) patch.assigned_to = input.assignTo;
 
     const { error } = await db
       .from("admin_incidents")
@@ -98,7 +103,7 @@ export async function transitionAdminIncident(input: {
       resourceType: "incident",
       resourceId: input.incidentId,
       beforeState: { status: current.status },
-      afterState: { status: input.status },
+      afterState: { status: input.status, assignedTo: input.assignTo ?? undefined },
       reason: "incident_transition",
     });
     void recordSecurityEvent({
@@ -129,9 +134,7 @@ export async function transitionAdminIncident(input: {
   }
 }
 
-export async function resolveAdminErrorGroup(input: {
-  groupId: string;
-}): Promise<AdminActionResult> {
+export async function resolveAdminErrorGroup(input: { groupId: string }): Promise<AdminActionResult> {
   const session = await getSession();
   if (!session) return fail("UNAUTHORIZED", "Sign in required.");
   if (!UUID_RE.test(input.groupId)) return fail("INVALID", "Invalid group id.");
@@ -141,10 +144,7 @@ export async function resolveAdminErrorGroup(input: {
     const db = getSupabaseAdmin();
     const { error } = await db
       .from("admin_error_groups")
-      .update({
-        status: "resolved",
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: "resolved", updated_at: new Date().toISOString() })
       .eq("id", input.groupId);
     if (error) return fail("DB_ERROR", "Could not resolve error group.");
     await writeAdminAuditLog({
@@ -163,14 +163,7 @@ export async function resolveAdminErrorGroup(input: {
   }
 }
 
-/**
- * Cancel a queued/retrying import job safely.
- * Does not cancel terminal jobs. Does not invent cancel for in-flight scrapes
- * that lack a cooperative cancel signal — only queued/retrying are cancelled.
- */
-export async function cancelAdminImportJob(input: {
-  jobId: string;
-}): Promise<AdminActionResult> {
+export async function cancelAdminImportJob(input: { jobId: string }): Promise<AdminActionResult> {
   const session = await getSession();
   if (!session) return fail("UNAUTHORIZED", "Sign in required.");
   if (!UUID_RE.test(input.jobId)) return fail("INVALID", "Invalid job id.");
@@ -187,10 +180,7 @@ export async function cancelAdminImportJob(input: {
     if (!job) return fail("NOT_FOUND", "Job not found.");
     const status = String(job.status);
     if (status !== "queued" && status !== "retrying") {
-      return fail(
-        "INVALID",
-        "Only queued or retrying jobs can be cancelled safely.",
-      );
+      return fail("INVALID", "Only queued or retrying jobs can be cancelled safely.");
     }
 
     const patch = buildImportJobObservabilityUpdate({
@@ -201,7 +191,6 @@ export async function cancelAdminImportJob(input: {
       completedAt: new Date().toISOString(),
       metadata: { cancelledBy: actor.userId },
     });
-
     const { data: updated, error } = await db
       .from("import_jobs")
       .update(patch)
@@ -210,7 +199,6 @@ export async function cancelAdminImportJob(input: {
       .select("id")
       .maybeSingle();
     if (error) {
-      // Legacy DBs may not allow status=cancelled — fall back to failed.
       if (/check|status/i.test(error.message)) {
         const fallback = buildImportJobObservabilityUpdate({
           status: "failed",
@@ -254,7 +242,6 @@ export async function cancelAdminImportJob(input: {
       resourceId: input.jobId,
       message: "Job cancelled by admin",
     });
-
     revalidateAdmin("/admin/jobs", "/admin/queues", "/admin");
     return { ok: true };
   } catch (error) {
