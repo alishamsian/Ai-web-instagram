@@ -436,51 +436,61 @@ export function PuckEditorShell({
   );
 
   const dir = config.settings.direction === "rtl" ? "rtl" : "ltr";
+  const canvasLang = config.settings.language === "en" ? "en" : "fa";
+  const cartStorageKey = `vitrin-cart-editor:${website.id}`;
 
   return (
     <div
       className="puck-editor-shell h-dvh bg-[var(--puck-color-grey-12,#f5f5f5)]"
       dir={dir}
-      lang={config.settings.language === "en" ? "en" : "fa"}
+      lang={canvasLang}
     >
-      <PuckWebsiteProvider config={config} locale={locale}>
-        <StoreCartProvider
-          storageKey={`vitrin-cart-editor:${website.id}`}
-          persist={false}
-        >
-          <PuckAiPanelProvider value={aiPanelValue}>
-            <Puck
-              config={puckConfig}
-              data={puckData}
-              onChange={handlePuckChange}
-              height="100%"
-              headerTitle={config.brand.name || website.slug}
-              headerPath={`/${website.slug}`}
-              plugins={[aiPlugin]}
-              viewports={[
-                {
-                  width: 1440,
-                  height: "auto",
-                  label: "Desktop",
-                  icon: "Monitor",
-                },
-                {
-                  width: 768,
-                  height: "auto",
-                  label: "Tablet",
-                  icon: "Tablet",
-                },
-                {
-                  width: 390,
-                  height: "auto",
-                  label: "Mobile",
-                  icon: "Smartphone",
-                },
-              ]}
-              iframe={{ enabled: false }}
-              dnd={{ behavior: "auto" }}
-              overrides={{
-                puck: ({ children }) => (
+      <PuckAiPanelProvider value={aiPanelValue}>
+        <Puck
+          config={puckConfig}
+          data={puckData}
+          onChange={handlePuckChange}
+          height="100%"
+          headerTitle={config.brand.name || website.slug}
+          headerPath={`/${website.slug}`}
+          plugins={[aiPlugin]}
+          viewports={[
+            {
+              width: 1440,
+              height: "auto",
+              label: isFa ? "دسکتاپ" : "Desktop",
+              icon: "Monitor",
+            },
+            {
+              width: 768,
+              height: "auto",
+              label: isFa ? "تبلت" : "Tablet",
+              icon: "Tablet",
+            },
+            {
+              width: 390,
+              height: "auto",
+              label: isFa ? "موبایل" : "Mobile",
+              icon: "Smartphone",
+            },
+          ]}
+          // Iframe so CSS media queries follow the selected device width
+          // (mobile / tablet / desktop), not the host browser window.
+          iframe={{
+            enabled: true,
+            waitForStyles: true,
+            syncHostStyles: true,
+          }}
+          dnd={{ behavior: "auto" }}
+          overrides={{
+            // Providers must live inside the iframe — React context does not
+            // cross the frame boundary used for true responsive preview.
+            iframe: ({ children }) => (
+              <PuckWebsiteProvider config={config} locale={locale}>
+                <StoreCartProvider
+                  storageKey={cartStorageKey}
+                  persist={false}
+                >
                   <PuckEditBridge
                     config={config}
                     onConfigChange={handleConfigChange}
@@ -489,60 +499,66 @@ export function PuckEditorShell({
                       setLibraryOpen(true);
                     }}
                   >
-                    <PuckAiHotkey />
-                    <div className="flex h-full min-h-0 flex-col">
-                      {errorMessage ? (
-                        <div
-                          role="alert"
-                          className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-800"
-                        >
-                          {errorMessage}
-                        </div>
-                      ) : null}
-                      <div className="min-h-0 flex-1">{children}</div>
+                    <div
+                      className="vitrin-editor-canvas puck-preview-host min-h-full bg-white"
+                      dir={dir}
+                      lang={canvasLang}
+                    >
+                      {children}
                     </div>
                   </PuckEditBridge>
-                ),
-                headerActions: ({ children }) => (
-                  <PuckHeaderActions
-                    locale={locale}
-                    websiteId={website.id}
-                    saveState={saveState}
-                    publishing={publishing}
-                    isPublished={isPublished}
-                    onSave={() => void persist()}
-                    onPublish={() => {
-                      setPublishError(null);
-                      setPublishOpen(true);
-                    }}
-                    onOpenHistory={() => setHistoryOpen(true)}
-                    onOpenQuality={() => setQualityOpen(true)}
-                  >
-                    {children}
-                  </PuckHeaderActions>
-                ),
-                fields: ({ children, isLoading }) => (
-                  <PuckFieldsPanel
-                    locale={locale}
-                    config={config}
-                    websiteId={website.id}
-                    onConfigChange={handleConfigChange}
-                    canRemoveBranding={canRemoveBranding}
-                    isLoading={isLoading}
-                  >
-                    {children}
-                  </PuckFieldsPanel>
-                ),
-                preview: ({ children }) => (
-                  <div className="vitrin-editor-canvas puck-preview-host min-h-full bg-white">
-                    {children}
-                  </div>
-                ),
-              }}
-            />
-          </PuckAiPanelProvider>
-        </StoreCartProvider>
-      </PuckWebsiteProvider>
+                </StoreCartProvider>
+              </PuckWebsiteProvider>
+            ),
+            puck: ({ children }) => (
+              <>
+                <PuckAiHotkey />
+                <div className="flex h-full min-h-0 flex-col">
+                  {errorMessage ? (
+                    <div
+                      role="alert"
+                      className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-800"
+                    >
+                      {errorMessage}
+                    </div>
+                  ) : null}
+                  <div className="min-h-0 flex-1">{children}</div>
+                </div>
+              </>
+            ),
+            headerActions: ({ children }) => (
+              <PuckHeaderActions
+                locale={locale}
+                websiteId={website.id}
+                saveState={saveState}
+                publishing={publishing}
+                isPublished={isPublished}
+                onSave={() => void persist()}
+                onPublish={() => {
+                  setPublishError(null);
+                  setPublishOpen(true);
+                }}
+                onOpenHistory={() => setHistoryOpen(true)}
+                onOpenQuality={() => setQualityOpen(true)}
+              >
+                {children}
+              </PuckHeaderActions>
+            ),
+            fields: ({ children, isLoading }) => (
+              <PuckFieldsPanel
+                locale={locale}
+                config={config}
+                websiteId={website.id}
+                onConfigChange={handleConfigChange}
+                canRemoveBranding={canRemoveBranding}
+                isLoading={isLoading}
+              >
+                {children}
+              </PuckFieldsPanel>
+            ),
+          }}
+        />
+      </PuckAiPanelProvider>
 
       <PublishDialog
         open={publishOpen}

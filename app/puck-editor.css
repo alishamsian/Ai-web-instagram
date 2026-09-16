@@ -107,6 +107,15 @@
   min-height: 100%;
 }
 
+/* Responsive preview iframe — media queries use this frame's width */
+.puck-editor-shell [class*="_PuckPreview"] iframe {
+  background: #fff;
+  border: 0;
+  border-radius: 14px;
+  display: block;
+  max-width: 100%;
+}
+
 .puck-editor-shell .editor-section-frame {
   outline-offset: -1px;
 }

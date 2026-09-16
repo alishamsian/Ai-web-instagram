@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { Fraunces, Instrument_Serif } from "next/font/google";
 import { headers } from "next/headers";
@@ -13,6 +13,13 @@ import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { PerformanceMeasureGuard } from "@/components/dev/PerformanceMeasureGuard";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/config/env";
 import { getDictionary } from "@/lib/i18n/dictionary";
+
+/** Ensure published + preview sites scale correctly on phones and tablets. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 const vitrinSerif = Instrument_Serif({
   weight: "400",
