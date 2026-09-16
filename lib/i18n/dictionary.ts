@@ -511,6 +511,7 @@ export const fa = {
     saved: "ذخیره شد",
     saving: "در حال ذخیره…",
     saveFailed: "ذخیره نشد. دوباره تلاش کن.",
+    saveConflict: "تغییرات جای دیگری اعمال شده. صفحه را بارگذاری مجدد کن یا بررسی کن.",
     publish: "انتشار",
     unpublish: "لغو انتشار",
     published: "منتشر شد",
@@ -1291,6 +1292,8 @@ export const en: Dictionary = {
     saved: "Saved",
     saving: "Saving…",
     saveFailed: "Couldn’t save. Try again.",
+    saveConflict:
+      "Changes were made elsewhere. Reload or review before saving again.",
     publish: "Publish",
     unpublish: "Unpublish",
     published: "Published",

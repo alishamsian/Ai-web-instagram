@@ -160,12 +160,13 @@ export async function getPublishedSlugByCustomHost(
     const db = getSupabaseAdmin();
     const softDeleteReady = await softDeleteColumnsSupported();
     const select = softDeleteReady
-      ? "host, website_id, websites!inner(slug, status, deleted_at)"
-      : "host, website_id, websites!inner(slug, status)";
+      ? "host, website_id, verified_at, websites!inner(slug, status, deleted_at)"
+      : "host, website_id, verified_at, websites!inner(slug, status)";
     const { data, error } = await db
       .from("domains")
       .select(select)
       .eq("host", normalized)
+      .not("verified_at", "is", null)
       .maybeSingle();
     if (error || !data) return null;
     const website = data.websites as unknown as {
@@ -179,7 +180,7 @@ export async function getPublishedSlugByCustomHost(
   }
   const store = await readStore();
   const domain = (store.domains ?? []).find((d) => d.host === normalized);
-  if (!domain) return null;
+  if (!domain || !domain.verifiedAt) return null;
   const site = store.websites.find(
     (w) =>
       w.id === domain.websiteId &&

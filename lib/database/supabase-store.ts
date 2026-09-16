@@ -63,6 +63,7 @@ export type DomainRow = {
   website_id: string;
   host: string;
   created_at: string;
+  verified_at?: string | null;
 };
 
 let schemaReadyCache: boolean | null = null;
@@ -207,6 +208,7 @@ export function mapDomainRow(row: DomainRow): DomainRecord {
     websiteId: row.website_id,
     host: row.host,
     createdAt: row.created_at,
+    verifiedAt: row.verified_at ?? null,
   };
 }
 
@@ -294,6 +296,8 @@ async function readTableStore(): Promise<AppStore> {
             websiteId: row.website_id as string,
             host: row.host as string,
             createdAt: row.created_at as string,
+            verifiedAt:
+              (row as { verified_at?: string | null }).verified_at ?? null,
           }),
         ),
   };
@@ -561,8 +565,11 @@ async function writeTableStore(before: AppStore, after: AppStore) {
     website_id: domain.websiteId,
     host: domain.host,
     created_at: domain.createdAt,
-  })).catch(() => {
-    // domains table may be absent in older projects
+    verified_at: domain.verifiedAt ?? null,
+  })).catch((error) => {
+    // Older projects without domains table: only swallow missing-relation.
+    if (isMissingRelation(error)) return;
+    throw error;
   });
 
   // Cap versions for websites that received a new version in this write

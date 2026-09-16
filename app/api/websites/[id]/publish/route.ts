@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { writeStore } from "@/lib/database/store";
 import { logInfo } from "@/lib/observability/log";
+import { runPublishPreflight } from "@/lib/editor/validation";
 
 export async function POST(
   request: Request,
@@ -13,7 +14,7 @@ export async function POST(
   const body = (await request.json().catch(() => ({}))) as { published?: boolean };
   const published = body.published !== false;
   let updated = null;
-  let noProducts = false;
+  let preflightErrors: ReturnType<typeof runPublishPreflight>["errors"] = [];
 
   const { recordProductEvent } = await import("@/lib/admin/events");
   void recordProductEvent({
@@ -33,25 +34,54 @@ export async function POST(
     if (!website) return;
 
     if (published) {
-      const products = website.config.content.products?.items ?? [];
-      if (products.length === 0) {
-        noProducts = true;
+      const preflight = runPublishPreflight(website.config);
+      if (!preflight.ok) {
+        preflightErrors = preflight.errors;
         return;
       }
     }
 
+    // Idempotent: setting the same status is a no-op aside from updatedAt.
     website.status = published ? "published" : "unpublished";
     website.config.settings.published = published;
-    website.publishedAt = published ? new Date().toISOString() : null;
+    if (published) {
+      website.publishedAt = website.publishedAt ?? new Date().toISOString();
+    } else {
+      website.publishedAt = null;
+    }
     website.updatedAt = new Date().toISOString();
     updated = website;
   });
 
-  if (noProducts) {
+  if (preflightErrors.length) {
+    void recordProductEvent({
+      eventName: "publish_failed",
+      userId: session.user.id,
+      workspaceId: session.workspace.id,
+      websiteId: id,
+      resourceType: "website",
+      resourceId: id,
+      metadata: { reason: "preflight" },
+    });
+    void recordProductEvent({
+      eventName: "publish_flow_completed",
+      userId: session.user.id,
+      workspaceId: session.workspace.id,
+      websiteId: id,
+      resourceType: "website",
+      resourceId: id,
+      metadata: { published: false, failed: true, reason: "preflight" },
+    });
     return NextResponse.json(
       {
-        error: "NO_PRODUCTS",
-        message: "Add at least one product before publishing.",
+        error: "PUBLISH_PREFLIGHT_FAILED",
+        message: preflightErrors[0]?.message.en ?? "Publish validation failed.",
+        messageFa: preflightErrors[0]?.message.fa,
+        issues: preflightErrors.map((e) => ({
+          id: e.id,
+          category: e.category,
+          message: e.message,
+        })),
       },
       { status: 400 },
     );

@@ -75,4 +75,12 @@ export interface WebsiteRecord {
   deletedAt?: string | null;
 }
 export interface WebsiteVersion { id: string; websiteId: string; version: number; config: WebsiteConfig; createdAt: string; }
-export interface DomainRecord { id: string; websiteId: string; host: string; createdAt: string; }
+export interface DomainRecord {
+  id: string;
+  websiteId: string;
+  host: string;
+  createdAt: string;
+  /** Set when DNS/ownership is confirmed. Unverified hosts must not route. */
+  verifiedAt?: string | null;
+}
+

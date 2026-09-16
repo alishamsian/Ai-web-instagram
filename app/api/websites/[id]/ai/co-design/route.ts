@@ -7,6 +7,10 @@ import {
   type AiDraftHints,
 } from "@/lib/editor/ai/draft";
 import type { ViewportBucket } from "@/lib/editor/responsive";
+import {
+  consumeRateLimit,
+  clientIpFromRequest,
+} from "@/lib/auth/rate-limit";
 
 const MAX_PROMPT = 2000;
 
@@ -23,6 +27,26 @@ export async function POST(
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  const rate = consumeRateLimit({
+    key: `ai:co-design:${session.user.id}:${clientIpFromRequest(request)}`,
+    limit: 30,
+    windowMs: 60 * 60_000,
+  });
+  if (!rate.ok) {
+    return NextResponse.json(
+      {
+        error: "RATE_LIMITED",
+        messageFa: "تعداد درخواست‌های AI زیاد است. کمی بعد دوباره تلاش کنید.",
+        messageEn: "Too many AI requests. Please try again later.",
+        retryAfterSec: rate.retryAfterSec,
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rate.retryAfterSec) },
+      },
+    );
   }
 
   const { id } = await params;
@@ -42,7 +66,6 @@ export async function POST(
     config?: unknown;
   };
 
-  // Explicitly ignore body.config (security)
   void body.config;
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
@@ -90,7 +113,6 @@ export async function POST(
     );
   }
 
-  // selectedSectionId must exist on the working config (server + draft)
   let selectedSectionId = body.selectedSectionId ?? null;
   if (
     selectedSectionId &&
@@ -107,6 +129,7 @@ export async function POST(
     viewport: body.viewport ?? "desktop",
     workspaceId: session.workspace.id,
     userId: session.user.id,
+    workspacePlan: session.workspace.plan,
   });
 
   if (!result.ok) {
@@ -115,9 +138,11 @@ export async function POST(
         ? 422
         : result.code === "ai_unavailable"
           ? 503
-          : result.code === "unsafe" || result.code === "invalid"
-            ? 422
-            : 502;
+          : result.code === "quota"
+            ? 402
+            : result.code === "unsafe" || result.code === "invalid"
+              ? 422
+              : 502;
     const errorCode =
       result.code === "unsafe"
         ? "AI_ACTION_REJECTED"
@@ -125,9 +150,11 @@ export async function POST(
           ? "AI_INVALID_RESPONSE"
           : result.code === "ai_unavailable"
             ? "AI_UNAVAILABLE"
-            : result.code === "clarify"
-              ? "INVALID_REQUEST"
-              : result.code.toUpperCase();
+            : result.code === "quota"
+              ? "AI_QUOTA_EXCEEDED"
+              : result.code === "clarify"
+                ? "INVALID_REQUEST"
+                : result.code.toUpperCase();
     return NextResponse.json(
       {
         error: errorCode,

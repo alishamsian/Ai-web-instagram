@@ -56,6 +56,7 @@ async function customDomainSlug(hostHeader: string | null): Promise<string | nul
   try {
     const endpoint = new URL(`${url}/rest/v1/domains`);
     endpoint.searchParams.set("host", `eq.${host}`);
+    endpoint.searchParams.set("verified_at", "not.is.null");
     endpoint.searchParams.set("select", "websites!inner(slug,status)");
     endpoint.searchParams.set("websites.status", "eq.published");
     endpoint.searchParams.set("limit", "1");

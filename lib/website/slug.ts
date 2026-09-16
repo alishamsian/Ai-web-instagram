@@ -4,6 +4,36 @@ import { isSupabaseSchemaReady } from "@/lib/database/supabase-store";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { readStore } from "@/lib/database/store";
 
+/** Slugs that must never be claimed as public website hosts. */
+const RESERVED_SLUGS = new Set([
+  "www",
+  "app",
+  "api",
+  "admin",
+  "dashboard",
+  "login",
+  "signup",
+  "auth",
+  "static",
+  "assets",
+  "cdn",
+  "mail",
+  "ftp",
+  "s",
+  "preview",
+  "editor",
+  "billing",
+  "support",
+  "status",
+  "health",
+  "null",
+  "undefined",
+]);
+
+export function isReservedSlug(slug: string) {
+  return RESERVED_SLUGS.has(slug.toLowerCase());
+}
+
 /**
  * Allocate a globally unique website slug.
  * Prefers the base; appends -2, -3, … on collision across other workspaces.
@@ -14,9 +44,14 @@ export async function allocateUniqueSlug(params: {
   workspaceId: string;
   websiteId?: string;
 }) {
-  const base = slugify(params.base) || "site";
+  let base = slugify(params.base) || "site";
+  if (isReservedSlug(base)) {
+    base = `site-${base}`;
+  }
 
   const taken = async (candidate: string) => {
+    if (isReservedSlug(candidate)) return true;
+
     if (isSupabaseConfigured() && (await isSupabaseSchemaReady())) {
       const db = getSupabaseAdmin();
       const { data } = await db

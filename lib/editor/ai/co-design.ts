@@ -24,6 +24,7 @@ import {
   validateEditorActions,
 } from "@/lib/editor/ai/validator";
 import type { EditorAction } from "@/lib/editor/actions";
+import { assertAiGenerationAllowed } from "@/lib/billing/ai-quota";
 import type { ViewportBucket } from "@/lib/editor/responsive";
 
 export type CoDesignProposeInput = {
@@ -34,6 +35,7 @@ export type CoDesignProposeInput = {
   viewport?: ViewportBucket;
   workspaceId?: string | null;
   userId?: string | null;
+  workspacePlan?: string | null;
 };
 
 export type CoDesignProposeResult =
@@ -54,7 +56,8 @@ export type CoDesignProposeResult =
         | "empty"
         | "ai_unavailable"
         | "ai_failed"
-        | "invalid";
+        | "invalid"
+        | "quota";
       messageFa: string;
       messageEn: string;
     };
@@ -148,7 +151,17 @@ export async function proposeCoDesign(
     );
   }
 
-  // LLM path
+  // LLM path — enforce quota only when a provider call is required ($0 deterministic stays free).
+  if (input.workspaceId) {
+    const quota = await assertAiGenerationAllowed({
+      workspaceId: input.workspaceId,
+      workspacePlan: input.workspacePlan,
+    });
+    if (!quota.ok) {
+      return fail("quota", quota.messageFa, quota.messageEn);
+    }
+  }
+
   if (!isAIConfigured()) {
     if (!allowMockServices()) {
       return fail(

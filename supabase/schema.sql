@@ -102,6 +102,7 @@ create table if not exists domains (
   id uuid primary key default gen_random_uuid(),
   website_id uuid not null references websites(id) on delete cascade,
   host text not null unique,
+  verified_at timestamptz,
   created_at timestamptz not null default now()
 );
 

@@ -89,6 +89,8 @@ export async function PATCH(
       if (!limits.removeBranding) {
         nextConfig.settings.showBranding = true;
       }
+      // Keep draft/published flag aligned with persistence status — never trust client.
+      nextConfig.settings.published = website.status === "published";
       website.config = nextConfig;
       website.updatedAt = new Date().toISOString();
       website.version += 1;
@@ -125,6 +127,15 @@ export async function PATCH(
       websiteId: id,
       resourceType: "website",
       resourceId: id,
+    });
+    void recordProductEvent({
+      eventName: "website_saved",
+      userId: session.user.id,
+      workspaceId: session.workspace.id,
+      websiteId: id,
+      resourceType: "website",
+      resourceId: id,
+      metadata: { version: updated.version },
     });
   }
   return NextResponse.json(updated);

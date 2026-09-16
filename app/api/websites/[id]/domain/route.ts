@@ -16,6 +16,27 @@ function normalizeHost(raw: string) {
     .replace(/\.$/, "");
 }
 
+/** Reject malformed / unsafe hostnames before persistence. */
+function isValidPublicHost(host: string) {
+  if (!host || host.length > 253) return false;
+  if (host.includes("..") || host.includes(" ") || host.includes("@")) return false;
+  if (!host.includes(".")) return false;
+  if (!/^[a-z0-9.-]+$/.test(host)) return false;
+  if (host.startsWith("-") || host.endsWith("-") || host.startsWith(".")) return false;
+  // Block obvious local / metadata hosts from becoming custom domains.
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "127.0.0.1" ||
+    host.startsWith("127.") ||
+    host.endsWith(".local") ||
+    host === "0.0.0.0"
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -61,9 +82,9 @@ export async function POST(
     resourceId: id,
   });
 
-  const body = (await request.json()) as { host?: string };
+  const body = (await request.json().catch(() => ({}))) as { host?: string };
   const host = normalizeHost(body.host ?? "");
-  if (!host || !host.includes(".")) {
+  if (!isValidPublicHost(host)) {
     void recordProductEvent({
       eventName: "domain_connection_failed",
       userId: session.user.id,
@@ -97,6 +118,8 @@ export async function POST(
       websiteId: id,
       host,
       createdAt: new Date().toISOString(),
+      // Unverified until DNS ownership is confirmed — edge will not route yet.
+      verifiedAt: null as string | null,
     };
     store.domains.push(domain);
     website.updatedAt = new Date().toISOString();
@@ -123,9 +146,14 @@ export async function POST(
     websiteId: id,
     resourceType: "domain",
     resourceId: created.id,
-    metadata: { hostLength: host.length },
+    metadata: { hostLength: host.length, verified: false },
   });
-  return NextResponse.json(created);
+  return NextResponse.json({
+    ...created,
+    status: "pending_verification",
+    message:
+      "Domain saved. Public routing activates after verification.",
+  });
 }
 
 export async function DELETE(

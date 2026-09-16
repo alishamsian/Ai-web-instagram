@@ -409,7 +409,11 @@ export function EditorShell({
         });
         if (!response.ok) {
           setSavePhase("error");
-          flashMessage(dict.editor.saveFailed);
+          if (response.status === 409) {
+            flashMessage(dict.editor.saveConflict);
+          } else {
+            flashMessage(dict.editor.saveFailed);
+          }
           return false;
         }
         const payload = (await response.json().catch(() => null)) as {
@@ -440,7 +444,7 @@ export function EditorShell({
       () => undefined,
     );
     return next;
-  }, [dict.editor.saveFailed, router, website.id]);
+  }, [dict.editor.saveConflict, dict.editor.saveFailed, router, website.id]);
 
   useEffect(() => {
     undoRef.current = undo;
