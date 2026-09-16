@@ -35,12 +35,38 @@ Schema fields: `user_id`, `workspace_id`, `event_name`, `occurred_at`, `metadata
 
 ## Activation definition
 
-**ID:** `v1_publish_or_successful_import`
+**ID:** `v1_publish_or_successful_import_within_window`
 
-A user/workspace is **activated** when it has:
+**Window:** `ACTIVATION_WINDOW_DAYS = 30` (canonical constant in `lib/admin/intelligence/limits.ts`)
 
-- ≥1 published website (`status=published` or `published_at`), **OR**
-- ≥1 `instagram_imports` row
+A user is **activated** when, **within 30 days after signup** (`profiles.created_at`), their workspace achieves at least one of:
+
+1. **Successful Instagram import** — `import_jobs.status = 'completed'` (timestamp = `completed_at` or `updated_at`)
+2. **Published website** — `websites.published_at` set
+
+### Temporal integrity (non-negotiable)
+
+```text
+signup_at ≤ activation_at ≤ signup_at + ACTIVATION_WINDOW_DAYS
+AND activation_at ≤ analysis_cutoff (now)
+```
+
+Never count:
+
+* activation before signup
+* activation after the 30-day window
+* future activity relative to the analysis cutoff
+* raw `instagram_imports` row existence (not a success signal)
+
+### Query boundaries
+
+Cohort profiles: `[range.start, range.end)`.
+
+Related activation scans: `[range.start, range.end + ACTIVATION_WINDOW_DAYS)`, then per-user validation.
+
+### Performance
+
+Owner→workspaces maps built once (`O(users + workspaces + events)`). Sample caps mark metrics as **`partial`**, never as exact.
 
 **Denominator:** profiles created in the selected range (eligible users).
 

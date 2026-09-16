@@ -15,19 +15,23 @@ import {
 import { adminHref } from "@/components/admin/nav";
 import type { DateRangePreset } from "@/lib/admin/dates";
 import type { MetricResult } from "@/lib/admin/contracts";
+import { ACTIVATION_WINDOW_DAYS } from "@/lib/admin/intelligence/limits";
 
 function metricText(m: MetricResult<number>, asPct = false) {
-  if (m.status === "unavailable" || m.status === "error") {
+  if (m.status === "unavailable") {
     return { kind: "unavailable" as const, text: m.reason };
   }
+  if (m.status === "error") {
+    return { kind: "error" as const, text: m.reason };
+  }
   if (m.status === "insufficient_sample") {
-    return { kind: "unavailable" as const, text: m.reason };
+    return { kind: "insufficient_data" as const, text: m.reason };
   }
   const v =
     m.status === "available" || m.status === "partial" ? m.value : null;
   if (v == null) return { kind: "unavailable" as const, text: "—" };
   return {
-    kind: "value" as const,
+    kind: m.status === "partial" ? ("partial" as const) : ("value" as const),
     text: asPct ? `${(v * 100).toFixed(1)}%` : v.toLocaleString(),
     warning: m.status === "partial" ? m.warning : undefined,
   };
@@ -102,27 +106,45 @@ export default async function AdminAnalyticsHubPage({
             return (
               <AdminCard key={label} className="!p-4">
                 <p className="text-[11px] text-[var(--admin-muted)]">{label}</p>
-                {d.kind === "unavailable" ? (
+                {d.kind === "unavailable" ||
+                d.kind === "error" ||
+                d.kind === "insufficient_data" ? (
                   <p className="mt-2 text-sm text-[var(--admin-muted)]">
-                    Unavailable
+                    {d.kind === "error"
+                      ? "Error"
+                      : d.kind === "insufficient_data"
+                        ? "Insufficient data"
+                        : "Unavailable"}
                     <span className="mt-1 block text-[11px]">
                       Reason: {d.text}
                     </span>
                   </p>
                 ) : (
-                  <p className="mt-2 font-display text-2xl tabular-nums text-[var(--admin-fg)]">
-                    {d.text}
-                  </p>
+                  <>
+                    <p className="mt-2 font-display text-2xl tabular-nums text-[var(--admin-fg)]">
+                      {d.text}
+                    </p>
+                    {d.kind === "partial" && d.warning ? (
+                      <p className="mt-1 text-[11px] text-[var(--admin-muted)]">
+                        Partial — {d.warning}
+                      </p>
+                    ) : null}
+                  </>
                 )}
               </AdminCard>
             );
           })}
         </div>
         <p className="mt-2 text-[11px] text-[var(--admin-muted)]">
-          Median time-to-activation:{" "}
-          {metricText(activation.medianHoursToActivation).kind === "value"
-            ? `${metricText(activation.medianHoursToActivation).text}h`
-            : "Insufficient data"}
+          Window: {ACTIVATION_WINDOW_DAYS}d after signup · Median
+          time-to-activation:{" "}
+          {(() => {
+            const d = metricText(activation.medianHoursToActivation);
+            if (d.kind === "value" || d.kind === "partial") return `${d.text}h`;
+            return d.kind === "insufficient_data"
+              ? "Insufficient data"
+              : "Unavailable";
+          })()}
         </p>
       </AdminSection>
 

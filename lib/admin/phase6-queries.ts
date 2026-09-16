@@ -22,10 +22,14 @@ import {
   utcWeekKey,
   isRetainedOnDay,
   isRetainedInWeek,
+  addUtcDaysIso,
+  computeActivationCohort,
+  isValidActivationTimestamp,
   type FunnelStepStat,
 } from "@/lib/admin/intelligence/metrics";
 import {
   ANALYTICS_SAMPLE_CAP,
+  ACTIVATION_WINDOW_DAYS,
   MAX_ANALYTICS_DAYS,
   MIN_COHORT_SIZE,
   clampAnalyticsPreset,
@@ -51,12 +55,22 @@ function available<T>(value: T, source: string): MetricResult<T> {
 function unavailable<T = number>(reason: string, source?: string): MetricResult<T> {
   return { status: "unavailable", reason, source };
 }
+function metricError<T = number>(reason: string, source?: string): MetricResult<T> {
+  return { status: "error", reason, source };
+}
 function insufficientSample<T = number>(
   reason: string,
   sampleSize: number,
   source?: string,
 ): MetricResult<T> {
   return { status: "insufficient_sample", reason, sampleSize, source };
+}
+function partialMetric<T>(
+  value: T,
+  source: string,
+  warning: string,
+): MetricResult<T> {
+  return { status: "partial", value, source, warning };
 }
 
 /** Clamp preset so analytics never exceed MAX_ANALYTICS_DAYS. */
@@ -71,6 +85,47 @@ function assertRangeBounded(start: string, end: string) {
 
 async function authorize(userId: string) {
   await requireAdminPermission(userId, "system.read");
+}
+
+function allActivationUnavailable(
+  range: ReturnType<typeof resolveDateRange>,
+  reason: string,
+): ActivationIntelligence {
+  const u = unavailable(reason);
+  return {
+    definition: ACTIVATION_DEFINITION,
+    range,
+    eligibleUsers: u,
+    activatedUsers: u,
+    activatedWorkspaces: u,
+    activationRate: u,
+    medianHoursToActivation: u,
+    dropOff: u,
+  };
+}
+
+function allActivationError(
+  range: ReturnType<typeof resolveDateRange>,
+  reason: string,
+): ActivationIntelligence {
+  const e = metricError(reason);
+  return {
+    definition: ACTIVATION_DEFINITION,
+    range,
+    eligibleUsers: e,
+    activatedUsers: e,
+    activatedWorkspaces: e,
+    activationRate: e,
+    medianHoursToActivation: e,
+    dropOff: e,
+  };
+}
+
+/** Chunk `.in()` filters to keep PostgREST URLs bounded. */
+function chunkIds<T>(ids: T[], size = 200): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
 }
 
 // ─── Activation ───────────────────────────────────────────────
@@ -95,151 +150,249 @@ export async function getActivationIntelligence(input: {
   assertRangeBounded(range.start, range.end);
 
   if (!supabaseConfigured()) {
-    const u = unavailable("Supabase not configured");
-    return {
-      definition: ACTIVATION_DEFINITION,
-      range,
-      eligibleUsers: u,
-      activatedUsers: u,
-      activatedWorkspaces: u,
-      activationRate: u,
-      medianHoursToActivation: u,
-      dropOff: u,
-    };
+    return allActivationUnavailable(range, "Supabase not configured");
   }
 
   const db = getSupabaseAdmin();
+  const cutoffAt = new Date().toISOString();
+  // Related activation evidence may land up to ACTIVATION_WINDOW_DAYS after cohort end.
+  const activationScanEnd = addUtcDaysIso(range.end, ACTIVATION_WINDOW_DAYS);
 
-  const [profilesRes, websitesRes, importsRes, workspacesRes] = await Promise.all([
-    db
-      .from("profiles")
-      .select("id, created_at")
-      .gte("created_at", range.start)
-      .lt("created_at", range.end)
-      .limit(ANALYTICS_SAMPLE_CAP),
-    db
-      .from("websites")
-      .select("id, workspace_id, published_at, status, created_at")
-      .is("deleted_at", null)
-      .limit(ANALYTICS_SAMPLE_CAP),
-    db
-      .from("instagram_imports")
-      .select("id, workspace_id, created_at")
-      .limit(ANALYTICS_SAMPLE_CAP),
-    db
-      .from("workspaces")
-      .select("id, owner_id, created_at")
-      .is("deleted_at", null)
-      .limit(ANALYTICS_SAMPLE_CAP),
-  ]);
+  const profilesRes = await db
+    .from("profiles")
+    .select("id, created_at")
+    .gte("created_at", range.start)
+    .lt("created_at", range.end)
+    .limit(ANALYTICS_SAMPLE_CAP);
 
   if (profilesRes.error) {
     logAdminFailure("phase6.activation.profiles", profilesRes.error.message);
+    return allActivationError(
+      range,
+      `Profiles query failed: ${profilesRes.error.message}`,
+    );
   }
 
-  const profiles = profilesRes.data ?? [];
-  const websites = websitesRes.data ?? [];
-  const imports = importsRes.data ?? [];
-  const workspaces = workspacesRes.data ?? [];
+  const profiles = (profilesRes.data ?? []).map((p) => ({
+    id: p.id as string,
+    created_at: p.created_at as string,
+  }));
+  const profileIds = profiles.map((p) => p.id);
+  const profilesTruncated = profiles.length >= ANALYTICS_SAMPLE_CAP;
 
-  const ownerByWs = new Map(
-    workspaces.map((w) => [w.id as string, w.owner_id as string | null]),
-  );
-
-  const publishedByWs = new Map<string, string>();
-  for (const w of websites) {
-    const pub =
-      w.published_at ??
-      (w.status === "published" ? (w.created_at as string) : null);
-    if (!pub) continue;
-    const ws = w.workspace_id as string;
-    const prev = publishedByWs.get(ws);
-    if (!prev || pub < prev) publishedByWs.set(ws, pub);
+  if (profileIds.length === 0) {
+    return {
+      definition: ACTIVATION_DEFINITION,
+      range,
+      eligibleUsers: available(0, "profiles.created_at"),
+      activatedUsers: available(0, "activation"),
+      activatedWorkspaces: available(0, "activation"),
+      activationRate: unavailable("No eligible users in range", "activation_rate"),
+      medianHoursToActivation: insufficientSample(
+        "No eligible users in range",
+        0,
+        "median_hours_to_activation",
+      ),
+      dropOff: unavailable("No eligible users in range"),
+    };
   }
 
-  const importByWs = new Map<string, string>();
-  for (const row of imports) {
-    const ws = row.workspace_id as string;
-    const at = row.created_at as string;
-    const prev = importByWs.get(ws);
-    if (!prev || at < prev) importByWs.set(ws, at);
+  // Workspaces owned by cohort profiles (chunked .in)
+  const workspaces: Array<{ id: string; owner_id: string }> = [];
+  let workspacesTruncated = false;
+  let workspacesError: string | null = null;
+  for (const chunk of chunkIds(profileIds)) {
+    const res = await db
+      .from("workspaces")
+      .select("id, owner_id")
+      .in("owner_id", chunk)
+      .is("deleted_at", null)
+      .limit(ANALYTICS_SAMPLE_CAP);
+    if (res.error) {
+      workspacesError = res.error.message;
+      break;
+    }
+    for (const w of res.data ?? []) {
+      workspaces.push({
+        id: w.id as string,
+        owner_id: w.owner_id as string,
+      });
+    }
+    if ((res.data ?? []).length >= ANALYTICS_SAMPLE_CAP) {
+      workspacesTruncated = true;
+    }
+  }
+  if (workspacesError) {
+    logAdminFailure("phase6.activation.workspaces", workspacesError);
+    return allActivationError(
+      range,
+      `Workspaces query failed: ${workspacesError}`,
+    );
   }
 
-  const activatedWs = new Set([...publishedByWs.keys(), ...importByWs.keys()]);
-  const activatedOwners = new Set<string>();
-  for (const ws of activatedWs) {
-    const owner = ownerByWs.get(ws);
-    if (owner) activatedOwners.add(owner);
+  const workspacesByOwner = new Map<string, string[]>();
+  const workspaceIds: string[] = [];
+  for (const w of workspaces) {
+    workspaceIds.push(w.id);
+    const list = workspacesByOwner.get(w.owner_id) ?? [];
+    list.push(w.id);
+    workspacesByOwner.set(w.owner_id, list);
   }
 
-  const eligible = profiles.length;
-  const activatedInCohort = profiles.filter((p) =>
-    activatedOwners.has(p.id as string),
-  ).length;
+  const activationCandidatesByWorkspace = new Map<string, string[]>();
+  function pushCandidate(wsId: string, at: string | null | undefined) {
+    if (!at || !wsId) return;
+    const list = activationCandidatesByWorkspace.get(wsId) ?? [];
+    list.push(at);
+    activationCandidatesByWorkspace.set(wsId, list);
+  }
 
-  const hours: number[] = [];
-  for (const p of profiles) {
-    if (!activatedOwners.has(p.id as string)) continue;
-    const owned = workspaces.filter((w) => w.owner_id === p.id);
-    let first: string | null = null;
-    for (const w of owned) {
-      const candidates = [
-        publishedByWs.get(w.id as string),
-        importByWs.get(w.id as string),
-      ].filter(Boolean) as string[];
-      for (const c of candidates) {
-        if (!first || c < first) first = c;
+  let websitesTruncated = false;
+  let importsTruncated = false;
+
+  if (workspaceIds.length > 0) {
+    // Published websites in [cohortStart, cohortEnd + window]
+    for (const chunk of chunkIds(workspaceIds)) {
+      const res = await db
+        .from("websites")
+        .select("workspace_id, published_at, status")
+        .in("workspace_id", chunk)
+        .is("deleted_at", null)
+        .not("published_at", "is", null)
+        .gte("published_at", range.start)
+        .lt("published_at", activationScanEnd)
+        .limit(ANALYTICS_SAMPLE_CAP);
+      if (res.error) {
+        logAdminFailure("phase6.activation.websites", res.error.message);
+        return allActivationError(
+          range,
+          `Websites query failed: ${res.error.message}`,
+        );
+      }
+      for (const row of res.data ?? []) {
+        pushCandidate(row.workspace_id as string, row.published_at as string);
+      }
+      if ((res.data ?? []).length >= ANALYTICS_SAMPLE_CAP) {
+        websitesTruncated = true;
       }
     }
-    if (first && first >= (p.created_at as string)) {
-      hours.push(
-        (Date.parse(first) - Date.parse(p.created_at as string)) / 3_600_000,
-      );
+
+    // Successful imports only: import_jobs.status = completed
+    for (const chunk of chunkIds(workspaceIds)) {
+      const res = await db
+        .from("import_jobs")
+        .select("workspace_id, completed_at, updated_at, status")
+        .in("workspace_id", chunk)
+        .eq("status", "completed")
+        .gte("completed_at", range.start)
+        .lt("completed_at", activationScanEnd)
+        .limit(ANALYTICS_SAMPLE_CAP);
+      if (res.error) {
+        // Fallback: some environments may lack completed_at filterability —
+        // retry with updated_at bound and filter status in app (still completed only).
+        const retry = await db
+          .from("import_jobs")
+          .select("workspace_id, completed_at, updated_at, status")
+          .in("workspace_id", chunk)
+          .eq("status", "completed")
+          .gte("updated_at", range.start)
+          .lt("updated_at", activationScanEnd)
+          .limit(ANALYTICS_SAMPLE_CAP);
+        if (retry.error) {
+          logAdminFailure("phase6.activation.import_jobs", retry.error.message);
+          return allActivationError(
+            range,
+            `Import jobs query failed: ${retry.error.message}`,
+          );
+        }
+        for (const row of retry.data ?? []) {
+          const at =
+            (row.completed_at as string | null) ?? (row.updated_at as string);
+          pushCandidate(row.workspace_id as string, at);
+        }
+        if ((retry.data ?? []).length >= ANALYTICS_SAMPLE_CAP) {
+          importsTruncated = true;
+        }
+        continue;
+      }
+      for (const row of res.data ?? []) {
+        const at =
+          (row.completed_at as string | null) ?? (row.updated_at as string);
+        pushCandidate(row.workspace_id as string, at);
+      }
+      if ((res.data ?? []).length >= ANALYTICS_SAMPLE_CAP) {
+        importsTruncated = true;
+      }
     }
   }
 
-  const rate = conversionRate(activatedInCohort, eligible);
-  const med = median(hours);
+  const computed = computeActivationCohort({
+    profiles,
+    workspacesByOwner,
+    activationCandidatesByWorkspace,
+    windowDays: ACTIVATION_WINDOW_DAYS,
+    cutoffAt,
+  });
 
   const truncated =
-    profiles.length >= ANALYTICS_SAMPLE_CAP ||
-    websites.length >= ANALYTICS_SAMPLE_CAP;
+    profilesTruncated ||
+    workspacesTruncated ||
+    websitesTruncated ||
+    importsTruncated;
+  const truncateWarning = `Sample truncated at ${ANALYTICS_SAMPLE_CAP} — metric is partial, not exact`;
+
+  const rate = conversionRate(
+    computed.activatedUserIds.size,
+    computed.eligibleUsers,
+  );
+  const med = median(computed.hoursToActivation);
+
+  const countMetric = (value: number, source: string): MetricResult<number> =>
+    truncated
+      ? partialMetric(value, source, truncateWarning)
+      : available(value, source);
 
   return {
     definition: ACTIVATION_DEFINITION,
     range,
-    eligibleUsers: available(eligible, "profiles.created_at"),
-    activatedUsers: available(
-      activatedInCohort,
-      "websites.published|instagram_imports ∩ profiles",
+    eligibleUsers: countMetric(computed.eligibleUsers, "profiles.created_at"),
+    activatedUsers: countMetric(
+      computed.activatedUserIds.size,
+      `import_jobs.completed|websites.published_at within ${ACTIVATION_WINDOW_DAYS}d of signup`,
     ),
-    activatedWorkspaces: available(
-      activatedWs.size,
-      "websites.published|instagram_imports",
+    activatedWorkspaces: countMetric(
+      computed.activatedWorkspaceIds.size,
+      `workspaces with valid activation within ${ACTIVATION_WINDOW_DAYS}d`,
     ),
     activationRate:
       rate == null
         ? unavailable("No eligible users in range", "activation_rate")
         : truncated
-          ? {
-              status: "partial",
-              value: rate,
-              source: "activation_rate",
-              warning: `Sample truncated at ${ANALYTICS_SAMPLE_CAP}`,
-            }
-          : available(rate, "activated/eligible profiles"),
+          ? partialMetric(rate, "activation_rate", truncateWarning)
+          : available(
+              rate,
+              `activated/eligible within ${ACTIVATION_WINDOW_DAYS}d window`,
+            ),
     medianHoursToActivation:
       med == null
         ? insufficientSample(
-            "No activated users with measurable time-to-activation",
-            hours.length,
+            "No activated users with measurable time-to-activation in window",
+            computed.hoursToActivation.length,
             "median_hours_to_activation",
           )
-        : available(med, "median(first_activation - signup)"),
+        : truncated
+          ? partialMetric(
+              med,
+              "median(first_valid_activation - signup)",
+              truncateWarning,
+            )
+          : available(med, "median(first_valid_activation - signup)"),
     dropOff:
       rate == null
-        ? unavailable("No eligible users")
-        : available(1 - rate, "1 - activation_rate"),
+        ? unavailable("No eligible users in range")
+        : truncated
+          ? partialMetric(1 - rate, "1 - activation_rate", truncateWarning)
+          : available(1 - rate, "1 - activation_rate"),
   };
 }
 
@@ -261,75 +414,210 @@ export async function getFunnelIntelligence(input: {
   assertRangeBounded(range.start, range.end);
 
   const note =
-    "Funnel uses table existence timestamps (profiles → imports → websites → publish). Preview step is unavailable until website_previewed is instrumented. Observed counts — not causal attribution.";
+    `Funnel cohort = workspaces created in range. Downstream steps require events ≥ workspace.created_at and ≤ created_at+${ACTIVATION_WINDOW_DAYS}d (and ≤ now). Import step uses import_jobs.status=completed only — not raw instagram_imports rows. Observed counts — not causal attribution.`;
 
   if (!supabaseConfigured()) {
     return {
       range,
       mode: "workspace",
-      note,
-      steps: [],
+      note: `${note} Supabase not configured.`,
+      steps: [
+        {
+          id: "signup",
+          label: "Signup",
+          users: null,
+          workspaces: null,
+          conversionFromPrevious: null,
+          dropOffFromPrevious: null,
+          medianHoursToNext: null,
+          status: "unavailable",
+          reason: "Supabase not configured",
+          source: "workspaces",
+        },
+      ],
     };
   }
 
   const db = getSupabaseAdmin();
-  const [wsRes, importRes, siteRes, pubRes, editEvents] = await Promise.all([
-    db
-      .from("workspaces")
-      .select("id, created_at")
-      .is("deleted_at", null)
-      .gte("created_at", range.start)
-      .lt("created_at", range.end)
-      .limit(ANALYTICS_SAMPLE_CAP),
-    db
-      .from("instagram_imports")
-      .select("workspace_id, created_at")
-      .limit(ANALYTICS_SAMPLE_CAP),
-    db
-      .from("websites")
-      .select("workspace_id, created_at, published_at, status")
-      .is("deleted_at", null)
-      .limit(ANALYTICS_SAMPLE_CAP),
-    db
-      .from("websites")
-      .select("workspace_id, published_at, status")
-      .is("deleted_at", null)
-      .or("status.eq.published,published_at.not.is.null")
-      .limit(ANALYTICS_SAMPLE_CAP),
-    db
+  const cutoffAt = new Date().toISOString();
+  const scanEnd = addUtcDaysIso(range.end, ACTIVATION_WINDOW_DAYS);
+
+  const wsRes = await db
+    .from("workspaces")
+    .select("id, created_at")
+    .is("deleted_at", null)
+    .gte("created_at", range.start)
+    .lt("created_at", range.end)
+    .limit(ANALYTICS_SAMPLE_CAP);
+
+  if (wsRes.error) {
+    logAdminFailure("phase6.funnel.workspaces", wsRes.error.message);
+    return {
+      range,
+      mode: "workspace",
+      note,
+      steps: [
+        {
+          id: "signup",
+          label: "Signup",
+          users: null,
+          workspaces: null,
+          conversionFromPrevious: null,
+          dropOffFromPrevious: null,
+          medianHoursToNext: null,
+          status: "unavailable",
+          reason: `Query failed: ${wsRes.error.message}`,
+          source: "workspaces",
+        },
+      ],
+    };
+  }
+
+  const cohortRows = (wsRes.data ?? []).map((w) => ({
+    id: w.id as string,
+    created_at: w.created_at as string,
+  }));
+  const cohort = new Map(cohortRows.map((w) => [w.id, w.created_at]));
+  const cohortIds = [...cohort.keys()];
+  const signupN = cohortIds.length;
+  const truncated = cohortRows.length >= ANALYTICS_SAMPLE_CAP;
+
+  const imported = new Set<string>();
+  const generated = new Set<string>();
+  const published = new Set<string>();
+  const edited = new Set<string>();
+
+  if (cohortIds.length > 0) {
+    for (const chunk of chunkIds(cohortIds)) {
+      const jobs = await db
+        .from("import_jobs")
+        .select("workspace_id, completed_at, updated_at, status")
+        .in("workspace_id", chunk)
+        .eq("status", "completed")
+        .gte("updated_at", range.start)
+        .lt("updated_at", scanEnd)
+        .limit(ANALYTICS_SAMPLE_CAP);
+      if (jobs.error) {
+        logAdminFailure("phase6.funnel.import_jobs", jobs.error.message);
+        return {
+          range,
+          mode: "workspace",
+          note,
+          steps: [
+            {
+              id: "import_completed",
+              label: "Import completed",
+              users: null,
+              workspaces: null,
+              conversionFromPrevious: null,
+              dropOffFromPrevious: null,
+              medianHoursToNext: null,
+              status: "unavailable",
+              reason: `Query failed: ${jobs.error.message}`,
+              source: "import_jobs",
+            },
+          ],
+        };
+      }
+      for (const row of jobs.data ?? []) {
+        const ws = row.workspace_id as string;
+        const signupAt = cohort.get(ws);
+        if (!signupAt) continue;
+        const at =
+          (row.completed_at as string | null) ?? (row.updated_at as string);
+        if (
+          isValidActivationTimestamp({
+            signupAt,
+            activationAt: at,
+            cutoffAt,
+          })
+        ) {
+          imported.add(ws);
+        }
+      }
+    }
+
+    for (const chunk of chunkIds(cohortIds)) {
+      const sites = await db
+        .from("websites")
+        .select("workspace_id, created_at, published_at")
+        .in("workspace_id", chunk)
+        .is("deleted_at", null)
+        .limit(ANALYTICS_SAMPLE_CAP);
+      if (sites.error) {
+        logAdminFailure("phase6.funnel.websites", sites.error.message);
+        return {
+          range,
+          mode: "workspace",
+          note,
+          steps: [
+            {
+              id: "website_generated",
+              label: "Website generated",
+              users: null,
+              workspaces: null,
+              conversionFromPrevious: null,
+              dropOffFromPrevious: null,
+              medianHoursToNext: null,
+              status: "unavailable",
+              reason: `Query failed: ${sites.error.message}`,
+              source: "websites",
+            },
+          ],
+        };
+      }
+      for (const row of sites.data ?? []) {
+        const ws = row.workspace_id as string;
+        const signupAt = cohort.get(ws);
+        if (!signupAt) continue;
+        const created = row.created_at as string;
+        if (
+          isValidActivationTimestamp({
+            signupAt,
+            activationAt: created,
+            cutoffAt,
+          })
+        ) {
+          generated.add(ws);
+        }
+        const pub = row.published_at as string | null;
+        if (
+          pub &&
+          isValidActivationTimestamp({
+            signupAt,
+            activationAt: pub,
+            cutoffAt,
+          })
+        ) {
+          published.add(ws);
+        }
+      }
+    }
+
+    const edits = await db
       .from("product_events")
       .select("workspace_id, occurred_at")
       .eq("event_name", "website_edited")
       .gte("occurred_at", range.start)
-      .lt("occurred_at", range.end)
-      .limit(ANALYTICS_SAMPLE_CAP),
-  ]);
-
-  const cohort = new Set((wsRes.data ?? []).map((w) => w.id as string));
-  const signupN = cohort.size;
-
-  const imported = new Set<string>();
-  for (const row of importRes.data ?? []) {
-    const ws = row.workspace_id as string;
-    if (cohort.has(ws)) imported.add(ws);
-  }
-
-  const generated = new Set<string>();
-  for (const row of siteRes.data ?? []) {
-    const ws = row.workspace_id as string;
-    if (cohort.has(ws)) generated.add(ws);
-  }
-
-  const edited = new Set<string>();
-  for (const row of editEvents.data ?? []) {
-    const ws = row.workspace_id as string | null;
-    if (ws && cohort.has(ws)) edited.add(ws);
-  }
-
-  const published = new Set<string>();
-  for (const row of pubRes.data ?? []) {
-    const ws = row.workspace_id as string;
-    if (cohort.has(ws)) published.add(ws);
+      .lt("occurred_at", scanEnd)
+      .limit(ANALYTICS_SAMPLE_CAP);
+    if (!edits.error) {
+      for (const row of edits.data ?? []) {
+        const ws = row.workspace_id as string | null;
+        if (!ws) continue;
+        const signupAt = cohort.get(ws);
+        if (!signupAt) continue;
+        if (
+          isValidActivationTimestamp({
+            signupAt,
+            activationAt: row.occurred_at as string,
+            cutoffAt,
+          })
+        ) {
+          edited.add(ws);
+        }
+      }
+    }
   }
 
   function step(
@@ -350,8 +638,13 @@ export async function getFunnelIntelligence(input: {
       conversionFromPrevious: conv,
       dropOffFromPrevious: conv == null ? null : 1 - conv,
       medianHoursToNext: null,
-      status,
-      reason,
+      status: truncated && status === "available" ? "partial" : status,
+      reason:
+        truncated && status !== "unavailable"
+          ? reason
+            ? `${reason}; sample may be truncated`
+            : `Sample truncated at ${ANALYTICS_SAMPLE_CAP}`
+          : reason,
       source,
     };
   }
@@ -364,7 +657,8 @@ export async function getFunnelIntelligence(input: {
       imported.size,
       signupN,
       "partial",
-      "instagram_imports.workspace_id",
+      "import_jobs.status=completed",
+      `Within ${ACTIVATION_WINDOW_DAYS}d of workspace creation`,
     ),
     step(
       "website_generated",
@@ -396,7 +690,8 @@ export async function getFunnelIntelligence(input: {
       published.size,
       generated.size || signupN,
       "partial",
-      "websites.published_at|status",
+      "websites.published_at",
+      `Within ${ACTIVATION_WINDOW_DAYS}d of workspace creation`,
     ),
   ];
 

@@ -2,19 +2,24 @@
  * Pure activation / funnel / retention helpers (unit-testable, no I/O).
  */
 
-import { MIN_COHORT_SIZE } from "@/lib/admin/intelligence/limits";
+import {
+  ACTIVATION_WINDOW_DAYS,
+  MIN_COHORT_SIZE,
+} from "@/lib/admin/intelligence/limits";
 
 export type ActivationDefinition = {
-  id: "v1_publish_or_successful_import";
+  id: "v1_publish_or_successful_import_within_window";
   description: string;
   eligibleDenominator: "profiles_in_range" | "workspaces_in_range";
+  windowDays: number;
 };
 
 export const ACTIVATION_DEFINITION: ActivationDefinition = {
-  id: "v1_publish_or_successful_import",
+  id: "v1_publish_or_successful_import_within_window",
   description:
-    "Activated when the user/workspace has at least one published website OR at least one successful Instagram import. Derived from websites + instagram_imports / import_jobs tables (not invented events).",
+    `Activated when, within ${ACTIVATION_WINDOW_DAYS} days after signup, the user/workspace achieves at least one successful Instagram import (import_jobs.status=completed) OR a published website (published_at). Activation timestamps must be ≥ signup and ≤ signup+${ACTIVATION_WINDOW_DAYS}d, and ≤ analysis cutoff.`,
   eligibleDenominator: "profiles_in_range",
+  windowDays: ACTIVATION_WINDOW_DAYS,
 };
 
 export type FunnelStepId =
@@ -59,7 +64,11 @@ export function conversionRate(
 export function retentionPercent(
   retained: number,
   cohortSize: number,
-): { status: "available" | "insufficient_data"; value: number | null; reason?: string } {
+): {
+  status: "available" | "insufficient_data";
+  value: number | null;
+  reason?: string;
+} {
   if (cohortSize < MIN_COHORT_SIZE) {
     return {
       status: "insufficient_data",
@@ -76,7 +85,9 @@ export function utcWeekKey(iso: string): string {
   const day = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  const week = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
   return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
@@ -84,6 +95,136 @@ export function daysBetween(aIso: string, bIso: string): number {
   const a = Date.parse(aIso);
   const b = Date.parse(bIso);
   return Math.floor((b - a) / 86_400_000);
+}
+
+export function addUtcDaysIso(iso: string, days: number): string {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString();
+}
+
+/**
+ * Temporal integrity for activation events.
+ * Requires: signup ≤ activation ≤ signup+windowDays AND activation ≤ cutoff.
+ */
+export function isValidActivationTimestamp(input: {
+  signupAt: string;
+  activationAt: string;
+  windowDays?: number;
+  /** Analysis/data cutoff — never count activity after this instant. */
+  cutoffAt?: string;
+}): boolean {
+  const signupMs = Date.parse(input.signupAt);
+  const actMs = Date.parse(input.activationAt);
+  if (!Number.isFinite(signupMs) || !Number.isFinite(actMs)) return false;
+  if (actMs < signupMs) return false;
+
+  const windowDays = input.windowDays ?? ACTIVATION_WINDOW_DAYS;
+  const windowEndMs = signupMs + windowDays * 86_400_000;
+  if (actMs > windowEndMs) return false;
+
+  if (input.cutoffAt) {
+    const cutoffMs = Date.parse(input.cutoffAt);
+    if (Number.isFinite(cutoffMs) && actMs > cutoffMs) return false;
+  }
+  return true;
+}
+
+/** Earliest valid activation among candidates, or null. */
+export function firstValidActivationAt(input: {
+  signupAt: string;
+  candidates: Array<string | null | undefined>;
+  windowDays?: number;
+  cutoffAt?: string;
+}): string | null {
+  let best: string | null = null;
+  for (const c of input.candidates) {
+    if (!c) continue;
+    if (
+      !isValidActivationTimestamp({
+        signupAt: input.signupAt,
+        activationAt: c,
+        windowDays: input.windowDays,
+        cutoffAt: input.cutoffAt,
+      })
+    ) {
+      continue;
+    }
+    if (!best || c < best) best = c;
+  }
+  return best;
+}
+
+export type ActivationCohortProfile = {
+  id: string;
+  created_at: string;
+};
+
+export type ActivationComputeInput = {
+  profiles: ActivationCohortProfile[];
+  /** owner_id → workspace ids */
+  workspacesByOwner: Map<string, string[]>;
+  /** workspace_id → activation candidate timestamps (published / completed import) */
+  activationCandidatesByWorkspace: Map<string, string[]>;
+  windowDays?: number;
+  cutoffAt: string;
+};
+
+export type ActivationComputeResult = {
+  eligibleUsers: number;
+  activatedUserIds: Set<string>;
+  activatedWorkspaceIds: Set<string>;
+  /** Hours from signup to first valid activation, per activated user */
+  hoursToActivation: number[];
+};
+
+/**
+ * Pure cohort activation — O(users + workspace links + candidates).
+ * Does not scan workspaces per profile via filter.
+ */
+export function computeActivationCohort(
+  input: ActivationComputeInput,
+): ActivationComputeResult {
+  const windowDays = input.windowDays ?? ACTIVATION_WINDOW_DAYS;
+  const activatedUserIds = new Set<string>();
+  const activatedWorkspaceIds = new Set<string>();
+  const hoursToActivation: number[] = [];
+
+  for (const profile of input.profiles) {
+    const wsIds = input.workspacesByOwner.get(profile.id) ?? [];
+    let first: string | null = null;
+    const activatedWsForUser: string[] = [];
+
+    for (const wsId of wsIds) {
+      const candidates = input.activationCandidatesByWorkspace.get(wsId) ?? [];
+      const valid = firstValidActivationAt({
+        signupAt: profile.created_at,
+        candidates,
+        windowDays,
+        cutoffAt: input.cutoffAt,
+      });
+      if (!valid) continue;
+      activatedWsForUser.push(wsId);
+      if (!first || valid < first) first = valid;
+    }
+
+    if (first) {
+      activatedUserIds.add(profile.id);
+      for (const wsId of activatedWsForUser) {
+        activatedWorkspaceIds.add(wsId);
+      }
+      hoursToActivation.push(
+        (Date.parse(first) - Date.parse(profile.created_at)) / 3_600_000,
+      );
+    }
+  }
+
+  return {
+    eligibleUsers: input.profiles.length,
+    activatedUserIds,
+    activatedWorkspaceIds,
+    hoursToActivation,
+  };
 }
 
 /** True if activityIso falls on day offset N after signup (UTC calendar day). */

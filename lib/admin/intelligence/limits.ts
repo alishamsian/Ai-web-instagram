@@ -32,6 +32,12 @@ export const AT_RISK_INACTIVITY_DAYS = 14;
 /** Cap on founder insights returned to the dashboard. */
 export const FOUNDER_INSIGHTS_CAP = 5;
 
+/**
+ * Activation must occur within this many days after signup.
+ * Canonical product window — do not scatter literal 30 elsewhere.
+ */
+export const ACTIVATION_WINDOW_DAYS = 30;
+
 /** Clamp preset so analytics never exceed MAX_ANALYTICS_DAYS. */
 export function clampAnalyticsPreset(
   preset: DateRangePreset | undefined,

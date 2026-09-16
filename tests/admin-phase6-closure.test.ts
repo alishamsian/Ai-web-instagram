@@ -8,6 +8,10 @@ import {
   isRetainedOnDay,
   isRetainedInWeek,
   ACTIVATION_DEFINITION,
+  isValidActivationTimestamp,
+  firstValidActivationAt,
+  computeActivationCohort,
+  addUtcDaysIso,
 } from "@/lib/admin/intelligence/metrics";
 import { computeHealthScore, HEALTH_WEIGHTS } from "@/lib/admin/intelligence/health-score";
 import { resolveLifecycle } from "@/lib/admin/intelligence/lifecycle";
@@ -20,6 +24,7 @@ import {
   MIN_COHORT_SIZE,
   ANALYTICS_SAMPLE_CAP,
   FOUNDER_INSIGHTS_CAP,
+  ACTIVATION_WINDOW_DAYS,
   clampAnalyticsPreset,
 } from "@/lib/admin/intelligence/limits";
 import { roleHasPermission } from "@/lib/admin/permissions";
@@ -29,9 +34,15 @@ const root = process.cwd();
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
 describe("Phase 6 — activation / funnel math", () => {
-  it("defines activation from real tables, not invented events", () => {
-    expect(ACTIVATION_DEFINITION.id).toBe("v1_publish_or_successful_import");
-    expect(ACTIVATION_DEFINITION.description).toMatch(/websites/);
+  it("defines activation from real tables with a window", () => {
+    expect(ACTIVATION_DEFINITION.id).toBe(
+      "v1_publish_or_successful_import_within_window",
+    );
+    expect(ACTIVATION_DEFINITION.windowDays).toBe(ACTIVATION_WINDOW_DAYS);
+    expect(ACTIVATION_DEFINITION.description).toMatch(/import_jobs/);
+    expect(ACTIVATION_DEFINITION.description).toMatch(
+      new RegExp(String(ACTIVATION_WINDOW_DAYS)),
+    );
   });
 
   it("computes conversion and median honestly", () => {
@@ -40,6 +51,96 @@ describe("Phase 6 — activation / funnel math", () => {
     expect(median([])).toBeNull();
     expect(median([1, 3, 2])).toBe(2);
     expect(median([1, 2, 3, 4])).toBe(2.5);
+  });
+});
+
+describe("Phase 6 — activation temporal integrity", () => {
+  const cutoff = "2026-06-01T00:00:00.000Z";
+
+  it("Case A: import before signup is rejected", () => {
+    expect(
+      isValidActivationTimestamp({
+        signupAt: "2026-01-01T00:00:00.000Z",
+        activationAt: "2025-12-31T00:00:00.000Z",
+        cutoffAt: cutoff,
+      }),
+    ).toBe(false);
+  });
+
+  it("Case B: import after window is rejected", () => {
+    expect(
+      isValidActivationTimestamp({
+        signupAt: "2026-01-01T00:00:00.000Z",
+        activationAt: "2026-02-15T00:00:00.000Z", // 45 days
+        cutoffAt: cutoff,
+      }),
+    ).toBe(false);
+  });
+
+  it("Case C: import within window is accepted", () => {
+    expect(
+      isValidActivationTimestamp({
+        signupAt: "2026-01-01T00:00:00.000Z",
+        activationAt: "2026-01-15T00:00:00.000Z",
+        cutoffAt: cutoff,
+      }),
+    ).toBe(true);
+  });
+
+  it("Case D: activation after analysis cutoff is rejected", () => {
+    expect(
+      isValidActivationTimestamp({
+        signupAt: "2026-01-01T00:00:00.000Z",
+        activationAt: "2026-01-10T00:00:00.000Z",
+        cutoffAt: "2026-01-05T00:00:00.000Z",
+      }),
+    ).toBe(false);
+  });
+
+  it("Case E: cohort compute ignores historical leakage and O(n) maps", () => {
+    const workspacesByOwner = new Map<string, string[]>([
+      ["u1", ["ws1"]],
+      ["u2", ["ws2"]],
+    ]);
+    const activationCandidatesByWorkspace = new Map<string, string[]>([
+      // before signup — must not activate u1
+      ["ws1", ["2025-12-01T00:00:00.000Z", "2026-01-10T00:00:00.000Z"]],
+      // after window — must not activate u2
+      ["ws2", ["2026-03-01T00:00:00.000Z"]],
+    ]);
+    const result = computeActivationCohort({
+      profiles: [
+        { id: "u1", created_at: "2026-01-01T00:00:00.000Z" },
+        { id: "u2", created_at: "2026-01-01T00:00:00.000Z" },
+      ],
+      workspacesByOwner,
+      activationCandidatesByWorkspace,
+      cutoffAt: cutoff,
+    });
+    expect(result.activatedUserIds.has("u1")).toBe(true);
+    expect(result.activatedUserIds.has("u2")).toBe(false);
+    expect(result.activatedWorkspaceIds.has("ws1")).toBe(true);
+    expect(result.hoursToActivation).toHaveLength(1);
+  });
+
+  it("firstValidActivationAt picks earliest valid candidate", () => {
+    expect(
+      firstValidActivationAt({
+        signupAt: "2026-01-01T00:00:00.000Z",
+        candidates: [
+          "2025-12-31T00:00:00.000Z",
+          "2026-01-20T00:00:00.000Z",
+          "2026-01-05T00:00:00.000Z",
+        ],
+        cutoffAt: cutoff,
+      }),
+    ).toBe("2026-01-05T00:00:00.000Z");
+  });
+
+  it("activation scan end extends cohort end by window days", () => {
+    expect(addUtcDaysIso("2026-01-31T00:00:00.000Z", ACTIVATION_WINDOW_DAYS)).toBe(
+      "2026-03-02T00:00:00.000Z",
+    );
   });
 });
 
@@ -250,11 +351,25 @@ describe("Phase 6 — security / instrumentation", () => {
     expect(mig).not.toMatch(/drop table/i);
   });
 
+  it("activation query uses temporal bounds and completed jobs, not full-table imports", () => {
+    const src = read("lib/admin/phase6-queries.ts");
+    expect(src).toMatch(/ACTIVATION_WINDOW_DAYS/);
+    expect(src).toMatch(/computeActivationCohort/);
+    expect(src).toMatch(/workspacesByOwner/);
+    expect(src).toMatch(/\.eq\("status", "completed"\)/);
+    expect(src).toMatch(/allActivationError|metricError/);
+    expect(src).toMatch(
+      /getActivationIntelligence[\s\S]*import_jobs[\s\S]*completed/,
+    );
+  });
+
   it("dashboard stays lite and docs exist", () => {
     const page = read("app/[locale]/admin/dashboard/page.tsx");
     expect(page).toMatch(/getAdminDashboardKpisLite/);
     expect(page).toMatch(/getFounderInsightsLite/);
     expect(page).not.toMatch(/getAdminAiOverview/);
     expect(existsSync(join(root, "docs/admin-phase6.md"))).toBe(true);
+    const docs = read("docs/admin-phase6.md");
+    expect(docs).toMatch(/ACTIVATION_WINDOW_DAYS|30 days/);
   });
 });
