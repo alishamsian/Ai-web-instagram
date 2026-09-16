@@ -39,6 +39,10 @@ export function PuckTopBar({
   publishing,
   zoom,
   onZoomChange,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }: {
   locale: Locale;
   websiteId: string;
@@ -51,9 +55,13 @@ export function PuckTopBar({
   publishing?: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }) {
   const isFa = locale === "fa";
-  const { history, dispatch, appState } = usePuck();
+  const { dispatch, appState } = usePuck();
   const currentWidth = appState.ui.viewports.current.width;
 
   const saveLabel =
@@ -91,15 +99,15 @@ export function PuckTopBar({
       <div className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
         <IconBtn
           label={isFa ? "واگرد" : "Undo"}
-          disabled={!history.hasPast}
-          onClick={() => history.back()}
+          disabled={!canUndo}
+          onClick={onUndo}
         >
           <Undo2 className="size-3.5" />
         </IconBtn>
         <IconBtn
           label={isFa ? "ازنو" : "Redo"}
-          disabled={!history.hasFuture}
-          onClick={() => history.forward()}
+          disabled={!canRedo}
+          onClick={onRedo}
         >
           <Redo2 className="size-3.5" />
         </IconBtn>

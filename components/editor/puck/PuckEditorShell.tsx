@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Phase 2 — Professional Puck editor shell.
+ * Phase 3 — Puck editor shell with AI Co-Designer + unified WebsiteConfig history.
  * Classic EditorShell remains the default route and is NOT deleted.
  *
- * Ownership model (undo/redo):
- * - Structural canvas history → Puck history (undo/redo in top bar)
- * - WebsiteConfig content/brand/seo → React state + autosave
- * - Phase 3 can unify AI + history stacks; do not dual-stack here
+ * History ownership (Phase 3):
+ * - Application stack (`lib/editor/history`) owns WebsiteConfig snapshots
+ * - AI Apply = one labeled transaction ("AI Edit: …")
+ * - Top bar / ⌘Z use this stack (not a fighting dual stack with Puck)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,15 +25,26 @@ import { PuckWebsiteProvider } from "@/lib/puck/website-context";
 import { PuckTopBar, type PuckSaveState } from "@/components/editor/puck/PuckTopBar";
 import { PuckLeftPanel } from "@/components/editor/puck/PuckLeftPanel";
 import { PuckInspector } from "@/components/editor/puck/PuckInspector";
-import { PuckAiBar } from "@/components/editor/puck/PuckAiBar";
+import { PuckAiBar, type AiProposal } from "@/components/editor/puck/PuckAiBar";
 import { PuckKeyboardShortcuts } from "@/components/editor/puck/PuckKeyboardShortcuts";
 import { PuckCanvasFrame } from "@/components/editor/puck/PuckCanvasFrame";
 import { ensureStoreSectionRenderersBound } from "@/components/store/bind-store-renderers";
+import {
+  EDITOR_HISTORY_LIMIT,
+  createHistoryEntry,
+  pushHistory,
+  undoHistory,
+  redoHistory,
+  shouldDebounceHistoryLabel,
+  executeAiActionBatch,
+  type HistoryEntry,
+} from "@/lib/editor";
 import { cn } from "@/lib/utils";
 
 ensureStoreSectionRenderersBound();
 
 const AUTOSAVE_MS = 900;
+const HISTORY_DEBOUNCE_MS = 450;
 
 export function PuckEditorShell({
   website,
@@ -53,12 +64,21 @@ export function PuckEditorShell({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [zoom, setZoom] = useState(1);
+
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>(() => [
+    createHistoryEntry(website.config, "Initial"),
+  ]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingHistoryLabel = useRef("Edit");
   const savingRef = useRef(false);
   const configRef = useRef(config);
   const versionRef = useRef(version);
-  /** Skip echoing Puck onChange when we push data from WebsiteConfig. */
+  const historyEntriesRef = useRef(historyEntries);
+  const historyIndexRef = useRef(historyIndex);
   const suppressPuckEcho = useRef(false);
 
   useEffect(() => {
@@ -67,6 +87,12 @@ export function PuckEditorShell({
   useEffect(() => {
     versionRef.current = version;
   }, [version]);
+  useEffect(() => {
+    historyEntriesRef.current = historyEntries;
+  }, [historyEntries]);
+  useEffect(() => {
+    historyIndexRef.current = historyIndex;
+  }, [historyIndex]);
 
   const puckConfig = useMemo(() => {
     const base = buildPuckConfig({
@@ -105,8 +131,8 @@ export function PuckEditorShell({
         setSaveState("error");
         setErrorMessage(
           isFa
-            ? "تداخل نسخه — صفحه را رفرش کنید."
-            : "Version conflict — please refresh.",
+            ? "نسخه سایت تغییر کرده. صفحه را به‌روزرسانی کنید و دوباره تلاش کنید."
+            : "The website changed while you were editing. Refresh and try again.",
         );
         dirtyRef.current = true;
         return;
@@ -144,23 +170,102 @@ export function PuckEditorShell({
     }, AUTOSAVE_MS);
   }, [persist]);
 
+  const commitHistory = useCallback((snapshot: WebsiteConfig, label: string) => {
+    if (historyDebounce.current) {
+      clearTimeout(historyDebounce.current);
+      historyDebounce.current = null;
+    }
+    const pushed = pushHistory({
+      entries: historyEntriesRef.current,
+      index: historyIndexRef.current,
+      next: snapshot,
+      label,
+      limit: EDITOR_HISTORY_LIMIT,
+    });
+    historyEntriesRef.current = pushed.entries;
+    historyIndexRef.current = pushed.index;
+    setHistoryEntries(pushed.entries);
+    setHistoryIndex(pushed.index);
+  }, []);
+
+  const syncPuckFromConfig = useCallback((next: WebsiteConfig) => {
+    suppressPuckEcho.current = true;
+    setPuckData(websiteConfigToPuck(next));
+    queueMicrotask(() => {
+      suppressPuckEcho.current = false;
+    });
+  }, []);
+
   /**
-   * WebsiteConfig-first updates (inspector / layers / brand).
-   * Sync Puck projection so structural props stay aligned — no remount.
+   * Canonical mutator — all WebsiteConfig writes should go through here.
    */
-  const handleConfigChange = useCallback(
-    (next: WebsiteConfig) => {
+  const applyConfig = useCallback(
+    (next: WebsiteConfig, label = "Edit") => {
+      if (!shouldDebounceHistoryLabel(label)) {
+        if (historyDebounce.current) {
+          clearTimeout(historyDebounce.current);
+          historyDebounce.current = null;
+          commitHistory(configRef.current, pendingHistoryLabel.current);
+        }
+        setConfig(next);
+        configRef.current = next;
+        syncPuckFromConfig(next);
+        scheduleSave();
+        commitHistory(next, label);
+        return;
+      }
+
       setConfig(next);
       configRef.current = next;
-      suppressPuckEcho.current = true;
-      setPuckData(websiteConfigToPuck(next));
+      syncPuckFromConfig(next);
       scheduleSave();
-      queueMicrotask(() => {
-        suppressPuckEcho.current = false;
-      });
+      pendingHistoryLabel.current = label;
+      if (historyDebounce.current) clearTimeout(historyDebounce.current);
+      historyDebounce.current = setTimeout(() => {
+        historyDebounce.current = null;
+        commitHistory(configRef.current, pendingHistoryLabel.current);
+      }, HISTORY_DEBOUNCE_MS);
     },
-    [scheduleSave],
+    [commitHistory, scheduleSave, syncPuckFromConfig],
   );
+
+  const handleConfigChange = useCallback(
+    (next: WebsiteConfig) => {
+      applyConfig(next, "Edit");
+    },
+    [applyConfig],
+  );
+
+  const handleUndo = useCallback(() => {
+    const result = undoHistory({
+      entries: historyEntriesRef.current,
+      index: historyIndexRef.current,
+    });
+    if (!result.config) return;
+    historyIndexRef.current = result.index;
+    setHistoryIndex(result.index);
+    setConfig(result.config);
+    configRef.current = result.config;
+    syncPuckFromConfig(result.config);
+    scheduleSave();
+  }, [scheduleSave, syncPuckFromConfig]);
+
+  const handleRedo = useCallback(() => {
+    const result = redoHistory({
+      entries: historyEntriesRef.current,
+      index: historyIndexRef.current,
+    });
+    if (!result.config) return;
+    historyIndexRef.current = result.index;
+    setHistoryIndex(result.index);
+    setConfig(result.config);
+    configRef.current = result.config;
+    syncPuckFromConfig(result.config);
+    scheduleSave();
+  }, [scheduleSave, syncPuckFromConfig]);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < historyEntries.length - 1;
 
   useEffect(() => {
     const onPageHide = () => {
@@ -179,6 +284,7 @@ export function PuckEditorShell({
     return () => {
       window.removeEventListener("pagehide", onPageHide);
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (historyDebounce.current) clearTimeout(historyDebounce.current);
     };
   }, [website.id]);
 
@@ -190,11 +296,23 @@ export function PuckEditorShell({
       }
       setPuckData(data);
       const next = puckToWebsiteConfig(data, configRef.current);
-      setConfig(next);
-      configRef.current = next;
-      scheduleSave();
+      applyConfig(next, "Move Section");
     },
-    [scheduleSave],
+    [applyConfig],
+  );
+
+  const handleApplyAiProposal = useCallback(
+    (proposal: AiProposal) => {
+      const executed = executeAiActionBatch({
+        config: configRef.current,
+        actions: proposal.actions,
+        label: `AI Edit: ${proposal.summary}`,
+      });
+      if (!executed.ok) return false;
+      applyConfig(executed.config, executed.label);
+      return true;
+    },
+    [applyConfig],
   );
 
   const handlePublish = useCallback(async () => {
@@ -237,7 +355,12 @@ export function PuckEditorShell({
           ]}
           iframe={{ enabled: false }}
         >
-          <PuckKeyboardShortcuts />
+          <PuckKeyboardShortcuts
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+          />
           <div className="flex h-full min-h-0 flex-col">
             <PuckTopBar
               locale={locale}
@@ -251,6 +374,10 @@ export function PuckEditorShell({
               publishing={publishing}
               zoom={zoom}
               onZoomChange={setZoom}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
             />
             {errorMessage ? (
               <div
@@ -261,7 +388,6 @@ export function PuckEditorShell({
               </div>
             ) : null}
             <div className="flex min-h-0 flex-1">
-              {/* Mobile: stack notice — full editing needs wider viewport */}
               <div className="hidden min-h-0 md:flex md:flex-1">
                 <PuckLeftPanel
                   locale={locale}
@@ -298,7 +424,13 @@ export function PuckEditorShell({
                 </a>
               </div>
             </div>
-            <PuckAiBar locale={locale} />
+            <PuckAiBar
+              locale={locale}
+              websiteId={website.id}
+              config={config}
+              version={version}
+              onApplyProposal={handleApplyAiProposal}
+            />
           </div>
         </Puck>
       </PuckWebsiteProvider>
