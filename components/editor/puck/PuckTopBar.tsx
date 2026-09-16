@@ -4,6 +4,8 @@ import Link from "next/link";
 import {
   ArrowLeftRight,
   ExternalLink,
+  Gauge,
+  History,
   Loader2,
   Monitor,
   Redo2,
@@ -37,12 +39,15 @@ export function PuckTopBar({
   onSave,
   onPublish,
   publishing,
+  isPublished,
   zoom,
   onZoomChange,
   canUndo,
   canRedo,
   onUndo,
   onRedo,
+  onOpenHistory,
+  onOpenQuality,
 }: {
   locale: Locale;
   websiteId: string;
@@ -53,12 +58,15 @@ export function PuckTopBar({
   onSave: () => void;
   onPublish?: () => void;
   publishing?: boolean;
+  isPublished?: boolean;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  onOpenHistory?: () => void;
+  onOpenQuality?: () => void;
 }) {
   const isFa = locale === "fa";
   const { dispatch, appState } = usePuck();
@@ -86,9 +94,9 @@ export function PuckTopBar({
               : "Ready";
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-3 py-2">
+    <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 bg-[#111113] px-3 py-2 text-zinc-100">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-zinc-900">
+        <p className="truncate text-sm font-semibold text-zinc-50">
           {brandName || slug}
         </p>
         <p className="truncate text-[11px] text-zinc-500">
@@ -96,7 +104,7 @@ export function PuckTopBar({
         </p>
       </div>
 
-      <div className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+      <div className="flex items-center gap-0.5 rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5">
         <IconBtn
           label={isFa ? "واگرد" : "Undo"}
           disabled={!canUndo}
@@ -111,10 +119,20 @@ export function PuckTopBar({
         >
           <Redo2 className="size-3.5" />
         </IconBtn>
+        {onOpenHistory ? (
+          <IconBtn label={isFa ? "تاریخچه" : "History"} onClick={onOpenHistory}>
+            <History className="size-3.5" />
+          </IconBtn>
+        ) : null}
+        {onOpenQuality ? (
+          <IconBtn label={isFa ? "کیفیت" : "Quality"} onClick={onOpenQuality}>
+            <Gauge className="size-3.5" />
+          </IconBtn>
+        ) : null}
       </div>
 
       <div
-        className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+        className="flex items-center gap-0.5 rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5"
         role="group"
         aria-label={isFa ? "نمای دستگاه" : "Device viewport"}
       >
@@ -145,7 +163,7 @@ export function PuckTopBar({
       </div>
 
       <div
-        className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-zinc-50 p-0.5"
+        className="flex items-center gap-0.5 rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5"
         role="group"
         aria-label={isFa ? "زوم" : "Zoom"}
       >
@@ -162,7 +180,7 @@ export function PuckTopBar({
         </IconBtn>
         <button
           type="button"
-          className="min-w-[3rem] px-1 text-center text-[11px] font-medium text-zinc-700"
+          className="min-w-[3rem] px-1 text-center text-[11px] font-medium text-zinc-300"
           onClick={() => onZoomChange(1)}
           title={isFa ? "۱۰۰٪" : "100%"}
         >
@@ -183,11 +201,11 @@ export function PuckTopBar({
       <span
         className={cn(
           "rounded-full px-2.5 py-1 text-[11px] font-medium",
-          saveState === "saved" && "bg-emerald-50 text-emerald-800",
-          saveState === "saving" && "bg-sky-50 text-sky-800",
-          saveState === "dirty" && "bg-amber-50 text-amber-900",
-          saveState === "error" && "bg-red-50 text-red-800",
-          saveState === "idle" && "bg-zinc-100 text-zinc-600",
+          saveState === "saved" && "bg-emerald-500/15 text-emerald-300",
+          saveState === "saving" && "bg-sky-500/15 text-sky-300",
+          saveState === "dirty" && "bg-amber-500/15 text-amber-300",
+          saveState === "error" && "bg-red-500/15 text-red-300",
+          saveState === "idle" && "bg-zinc-800 text-zinc-400",
         )}
         title={errorMessage ?? undefined}
       >
@@ -204,7 +222,7 @@ export function PuckTopBar({
       <button
         type="button"
         onClick={onSave}
-        className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+        className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
       >
         {isFa ? "ذخیره" : "Save"}
       </button>
@@ -214,22 +232,26 @@ export function PuckTopBar({
           type="button"
           onClick={onPublish}
           disabled={publishing}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 disabled:opacity-50"
+          className="rounded-md border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-100 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-50"
         >
           {publishing
             ? isFa
-              ? "در حال انتشار…"
-              : "Publishing…"
-            : isFa
-              ? "انتشار"
-              : "Publish"}
+              ? "…"
+              : "…"
+            : isPublished
+              ? isFa
+                ? "لغو انتشار"
+                : "Unpublish"
+              : isFa
+                ? "انتشار"
+                : "Publish"}
         </button>
       ) : null}
 
       <Link
         href={`/${locale}/preview/${websiteId}`}
         target="_blank"
-        className="inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-50"
+        className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800"
       >
         <ExternalLink className="size-3.5" />
         {isFa ? "پیش‌نمایش" : "Preview"}
@@ -237,7 +259,7 @@ export function PuckTopBar({
 
       <Link
         href={`/${locale}/editor/${websiteId}`}
-        className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100"
+        className="inline-flex items-center gap-1 rounded-md border border-amber-700/50 bg-amber-950/40 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-900/50"
       >
         <ArrowLeftRight className="size-3.5" />
         {isFa ? "کلاسیک" : "Classic"}
@@ -268,9 +290,9 @@ function IconBtn({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex size-8 items-center justify-center rounded-md text-zinc-700 transition",
+        "inline-flex size-8 items-center justify-center rounded-md text-zinc-300 transition",
         active && "bg-white text-zinc-900 shadow-sm",
-        !active && "hover:bg-white/80",
+        !active && "hover:bg-zinc-800 hover:text-white",
         disabled && "cursor-not-allowed opacity-40",
       )}
     >

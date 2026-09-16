@@ -1,19 +1,20 @@
 "use client";
 
 /**
- * Phase 3 — Puck editor shell with AI Co-Designer + unified WebsiteConfig history.
+ * Phase 5 — Puck editor shell with demo-like chrome + Classic parity surfaces.
  * Classic EditorShell remains the default route and is NOT deleted.
  *
- * History ownership (Phase 3):
+ * History ownership:
  * - Application stack (`lib/editor/history`) owns WebsiteConfig snapshots
- * - AI Apply = one labeled transaction ("AI Edit: …")
- * - Top bar / ⌘Z use this stack (not a fighting dual stack with Puck)
+ * - AI Apply = one labeled transaction
+ * - Top bar / ⌘Z use this stack
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Puck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
-import type { WebsiteConfig, WebsiteRecord } from "@/types/website";
+import "@/app/puck-editor.css";
+import type { WebsiteConfig, WebsiteRecord, WebsiteSectionType } from "@/types/website";
 import type { Locale } from "@/lib/config/env";
 import {
   buildPuckConfig,
@@ -28,6 +29,14 @@ import { PuckInspector } from "@/components/editor/puck/PuckInspector";
 import { PuckAiBar, type AiProposal } from "@/components/editor/puck/PuckAiBar";
 import { PuckKeyboardShortcuts } from "@/components/editor/puck/PuckKeyboardShortcuts";
 import { PuckCanvasFrame } from "@/components/editor/puck/PuckCanvasFrame";
+import {
+  PuckEditBridge,
+  addSectionAfter,
+} from "@/components/editor/puck/PuckEditBridge";
+import { PublishDialog } from "@/components/editor/PublishDialog";
+import { HistoryPanel } from "@/components/editor/HistoryPanel";
+import { QualityPanel } from "@/components/editor/QualityPanel";
+import { SectionLibrary } from "@/components/editor/SectionLibrary";
 import { ensureStoreSectionRenderersBound } from "@/components/store/bind-store-renderers";
 import {
   EDITOR_HISTORY_LIMIT,
@@ -37,9 +46,12 @@ import {
   redoHistory,
   shouldDebounceHistoryLabel,
   executeAiActionBatch,
+  runPublishPreflight,
+  scoreWebsiteQuality,
   type HistoryEntry,
 } from "@/lib/editor";
 import { assertProposalFresh } from "@/lib/editor/ai/freshness";
+import { getDictionary } from "@/lib/i18n/dictionary";
 import { cn } from "@/lib/utils";
 
 ensureStoreSectionRenderersBound();
@@ -50,27 +62,41 @@ const HISTORY_DEBOUNCE_MS = 450;
 export function PuckEditorShell({
   website,
   locale,
+  plan,
 }: {
   website: WebsiteRecord;
   locale: Locale;
   plan?: string;
 }) {
   const isFa = locale === "fa";
+  const dict = useMemo(() => getDictionary(locale), [locale]);
+  const canRemoveBranding = plan === "pro" || plan === "business";
+
   const [config, setConfig] = useState(website.config);
   const [version, setVersion] = useState(website.version);
+  const [status, setStatus] = useState(website.status);
   const [puckData, setPuckData] = useState<PuckWebsiteData>(() =>
     websiteConfigToPuck(website.config),
   );
   const [saveState, setSaveState] = useState<PuckSaveState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [qualityOpen, setQualityOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryInsertAfterId, setLibraryInsertAfterId] = useState<
+    string | null
+  >(null);
   const [zoom, setZoom] = useState(1);
+  const [activePage, setActivePage] = useState("home");
+  const [canvasProduct, setCanvasProduct] = useState<string | null>(null);
 
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>(() => [
     createHistoryEntry(website.config, "Initial"),
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  /** Increments on every WebsiteConfig mutation — used for AI proposal freshness. */
   const [localRevision, setLocalRevision] = useState(0);
   const localRevisionRef = useRef(0);
 
@@ -117,8 +143,12 @@ export function PuckEditorShell({
     });
   }, [config.settings.vertical, config.sections, locale]);
 
+  const preflight = useMemo(() => runPublishPreflight(config), [config]);
+  const quality = useMemo(() => scoreWebsiteQuality(config), [config]);
+  const isPublished = status === "published";
+
   const persist = useCallback(async () => {
-    if (savingRef.current) return;
+    if (savingRef.current) return false;
     savingRef.current = true;
     setSaveState("saving");
     setErrorMessage(null);
@@ -135,17 +165,17 @@ export function PuckEditorShell({
         setSaveState("error");
         setErrorMessage(
           isFa
-            ? "نسخه سایت تغییر کرده. صفحه را به‌روزرسانی کنید و دوباره تلاش کنید."
-            : "The website changed while you were editing. Refresh and try again.",
+            ? "تغییرات جای دیگری اعمال شده. صفحه را بارگذاری مجدد کن یا بررسی کن."
+            : "Changes were made elsewhere. Reload or review before saving again.",
         );
         dirtyRef.current = true;
-        return;
+        return false;
       }
       if (!res.ok) {
         setSaveState("error");
         setErrorMessage(isFa ? "ذخیره ناموفق بود." : "Save failed.");
         dirtyRef.current = true;
-        return;
+        return false;
       }
       const body = (await res.json()) as { version?: number };
       if (typeof body.version === "number") {
@@ -154,12 +184,14 @@ export function PuckEditorShell({
       }
       dirtyRef.current = false;
       setSaveState("saved");
+      return true;
     } catch {
       setSaveState("error");
       setErrorMessage(
         isFa ? "خطای شبکه هنگام ذخیره." : "Network error while saving.",
       );
       dirtyRef.current = true;
+      return false;
     } finally {
       savingRef.current = false;
     }
@@ -200,9 +232,6 @@ export function PuckEditorShell({
     });
   }, []);
 
-  /**
-   * Canonical mutator — all WebsiteConfig writes should go through here.
-   */
   const applyConfig = useCallback(
     (next: WebsiteConfig, label = "Edit") => {
       const bumpRevision = () => {
@@ -241,8 +270,8 @@ export function PuckEditorShell({
   );
 
   const handleConfigChange = useCallback(
-    (next: WebsiteConfig) => {
-      applyConfig(next, "Edit");
+    (next: WebsiteConfig, label?: string) => {
+      applyConfig(next, label ?? "Edit");
     },
     [applyConfig],
   );
@@ -329,7 +358,10 @@ export function PuckEditorShell({
       if (!fresh.ok) {
         return {
           ok: false as const,
-          reason: fresh.code === "STALE_PROPOSAL" ? ("stale" as const) : ("error" as const),
+          reason:
+            fresh.code === "STALE_PROPOSAL"
+              ? ("stale" as const)
+              : ("error" as const),
           message: fresh.messageFa,
         };
       }
@@ -348,30 +380,75 @@ export function PuckEditorShell({
     [applyConfig],
   );
 
-  const handlePublish = useCallback(async () => {
+  const confirmPublish = useCallback(async () => {
     setPublishing(true);
+    setPublishError(null);
     try {
-      if (dirtyRef.current) await persist();
+      if (dirtyRef.current) {
+        const ok = await persist();
+        if (!ok) {
+          setPublishError(isFa ? "ذخیره ناموفق بود." : "Save failed.");
+          return;
+        }
+      }
+      const nextPublished = !isPublished;
       const res = await fetch(`/api/websites/${website.id}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ published: true }),
+        body: JSON.stringify({ published: nextPublished }),
       });
       if (!res.ok) {
-        setErrorMessage(isFa ? "انتشار ناموفق بود." : "Publish failed.");
+        const body = (await res.json().catch(() => null)) as {
+          message?: string;
+          messageFa?: string;
+        } | null;
+        setPublishError(
+          (isFa ? body?.messageFa : body?.message) ??
+            (isFa ? "انتشار ناموفق بود." : "Publish failed."),
+        );
+        return;
       }
+      setStatus(nextPublished ? "published" : "unpublished");
+      setPublishOpen(false);
     } catch {
-      setErrorMessage(isFa ? "خطا در انتشار." : "Publish error.");
+      setPublishError(isFa ? "خطا در انتشار." : "Publish error.");
     } finally {
       setPublishing(false);
     }
-  }, [website.id, persist, isFa]);
+  }, [website.id, persist, isFa, isPublished]);
+
+  const onPageChange = useCallback(
+    (pageId: string) => {
+      setActivePage(pageId);
+      if (pageId === "home") {
+        setCanvasProduct(null);
+        return;
+      }
+      if (pageId === "product") {
+        const first = configRef.current.content.products?.items.find(
+          (item) => !item.hidden && (item.slug || item.id),
+        );
+        if (first) setCanvasProduct(first.slug ?? first.id ?? null);
+        return;
+      }
+      setCanvasProduct(null);
+    },
+    [],
+  );
+
+  const existingTypes = useMemo(
+    () => new Set(config.sections.map((s) => s.type)),
+    [config.sections],
+  );
 
   const dir = config.settings.direction === "rtl" ? "rtl" : "ltr";
 
   return (
     <div
-      className={cn("flex h-dvh flex-col bg-zinc-100 text-zinc-900")}
+      className={cn(
+        "flex h-dvh flex-col bg-[#0c0c0e] text-zinc-100",
+        "puck-editor-shell",
+      )}
       dir={dir}
       lang={config.settings.language === "en" ? "en" : "fa"}
     >
@@ -388,86 +465,187 @@ export function PuckEditorShell({
           ]}
           iframe={{ enabled: false }}
         >
-          <PuckKeyboardShortcuts
-            onUndo={handleUndo}
-            onRedo={handleRedo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-          />
-          <div className="flex h-full min-h-0 flex-col">
-            <PuckTopBar
-              locale={locale}
-              websiteId={website.id}
-              brandName={config.brand.name}
-              slug={website.slug}
-              saveState={saveState}
-              errorMessage={errorMessage}
-              onSave={() => void persist()}
-              onPublish={() => void handlePublish()}
-              publishing={publishing}
-              zoom={zoom}
-              onZoomChange={setZoom}
-              canUndo={canUndo}
-              canRedo={canRedo}
+          <PuckEditBridge
+            config={config}
+            onConfigChange={handleConfigChange}
+            onRequestInsert={(afterId) => {
+              setLibraryInsertAfterId(afterId);
+              setLibraryOpen(true);
+            }}
+            onBrowseTemplates={() => {
+              /* site templates live in inspector */
+            }}
+            onOpenInspector={() => {
+              /* inspector always visible on desktop */
+            }}
+          >
+            <PuckKeyboardShortcuts
               onUndo={handleUndo}
               onRedo={handleRedo}
+              canUndo={canUndo}
+              canRedo={canRedo}
             />
-            {errorMessage ? (
-              <div
-                role="alert"
-                className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-800"
-              >
-                {errorMessage}
-              </div>
-            ) : null}
-            <div className="flex min-h-0 flex-1">
-              <div className="hidden min-h-0 md:flex md:flex-1">
-                <PuckLeftPanel
-                  locale={locale}
-                  config={config}
-                  onConfigChange={handleConfigChange}
-                />
-                <main className="relative min-w-0 flex-1 overflow-hidden bg-zinc-200/60">
-                  <div className="h-full overflow-auto p-4 md:p-6">
-                    <PuckCanvasFrame zoom={zoom} />
-                  </div>
-                </main>
-                <PuckInspector
-                  locale={locale}
-                  config={config}
-                  onConfigChange={handleConfigChange}
-                />
-              </div>
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center md:hidden">
-                <p className="text-sm font-medium text-zinc-900">
-                  {isFa
-                    ? "ویرایشگر حرفه‌ای روی صفحه بزرگ‌تر کار می‌کند"
-                    : "Professional editor needs a larger screen"}
-                </p>
-                <p className="max-w-sm text-xs text-zinc-500">
-                  {isFa
-                    ? "از تبلت افقی یا دسکتاپ استفاده کنید، یا ویرایشگر کلاسیک را باز کنید."
-                    : "Use landscape tablet or desktop, or open the classic editor."}
-                </p>
-                <a
-                  href={`/${locale}/editor/${website.id}`}
-                  className="rounded-md bg-zinc-900 px-4 py-2 text-xs font-medium text-white"
+            <div className="flex h-full min-h-0 flex-col">
+              <PuckTopBar
+                locale={locale}
+                websiteId={website.id}
+                brandName={config.brand.name}
+                slug={website.slug}
+                saveState={saveState}
+                errorMessage={errorMessage}
+                onSave={() => void persist()}
+                onPublish={() => {
+                  setPublishError(null);
+                  setPublishOpen(true);
+                }}
+                publishing={publishing}
+                isPublished={isPublished}
+                zoom={zoom}
+                onZoomChange={setZoom}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onOpenHistory={() => setHistoryOpen(true)}
+                onOpenQuality={() => setQualityOpen(true)}
+              />
+              {errorMessage ? (
+                <div
+                  role="alert"
+                  className="border-b border-red-900/60 bg-red-950/80 px-4 py-2 text-xs text-red-200"
                 >
-                  {isFa ? "باز کردن ویرایشگر کلاسیک" : "Open Classic Editor"}
-                </a>
+                  {errorMessage}
+                </div>
+              ) : null}
+              <div className="flex min-h-0 flex-1">
+                <div className="hidden min-h-0 md:flex md:flex-1">
+                  <PuckLeftPanel
+                    locale={locale}
+                    config={config}
+                    onConfigChange={handleConfigChange}
+                    activePage={activePage}
+                    onPageChange={onPageChange}
+                  />
+                  <main className="relative min-w-0 flex-1 overflow-hidden bg-[#141416]">
+                    <div className="h-full overflow-auto p-4 md:p-8">
+                      <PuckCanvasFrame
+                        zoom={zoom}
+                        config={config}
+                        locale={locale}
+                        websiteId={website.id}
+                        activePage={activePage}
+                        productSlug={canvasProduct}
+                        onProductNavigate={(slug) => {
+                          setCanvasProduct(slug);
+                          setActivePage("product");
+                        }}
+                        onHomeNavigate={() => {
+                          setCanvasProduct(null);
+                          setActivePage("home");
+                        }}
+                      />
+                    </div>
+                  </main>
+                  <PuckInspector
+                    locale={locale}
+                    config={config}
+                    websiteId={website.id}
+                    onConfigChange={handleConfigChange}
+                    canRemoveBranding={canRemoveBranding}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center md:hidden">
+                  <p className="text-sm font-medium text-zinc-100">
+                    {isFa
+                      ? "ویرایشگر حرفه‌ای روی صفحه بزرگ‌تر کار می‌کند"
+                      : "Professional editor needs a larger screen"}
+                  </p>
+                  <p className="max-w-sm text-xs text-zinc-500">
+                    {isFa
+                      ? "از تبلت افقی یا دسکتاپ استفاده کنید، یا ویرایشگر کلاسیک را باز کنید."
+                      : "Use landscape tablet or desktop, or open the classic editor."}
+                  </p>
+                  <a
+                    href={`/${locale}/editor/${website.id}`}
+                    className="rounded-md bg-white px-4 py-2 text-xs font-medium text-zinc-900"
+                  >
+                    {isFa ? "باز کردن ویرایشگر کلاسیک" : "Open Classic Editor"}
+                  </a>
+                </div>
               </div>
+              <PuckAiBar
+                locale={locale}
+                websiteId={website.id}
+                config={config}
+                version={version}
+                localRevision={localRevision}
+                onApplyProposal={handleApplyAiProposal}
+              />
             </div>
-            <PuckAiBar
-              locale={locale}
-              websiteId={website.id}
-              config={config}
-              version={version}
-              localRevision={localRevision}
-              onApplyProposal={handleApplyAiProposal}
-            />
-          </div>
+          </PuckEditBridge>
         </Puck>
       </PuckWebsiteProvider>
+
+      <PublishDialog
+        open={publishOpen}
+        dict={dict}
+        locale={locale}
+        isPublished={isPublished}
+        changes={[]}
+        publishing={publishing}
+        error={publishError}
+        preflight={preflight}
+        onClose={() => setPublishOpen(false)}
+        onConfirm={() => void confirmPublish()}
+      />
+
+      <HistoryPanel
+        open={historyOpen}
+        locale={locale}
+        entries={historyEntries}
+        index={historyIndex}
+        onClose={() => setHistoryOpen(false)}
+        onRestore={(index) => {
+          const entry = historyEntries[index];
+          if (!entry) return;
+          historyIndexRef.current = index;
+          setHistoryIndex(index);
+          setConfig(entry.config);
+          configRef.current = entry.config;
+          syncPuckFromConfig(entry.config);
+          localRevisionRef.current += 1;
+          setLocalRevision(localRevisionRef.current);
+          scheduleSave();
+          setHistoryOpen(false);
+        }}
+      />
+
+      <QualityPanel
+        open={qualityOpen}
+        locale={locale}
+        score={quality}
+        onClose={() => setQualityOpen(false)}
+      />
+
+      <SectionLibrary
+        open={libraryOpen}
+        locale={locale}
+        dict={dict}
+        existingTypes={existingTypes}
+        vertical={config.settings.vertical}
+        onClose={() => setLibraryOpen(false)}
+        onAdd={(type: WebsiteSectionType) => {
+          const result = addSectionAfter(
+            configRef.current,
+            type,
+            libraryInsertAfterId,
+          );
+          if (!result) return;
+          applyConfig(result.config, result.label);
+          setLibraryOpen(false);
+          setActivePage("home");
+        }}
+      />
     </div>
   );
 }

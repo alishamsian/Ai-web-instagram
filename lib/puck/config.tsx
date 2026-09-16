@@ -14,15 +14,19 @@ import {
 import { SECTION_CATEGORIES } from "@/lib/store/registry/categories";
 import { renderRegisteredStoreSection } from "@/components/store/section-renderers";
 import { PuckUnsupportedSection } from "@/components/editor/puck/PuckUnsupportedSection";
+import { EditorSectionFrame } from "@/components/editor/EditorSectionFrame";
+import { useEditorEdit } from "@/components/editor/EditContext";
 import {
   buildStoreSectionContext,
   usePuckWebsiteOptional,
 } from "@/lib/puck/website-context";
 import { cn } from "@/lib/utils";
 import { hasSectionRenderer, resolveSectionRenderer } from "@/lib/store/registry";
+import { sectionLabel } from "@/components/editor/editor-utils";
 
 function SectionCanvasPreview(props: PuckSectionProps) {
   const ctx = usePuckWebsiteOptional();
+  const edit = useEditorEdit();
   const sectionType = props.sectionType || (props.id?.split("-")[0] as WebsiteSectionType);
   const section = {
     id: props.sectionId || props.id,
@@ -56,12 +60,15 @@ function SectionCanvasPreview(props: PuckSectionProps) {
 
   const storeCtx = buildStoreSectionContext(ctx.config, merged);
   const def = getSectionDefinition(merged.type);
-  const label = def?.label[ctx.locale] ?? merged.type;
+  const label =
+    def?.label[ctx.locale] ??
+    sectionLabel(merged.type as never, ctx.locale) ??
+    merged.type;
   const hasRenderer =
     hasSectionRenderer(merged.type) ||
     Boolean(resolveSectionRenderer(merged.type, merged.variant));
 
-  return (
+  const body = (
     <div
       className={cn(
         "relative",
@@ -82,6 +89,21 @@ function SectionCanvasPreview(props: PuckSectionProps) {
       )}
     </div>
   );
+
+  // Classic chrome + inline EditableText when EditorEditProvider is present.
+  if (edit?.enabled && edit.mode === "editor") {
+    return (
+      <EditorSectionFrame
+        sectionId={merged.id}
+        label={label}
+        settings={merged.settings}
+      >
+        {body}
+      </EditorSectionFrame>
+    );
+  }
+
+  return body;
 }
 
 function variantFieldOptions(type: string) {

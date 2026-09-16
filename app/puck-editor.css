@@ -1,0 +1,19 @@
+/* Puck editor shell — dark chrome + light classic panel embeds */
+
+.puck-editor-shell .puck-components-host {
+  color: #f4f4f5;
+}
+
+.puck-editor-shell .puck-components-host * {
+  box-sizing: border-box;
+}
+
+/* Make Puck's built-in component library fill the dark left rail */
+.puck-editor-shell .puck-components-host [class*="_ComponentList"],
+.puck-editor-shell .puck-components-host [class*="ComponentList"] {
+  background: transparent !important;
+}
+
+.puck-editor-shell .vitrin-editor-canvas {
+  min-height: 640px;
+}
