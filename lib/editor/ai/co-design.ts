@@ -104,10 +104,17 @@ export async function proposeCoDesign(
     locale: input.locale,
   });
 
+  const selectedType =
+    input.selectedSectionId != null
+      ? (input.config.sections.find((s) => s.id === input.selectedSectionId)
+          ?.type ?? null)
+      : null;
+
   const routed = routePromptToIntent({
     prompt: input.prompt,
     locale: input.locale,
-    hasSelection: Boolean(input.selectedSectionId),
+    hasSelection: Boolean(input.selectedSectionId && selectedType),
+    selectedSectionType: selectedType,
   });
 
   if (routed.kind === "clarify") {
