@@ -31,6 +31,18 @@ export function validateEditorActions(
   if (!actions.length) {
     return { ok: false, reason: "no_actions" };
   }
+  if (actions.length > 12) {
+    return { ok: false, reason: "too_many_actions" };
+  }
+
+  // Rough payload bound — reject absurd blobs
+  try {
+    if (JSON.stringify(actions).length > 48_000) {
+      return { ok: false, reason: "actions_payload_too_large" };
+    }
+  } catch {
+    return { ok: false, reason: "actions_not_serializable" };
+  }
 
   let working = cloneWebsiteConfig(config);
   const accepted: EditorAction[] = [];

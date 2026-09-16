@@ -2,12 +2,19 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getWebsiteForWorkspace } from "@/lib/database/queries";
 import { proposeCoDesign } from "@/lib/editor/ai/co-design";
+import {
+  mergeTrustedDraftHints,
+  type AiDraftHints,
+} from "@/lib/editor/ai/draft";
 import type { ViewportBucket } from "@/lib/editor/responsive";
+
+const MAX_PROMPT = 2000;
 
 /**
  * POST /api/websites/[id]/ai/co-design
- * Server-side only — returns validated EditorAction proposals.
- * Does not mutate the website; client applies after user confirmation.
+ * Server-authoritative: loads WebsiteConfig from DB.
+ * Optional bounded draftHints overlay unsaved content/brand only.
+ * Does not mutate the website; client applies after confirmation.
  */
 export async function POST(
   request: Request,
@@ -29,16 +36,20 @@ export async function POST(
     selectedSectionId?: string | null;
     viewport?: ViewportBucket;
     locale?: "fa" | "en";
-    /** Client may send live config so proposals match unsaved edits. */
-    config?: typeof website.config;
     expectedVersion?: number;
+    draftHints?: AiDraftHints;
+    /** Ignored — full client config is never trusted. */
+    config?: unknown;
   };
 
+  // Explicitly ignore body.config (security)
+  void body.config;
+
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-  if (!prompt || prompt.length > 2000) {
+  if (!prompt || prompt.length > MAX_PROMPT) {
     return NextResponse.json(
       {
-        error: "INVALID_PROMPT",
+        error: "INVALID_REQUEST",
         messageFa: "دستور نامعتبر است.",
         messageEn: "Invalid prompt.",
       },
@@ -67,13 +78,32 @@ export async function POST(
       ? body.locale
       : website.config.settings.language;
 
-  const config = body.config ?? website.config;
+  const merged = mergeTrustedDraftHints(website.config, body.draftHints);
+  if (!merged.ok) {
+    return NextResponse.json(
+      {
+        error: "INVALID_REQUEST",
+        messageFa: "پیش‌نویس ویرایش قابل‌اعتماد نیست.",
+        messageEn: "Draft hints could not be validated.",
+      },
+      { status: 400 },
+    );
+  }
+
+  // selectedSectionId must exist on the working config (server + draft)
+  let selectedSectionId = body.selectedSectionId ?? null;
+  if (
+    selectedSectionId &&
+    !merged.config.sections.some((s) => s.id === selectedSectionId)
+  ) {
+    selectedSectionId = null;
+  }
 
   const result = await proposeCoDesign({
-    config,
+    config: merged.config,
     prompt,
     locale,
-    selectedSectionId: body.selectedSectionId ?? null,
+    selectedSectionId,
     viewport: body.viewport ?? "desktop",
     workspaceId: session.workspace.id,
     userId: session.user.id,
@@ -88,9 +118,19 @@ export async function POST(
           : result.code === "unsafe" || result.code === "invalid"
             ? 422
             : 502;
+    const errorCode =
+      result.code === "unsafe"
+        ? "AI_ACTION_REJECTED"
+        : result.code === "ai_failed"
+          ? "AI_INVALID_RESPONSE"
+          : result.code === "ai_unavailable"
+            ? "AI_UNAVAILABLE"
+            : result.code === "clarify"
+              ? "INVALID_REQUEST"
+              : result.code.toUpperCase();
     return NextResponse.json(
       {
-        error: result.code.toUpperCase(),
+        error: errorCode,
         messageFa: result.messageFa,
         messageEn: result.messageEn,
       },
@@ -104,8 +144,7 @@ export async function POST(
     summary: result.summary,
     actions: result.actions,
     summaries: result.summaries,
-    // Client applies via executeAiActionBatch against live config;
-    // proposedConfig is for preview diff only (no secrets).
+    baseVersion: website.version,
     proposed: {
       brand: result.proposedConfig.brand,
       content: {

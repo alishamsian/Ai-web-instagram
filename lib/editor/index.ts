@@ -157,8 +157,17 @@ export {
   executeAiActionBatch,
   type ExecuteAiBatchResult,
 } from "@/lib/editor/ai/executor";
-// proposeCoDesign is server-only (uses AI telemetry / admin). Import from
-// `@/lib/editor/ai/co-design` in API routes — do not re-export here.
+export {
+  mergeTrustedDraftHints,
+  buildDraftHintsFromConfig,
+  type AiDraftHints,
+} from "@/lib/editor/ai/draft";
+export {
+  assertProposalFresh,
+  type ProposalFreshness,
+  type FreshnessCheckResult,
+} from "@/lib/editor/ai/freshness";
+// proposeCoDesign is server-only — import from `@/lib/editor/ai/co-design` in API routes.
 
 export {
   resolveEditorKeyCommand,

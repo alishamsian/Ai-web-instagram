@@ -162,19 +162,29 @@ export function isProductProtectedAction(action: EditorAction): boolean {
   if (action.type === "setContentPath") {
     return (
       action.path.startsWith("content.products.items") ||
-      action.path.includes(".price")
+      action.path.includes(".price") ||
+      action.path.includes("products.items")
     );
   }
   if (action.type === "setSchemaValue") {
     const path = action.field.path ?? "";
-    return path.includes("products.items") || path.includes("price");
+    return (
+      path.includes("products.items") ||
+      path.includes("price") ||
+      path.includes("sku") ||
+      path.includes("inventory")
+    );
   }
   if (action.type === "patchSectionSettings") {
-    return Object.keys(action.patch).some(
-      (k) =>
-        k.toLowerCase().includes("price") ||
-        k.toLowerCase().includes("product"),
-    );
+    return Object.keys(action.patch).some((k) => {
+      const lower = k.toLowerCase();
+      return (
+        lower.includes("price") ||
+        lower.includes("product") ||
+        lower.includes("sku") ||
+        lower.includes("inventory")
+      );
+    });
   }
   return false;
 }
