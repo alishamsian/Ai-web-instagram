@@ -2,30 +2,27 @@
 
 ## Goal
 
-Make `/[locale]/editor/[websiteId]/puck` feel closer to the official Puck demo
-(dark chrome, primary Components drag library, live canvas) while porting
-Classic product surfaces — without a second WebsiteConfig or deleting Classic.
+Make `/[locale]/editor/[websiteId]/puck` feel like the **official Puck demo**
+(native layout: Blocks / Outline / Fields, drag overlays, sidebars) while
+keeping Classic product surfaces via overrides — without a second WebsiteConfig
+or deleting Classic.
 
-## What landed
+## Layout strategy
 
-| Surface | Behavior |
+Use **Puck’s default UI** (do not replace children with a custom three-pane shell).
+
+| Layer | Source |
 | --- | --- |
-| Canvas | `EditorSectionFrame` chrome + inline `EditableText` via `PuckEditBridge` |
-| Components | `Puck.Components` is the primary left-rail tab (drag onto canvas) |
-| Layers | Visibility, move, duplicate, delete + Puck Outline |
-| Assets / Pages | Classic `AssetsPanel` + `PagesPanel` |
-| Inspector | Section schema + Content + Brand/Design + Media + SEO + Site (settings/templates/versions) |
-| Publish | Classic `PublishDialog` + preflight |
-| History / Quality | Classic drawers from top bar |
-| Insert-after | Classic `SectionLibrary` from section chrome “+” |
-| Page views | Non-home pages render `WebsiteRenderer` in editor mode |
+| Left rail Blocks / Outline | Built-in Puck plugins |
+| Canvas DnD / overlays | Built-in Puck |
+| Right Fields | Override → Classic Content/Brand/Media/SEO/Site + schema + Puck fields |
+| Header actions | Override → Save / Publish / History / Quality / Preview / Classic |
+| Shell wrap | Override `puck` → EditBridge + AI bar + dialogs |
 
 ## Source of truth
 
-Still `WebsiteConfig`. Puck Data remains a projection. Mutations go through
-existing editor commands / `applyConfig`.
+Still `WebsiteConfig`. Puck Data remains a projection.
 
 ## Classic
 
-`/[locale]/editor/[websiteId]` is untouched and remains available from the
-Puck top bar.
+`/[locale]/editor/[websiteId]` is untouched.

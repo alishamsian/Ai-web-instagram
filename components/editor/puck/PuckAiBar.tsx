@@ -288,7 +288,8 @@ export function PuckAiBar({
 
   return (
     <div
-      className="shrink-0 border-t border-zinc-200 bg-white"
+      className="puck-ai-bar shrink-0 border-t border-zinc-200 bg-white"
+      data-puck-ai-bar
       dir={isFa ? "rtl" : "ltr"}
     >
       {proposal && phase === "ready" ? (

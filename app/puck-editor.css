@@ -1,19 +1,55 @@
-/* Puck editor shell — dark chrome + light classic panel embeds */
+/* Puck editor — lean on official Puck chrome; polish canvas + AI bar */
 
-.puck-editor-shell .puck-components-host {
-  color: #f4f4f5;
+.puck-editor-shell {
+  --puck-editor-canvas-radius: 12px;
 }
 
-.puck-editor-shell .puck-components-host * {
+.puck-editor-shell,
+.puck-editor-shell * {
   box-sizing: border-box;
 }
 
-/* Make Puck's built-in component library fill the dark left rail */
-.puck-editor-shell .puck-components-host [class*="_ComponentList"],
-.puck-editor-shell .puck-components-host [class*="ComponentList"] {
-  background: transparent !important;
+/* Full-height Puck root inside our shell */
+.puck-editor-shell > div,
+.puck-editor-shell [class*="_Puck"] {
+  height: 100%;
+  min-height: 0;
+}
+
+.puck-editor-shell .puck-preview-host {
+  min-height: 100%;
+  background: #fff;
 }
 
 .puck-editor-shell .vitrin-editor-canvas {
-  min-height: 640px;
+  position: relative;
+}
+
+/* Section chrome should sit cleanly over store sections */
+.puck-editor-shell .editor-section-frame {
+  outline-offset: -1px;
+}
+
+.puck-editor-shell .editor-section-selected {
+  z-index: 5;
+}
+
+/* AI bar sits on top of Puck footer area */
+.puck-editor-shell [data-puck-ai-bar],
+.puck-editor-shell .puck-ai-bar {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.04);
+}
+
+/* Right fields rail: remove double scroll jank */
+.puck-editor-shell [class*="_RightSideBar"],
+.puck-editor-shell [class*="RightSideBar"] {
+  overflow: hidden !important;
+}
+
+/* Soften empty drop zones */
+.puck-editor-shell [class*="_DropZone"],
+.puck-editor-shell [class*="DropZone"] {
+  min-height: 48px;
 }
