@@ -24,6 +24,7 @@ import type { Locale } from "@/lib/config/env";
 import type { WebsiteConfig } from "@/types/website";
 import type { EditorAction } from "@/lib/editor/actions";
 import type { ViewportBucket } from "@/lib/editor/responsive";
+import { buildDraftHintsFromConfig } from "@/lib/editor/ai/draft";
 import { cn } from "@/lib/utils";
 
 export type AiBarPhase =
@@ -33,13 +34,19 @@ export type AiBarPhase =
   | "ready"
   | "applying"
   | "success"
-  | "error";
+  | "error"
+  | "stale"
+  | "cancelled";
 
 export type AiProposal = {
   summary: string;
   actions: EditorAction[];
   summaries: string[];
   mode: "deterministic" | "llm";
+  /** Server website.version at propose time */
+  baseVersion: number;
+  /** Client localRevision at propose time */
+  localRevision: number;
 };
 
 const EXAMPLES_FA = [
@@ -68,14 +75,31 @@ export function PuckAiBar({
   websiteId,
   config,
   version,
+  localRevision,
   onApplyProposal,
 }: {
   locale: Locale;
   websiteId: string;
   config: WebsiteConfig;
   version: number;
-  /** Apply validated actions as ONE history transaction. Returns false on failure. */
-  onApplyProposal: (proposal: AiProposal) => boolean | Promise<boolean>;
+  localRevision: number;
+  /**
+   * Apply validated actions as ONE history transaction.
+   * Returns `{ ok: true }` or `{ ok: false, reason }`.
+   */
+  onApplyProposal: (
+    proposal: AiProposal,
+  ) =>
+    | boolean
+    | { ok: boolean; reason?: "stale" | "rejected" | "error"; message?: string }
+    | Promise<
+        | boolean
+        | {
+            ok: boolean;
+            reason?: "stale" | "rejected" | "error";
+            message?: string;
+          }
+      >;
 }) {
   const isFa = locale === "fa";
   const inputId = useId();
@@ -141,8 +165,8 @@ export function PuckAiBar({
           selectedSectionId,
           viewport,
           locale,
-          config,
           expectedVersion: version,
+          draftHints: buildDraftHintsFromConfig(config),
         }),
       });
 
@@ -162,6 +186,7 @@ export function PuckAiBar({
         summary?: string;
         actions?: EditorAction[];
         summaries?: string[];
+        baseVersion?: number;
         messageFa?: string;
         messageEn?: string;
         error?: string;
@@ -172,8 +197,8 @@ export function PuckAiBar({
         setError(
           (isFa ? body.messageFa : body.messageEn) ||
             (isFa
-              ? "AI نتوانست این تغییر را به‌صورت امن اعمال کند."
-              : "AI could not safely apply this change."),
+              ? "امکان اعمال این تغییر وجود ندارد."
+              : "This change could not be applied safely."),
         );
         return;
       }
@@ -184,10 +209,14 @@ export function PuckAiBar({
         actions: body.actions,
         summaries: body.summaries ?? [],
         mode: body.mode ?? "llm",
+        baseVersion:
+          typeof body.baseVersion === "number" ? body.baseVersion : version,
+        localRevision,
       });
     } catch (err) {
       if ((err as Error).name === "AbortError") {
-        setPhase("idle");
+        setPhase("cancelled");
+        setTimeout(() => setPhase("idle"), 0);
         return;
       }
       setPhase("error");
@@ -206,6 +235,7 @@ export function PuckAiBar({
     locale,
     config,
     version,
+    localRevision,
     isFa,
   ]);
 
@@ -213,13 +243,29 @@ export function PuckAiBar({
     if (!proposal) return;
     setPhase("applying");
     try {
-      const ok = await onApplyProposal(proposal);
-      if (!ok) {
+      const result = await onApplyProposal(proposal);
+      const normalized =
+        typeof result === "boolean"
+          ? { ok: result as boolean }
+          : result;
+      if (!normalized.ok) {
+        if (normalized.reason === "stale") {
+          setPhase("stale");
+          setError(
+            normalized.message ||
+              (isFa
+                ? "این پیشنهاد قدیمی شده است؛ لطفاً دوباره تلاش کنید."
+                : "This proposal is out of date. Please regenerate and try again."),
+          );
+          setProposal(null);
+          return;
+        }
         setPhase("error");
         setError(
-          isFa
-            ? "اعمال تغییرات ناموفق بود."
-            : "Failed to apply changes.",
+          normalized.message ||
+            (isFa
+              ? "امکان اعمال این تغییر وجود ندارد."
+              : "This change could not be applied safely."),
         );
         return;
       }
@@ -229,7 +275,11 @@ export function PuckAiBar({
       window.setTimeout(() => setPhase("idle"), 1200);
     } catch {
       setPhase("error");
-      setError(isFa ? "اعمال تغییرات ناموفق بود." : "Failed to apply changes.");
+      setError(
+        isFa
+          ? "امکان اعمال این تغییر وجود ندارد."
+          : "This change could not be applied safely.",
+      );
     }
   }, [proposal, onApplyProposal, isFa]);
 
@@ -300,10 +350,16 @@ export function PuckAiBar({
         </div>
       ) : null}
 
-      {(phase === "error" || error) && phase !== "ready" ? (
+      {(phase === "error" || phase === "stale" || error) &&
+      phase !== "ready" ? (
         <div
           role="alert"
-          className="flex items-start gap-2 border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-800"
+          className={cn(
+            "flex items-start gap-2 border-b px-4 py-2 text-xs",
+            phase === "stale"
+              ? "border-amber-100 bg-amber-50 text-amber-900"
+              : "border-red-100 bg-red-50 text-red-800",
+          )}
         >
           <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
           <span className="flex-1">{error}</span>
@@ -347,13 +403,17 @@ export function PuckAiBar({
               }
             }}
             placeholder={
-              selectedSectionId
+              phase === "thinking"
                 ? isFa
-                  ? "چه تغییری روی سکشن انتخاب‌شده؟ (⌘K)"
-                  : "What should change on the selected section? (⌘K)"
-                : isFa
-                  ? "چه تغییری می‌خواهی؟ (⌘K)"
-                  : "What do you want to change? (⌘K)"
+                  ? "در حال بررسی درخواست…"
+                  : "Reviewing your request…"
+                : selectedSectionId
+                  ? isFa
+                    ? "چه تغییری روی سکشن انتخاب‌شده؟ (⌘K)"
+                    : "What should change on the selected section? (⌘K)"
+                  : isFa
+                    ? "چه تغییری می‌خواهی؟ (⌘K)"
+                    : "What do you want to change? (⌘K)"
             }
             className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 disabled:opacity-60"
             dir="auto"

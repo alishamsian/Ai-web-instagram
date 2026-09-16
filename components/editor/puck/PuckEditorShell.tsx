@@ -39,6 +39,7 @@ import {
   executeAiActionBatch,
   type HistoryEntry,
 } from "@/lib/editor";
+import { assertProposalFresh } from "@/lib/editor/ai/freshness";
 import { cn } from "@/lib/utils";
 
 ensureStoreSectionRenderersBound();
@@ -69,6 +70,9 @@ export function PuckEditorShell({
     createHistoryEntry(website.config, "Initial"),
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  /** Increments on every WebsiteConfig mutation — used for AI proposal freshness. */
+  const [localRevision, setLocalRevision] = useState(0);
+  const localRevisionRef = useRef(0);
 
   const dirtyRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,6 +205,11 @@ export function PuckEditorShell({
    */
   const applyConfig = useCallback(
     (next: WebsiteConfig, label = "Edit") => {
+      const bumpRevision = () => {
+        localRevisionRef.current += 1;
+        setLocalRevision(localRevisionRef.current);
+      };
+
       if (!shouldDebounceHistoryLabel(label)) {
         if (historyDebounce.current) {
           clearTimeout(historyDebounce.current);
@@ -212,6 +221,7 @@ export function PuckEditorShell({
         syncPuckFromConfig(next);
         scheduleSave();
         commitHistory(next, label);
+        bumpRevision();
         return;
       }
 
@@ -219,6 +229,7 @@ export function PuckEditorShell({
       configRef.current = next;
       syncPuckFromConfig(next);
       scheduleSave();
+      bumpRevision();
       pendingHistoryLabel.current = label;
       if (historyDebounce.current) clearTimeout(historyDebounce.current);
       historyDebounce.current = setTimeout(() => {
@@ -247,6 +258,8 @@ export function PuckEditorShell({
     setConfig(result.config);
     configRef.current = result.config;
     syncPuckFromConfig(result.config);
+    localRevisionRef.current += 1;
+    setLocalRevision(localRevisionRef.current);
     scheduleSave();
   }, [scheduleSave, syncPuckFromConfig]);
 
@@ -261,6 +274,8 @@ export function PuckEditorShell({
     setConfig(result.config);
     configRef.current = result.config;
     syncPuckFromConfig(result.config);
+    localRevisionRef.current += 1;
+    setLocalRevision(localRevisionRef.current);
     scheduleSave();
   }, [scheduleSave, syncPuckFromConfig]);
 
@@ -303,14 +318,32 @@ export function PuckEditorShell({
 
   const handleApplyAiProposal = useCallback(
     (proposal: AiProposal) => {
+      const fresh = assertProposalFresh({
+        proposal: {
+          baseVersion: proposal.baseVersion,
+          localRevision: proposal.localRevision,
+        },
+        currentLocalRevision: localRevisionRef.current,
+        currentServerVersion: versionRef.current,
+      });
+      if (!fresh.ok) {
+        return {
+          ok: false as const,
+          reason: fresh.code === "STALE_PROPOSAL" ? ("stale" as const) : ("error" as const),
+          message: fresh.messageFa,
+        };
+      }
+
       const executed = executeAiActionBatch({
         config: configRef.current,
         actions: proposal.actions,
         label: `AI Edit: ${proposal.summary}`,
       });
-      if (!executed.ok) return false;
+      if (!executed.ok) {
+        return { ok: false as const, reason: "rejected" as const };
+      }
       applyConfig(executed.config, executed.label);
-      return true;
+      return { ok: true as const };
     },
     [applyConfig],
   );
@@ -429,6 +462,7 @@ export function PuckEditorShell({
               websiteId={website.id}
               config={config}
               version={version}
+              localRevision={localRevision}
               onApplyProposal={handleApplyAiProposal}
             />
           </div>
