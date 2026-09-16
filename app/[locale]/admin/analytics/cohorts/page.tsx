@@ -8,7 +8,8 @@ import {
 
 function cellText(rate: number | null, status: string) {
   if (status === "insufficient_data") return "Insufficient data";
-  if (status === "pending" || rate == null) return "—";
+  if (status === "pending") return "Pending";
+  if (rate == null) return "—";
   return `${(rate * 100).toFixed(0)}%`;
 }
 

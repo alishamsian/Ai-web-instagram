@@ -7,7 +7,7 @@
 import "server-only";
 
 import { supabaseConfigured, getSupabaseAdmin } from "@/lib/supabase/admin";
-import { requireAdminPermission } from "@/lib/admin/rbac";
+import { requireAdminPermission, AdminAuthError } from "@/lib/admin/rbac";
 import {
   resolveDateRange,
   resolveComparisonPeriod,
@@ -18,20 +18,21 @@ import {
   ACTIVATION_DEFINITION,
   conversionRate,
   median,
-  retentionPercent,
   utcWeekKey,
-  isRetainedOnDay,
-  isRetainedInWeek,
   addUtcDaysIso,
   computeActivationCohort,
   isValidActivationTimestamp,
+  computeCausalFunnel,
+  funnelStageConversion,
+  computeRetentionDayCell,
+  computeRetentionWeekCell,
   type FunnelStepStat,
+  type FunnelWorkspaceEvents,
 } from "@/lib/admin/intelligence/metrics";
 import {
   ANALYTICS_SAMPLE_CAP,
   ACTIVATION_WINDOW_DAYS,
   MAX_ANALYTICS_DAYS,
-  MIN_COHORT_SIZE,
   clampAnalyticsPreset,
 } from "@/lib/admin/intelligence/limits";
 import {
@@ -479,13 +480,23 @@ export async function getFunnelIntelligence(input: {
   }));
   const cohort = new Map(cohortRows.map((w) => [w.id, w.created_at]));
   const cohortIds = [...cohort.keys()];
-  const signupN = cohortIds.length;
   const truncated = cohortRows.length >= ANALYTICS_SAMPLE_CAP;
 
-  const imported = new Set<string>();
-  const generated = new Set<string>();
-  const published = new Set<string>();
-  const edited = new Set<string>();
+  const byWs = new Map<string, FunnelWorkspaceEvents>();
+  for (const row of cohortRows) {
+    byWs.set(row.id, {
+      workspaceId: row.id,
+      createdAt: row.created_at,
+      importCompletedAt: null,
+      websiteGeneratedAt: null,
+      previewProxyAt: null,
+      publishedAt: null,
+    });
+  }
+
+  function earliest(current: string | null, next: string): string {
+    return !current || next < current ? next : current;
+  }
 
   if (cohortIds.length > 0) {
     for (const chunk of chunkIds(cohortIds)) {
@@ -521,19 +532,20 @@ export async function getFunnelIntelligence(input: {
       }
       for (const row of jobs.data ?? []) {
         const ws = row.workspace_id as string;
-        const signupAt = cohort.get(ws);
-        if (!signupAt) continue;
+        const entry = byWs.get(ws);
+        if (!entry) continue;
         const at =
           (row.completed_at as string | null) ?? (row.updated_at as string);
         if (
-          isValidActivationTimestamp({
-            signupAt,
+          !isValidActivationTimestamp({
+            signupAt: entry.createdAt,
             activationAt: at,
             cutoffAt,
           })
         ) {
-          imported.add(ws);
+          continue;
         }
+        entry.importCompletedAt = earliest(entry.importCompletedAt, at);
       }
     }
 
@@ -568,28 +580,31 @@ export async function getFunnelIntelligence(input: {
       }
       for (const row of sites.data ?? []) {
         const ws = row.workspace_id as string;
-        const signupAt = cohort.get(ws);
-        if (!signupAt) continue;
+        const entry = byWs.get(ws);
+        if (!entry) continue;
         const created = row.created_at as string;
         if (
           isValidActivationTimestamp({
-            signupAt,
+            signupAt: entry.createdAt,
             activationAt: created,
             cutoffAt,
           })
         ) {
-          generated.add(ws);
+          entry.websiteGeneratedAt = earliest(
+            entry.websiteGeneratedAt,
+            created,
+          );
         }
         const pub = row.published_at as string | null;
         if (
           pub &&
           isValidActivationTimestamp({
-            signupAt,
+            signupAt: entry.createdAt,
             activationAt: pub,
             cutoffAt,
           })
         ) {
-          published.add(ws);
+          entry.publishedAt = earliest(entry.publishedAt, pub);
         }
       }
     }
@@ -601,101 +616,155 @@ export async function getFunnelIntelligence(input: {
       .gte("occurred_at", range.start)
       .lt("occurred_at", scanEnd)
       .limit(ANALYTICS_SAMPLE_CAP);
-    if (!edits.error) {
+    if (edits.error) {
+      logAdminFailure("phase6.funnel.preview_proxy", edits.error.message);
+      // Preview stays unavailable; do not fail the whole funnel.
+    } else {
       for (const row of edits.data ?? []) {
         const ws = row.workspace_id as string | null;
         if (!ws) continue;
-        const signupAt = cohort.get(ws);
-        if (!signupAt) continue;
+        const entry = byWs.get(ws);
+        if (!entry) continue;
+        const at = row.occurred_at as string;
         if (
-          isValidActivationTimestamp({
-            signupAt,
-            activationAt: row.occurred_at as string,
+          !isValidActivationTimestamp({
+            signupAt: entry.createdAt,
+            activationAt: at,
             cutoffAt,
           })
         ) {
-          edited.add(ws);
+          continue;
         }
+        entry.previewProxyAt = earliest(entry.previewProxyAt, at);
       }
     }
   }
 
-  function step(
+  const causal = computeCausalFunnel({
+    workspaces: [...byWs.values()],
+    cutoffAt,
+    windowDays: ACTIVATION_WINDOW_DAYS,
+  });
+
+  const hasPreviewTelemetry = [...byWs.values()].some((w) => w.previewProxyAt);
+
+  function stage(
     id: FunnelStepStat["id"],
     label: string,
-    count: number,
-    prev: number | null,
-    status: FunnelStepStat["status"],
+    count: number | null,
+    previousCount: number | null,
+    baseStatus: FunnelStepStat["status"],
     source: string,
     reason?: string,
   ): FunnelStepStat {
-    const conv = prev == null ? null : conversionRate(count, prev);
+    if (count == null) {
+      return {
+        id,
+        label,
+        users: null,
+        workspaces: null,
+        conversionFromPrevious: null,
+        dropOffFromPrevious: null,
+        medianHoursToNext: null,
+        status: "unavailable",
+        reason,
+        source,
+      };
+    }
+    const conv =
+      previousCount == null
+        ? { rate: null, status: "available" as const }
+        : funnelStageConversion(count, previousCount);
+    const status: FunnelStepStat["status"] =
+      conv.status === "insufficient_data"
+        ? "insufficient_data"
+        : truncated && baseStatus === "available"
+          ? "partial"
+          : baseStatus;
     return {
       id,
       label,
       users: null,
-      workspaces: status === "unavailable" ? null : count,
-      conversionFromPrevious: conv,
-      dropOffFromPrevious: conv == null ? null : 1 - conv,
+      workspaces: count,
+      conversionFromPrevious: conv.rate,
+      dropOffFromPrevious: conv.rate == null ? null : 1 - conv.rate,
       medianHoursToNext: null,
-      status: truncated && status === "available" ? "partial" : status,
+      status,
       reason:
-        truncated && status !== "unavailable"
-          ? reason
-            ? `${reason}; sample may be truncated`
-            : `Sample truncated at ${ANALYTICS_SAMPLE_CAP}`
-          : reason,
+        conv.status === "insufficient_data"
+          ? conv.reason
+          : truncated
+            ? reason
+              ? `${reason}; sample may be truncated at ${ANALYTICS_SAMPLE_CAP}`
+              : `Sample truncated at ${ANALYTICS_SAMPLE_CAP}`
+            : reason,
       source,
     };
   }
 
   const steps: FunnelStepStat[] = [
-    step("signup", "Signup", signupN, null, "available", "workspaces.created_at"),
-    step(
+    stage(
+      "signup",
+      "Signup",
+      causal.signup,
+      null,
+      "available",
+      "workspaces.created_at",
+    ),
+    stage(
       "import_completed",
       "Import completed",
-      imported.size,
-      signupN,
+      causal.imported,
+      causal.signup,
       "partial",
       "import_jobs.status=completed",
-      `Within ${ACTIVATION_WINDOW_DAYS}d of workspace creation`,
+      `completed_at (fallback updated_at); within ${ACTIVATION_WINDOW_DAYS}d of workspace creation`,
     ),
-    step(
+    stage(
       "website_generated",
       "Website generated",
-      generated.size,
-      imported.size || signupN,
+      causal.generated,
+      causal.imported,
       "partial",
       "websites.created_at",
+      "Generation timestamp = earliest websites.created_at ≥ import and within window",
     ),
-    {
-      id: "website_previewed",
-      label: "Website previewed",
-      users: null,
-      workspaces: edited.size > 0 ? edited.size : null,
-      conversionFromPrevious:
-        edited.size > 0 ? conversionRate(edited.size, generated.size) : null,
-      dropOffFromPrevious: null,
-      medianHoursToNext: null,
-      status: edited.size > 0 ? "partial" : "unavailable",
-      reason:
-        edited.size > 0
-          ? "Proxied via website_edited events (not dedicated preview)"
-          : "No website_previewed instrumentation",
-      source: "product_events.website_edited",
-    },
-    step(
+    hasPreviewTelemetry
+      ? stage(
+          "website_previewed",
+          "Website previewed",
+          causal.previewProxy,
+          causal.generated,
+          "partial",
+          "product_events.website_edited",
+          "Preview proxy based on website_edited — not dedicated website_previewed telemetry",
+        )
+      : stage(
+          "website_previewed",
+          "Website previewed",
+          null,
+          null,
+          "unavailable",
+          "product_events.website_edited",
+          "No website_previewed instrumentation; website_edited proxy has no evidence in range",
+        ),
+    stage(
       "website_published",
       "Website published",
-      published.size,
-      generated.size || signupN,
+      causal.published,
+      causal.generated,
       "partial",
       "websites.published_at",
-      `Within ${ACTIVATION_WINDOW_DAYS}d of workspace creation`,
+      `published_at ≥ generation; within ${ACTIVATION_WINDOW_DAYS}d of workspace creation`,
     ),
   ];
 
-  return { range, mode: "workspace", steps, note };
+  return {
+    range,
+    mode: "workspace",
+    steps,
+    note: `${note} Generation semantic: websites.created_at. Preview is proxy-only.`,
+  };
 }
 
 // ─── Retention & Cohorts ──────────────────────────────────────
@@ -704,24 +773,30 @@ export type RetentionDay = {
   day: number;
   retained: number | null;
   cohortSize: number;
+  matureSize: number;
   rate: number | null;
-  status: "available" | "insufficient_data";
+  status: "available" | "insufficient_data" | "pending" | "partial" | "error";
   reason?: string;
 };
 
 export type RetentionIntelligence = {
   cohortBasis: "signup_date";
   activityDefinition: string;
+  cutoffAt: string;
+  timezone: "UTC";
   range: ReturnType<typeof resolveDateRange>;
   days: RetentionDay[];
   weekly: Array<{
     week: number;
     retained: number | null;
     cohortSize: number;
+    matureSize: number;
     rate: number | null;
-    status: "available" | "insufficient_data";
+    status: "available" | "insufficient_data" | "pending" | "partial" | "error";
     reason?: string;
   }>;
+  status: "available" | "unavailable" | "error" | "partial";
+  reason?: string;
 };
 
 export async function getRetentionIntelligence(input: {
@@ -731,17 +806,22 @@ export async function getRetentionIntelligence(input: {
   await authorize(input.userId);
   const range = resolveDateRange({ preset: clampAnalyticsPreset(input.preset) });
   assertRangeBounded(range.start, range.end);
+  const cutoffAt = new Date().toISOString();
 
   const activityDefinition =
-    "Activity = any product_events.occurred_at OR websites.updated_at OR import_jobs.updated_at for the user/workspace after signup. Not session/login telemetry — if those are missing, retention is activity-based.";
+    "Activity-based retention (NOT session/login retention). Activity = product_events.occurred_at OR websites.updated_at OR import_jobs.updated_at attributed to the user, with activity_at ≤ cutoff. Cohort = profiles.created_at. Timezone = UTC. Immature Day/Week cells are pending — never shown as 0%.";
 
   if (!supabaseConfigured()) {
     return {
       cohortBasis: "signup_date",
       activityDefinition,
+      cutoffAt,
+      timezone: "UTC",
       range,
       days: [],
       weekly: [],
+      status: "unavailable",
+      reason: "Supabase not configured",
     };
   }
 
@@ -758,29 +838,67 @@ export async function getRetentionIntelligence(input: {
       .select("user_id, occurred_at")
       .not("user_id", "is", null)
       .gte("occurred_at", range.start)
+      .lte("occurred_at", cutoffAt)
       .limit(ANALYTICS_SAMPLE_CAP),
     db
       .from("websites")
       .select("workspace_id, updated_at")
       .is("deleted_at", null)
       .gte("updated_at", range.start)
+      .lte("updated_at", cutoffAt)
       .limit(ANALYTICS_SAMPLE_CAP),
     db
       .from("import_jobs")
       .select("workspace_id, updated_at, user_id")
       .gte("updated_at", range.start)
+      .lte("updated_at", cutoffAt)
       .limit(ANALYTICS_SAMPLE_CAP),
   ]);
 
-  const profiles = profilesRes.data ?? [];
-  const cohortSize = profiles.length;
+  if (profilesRes.error) {
+    logAdminFailure("phase6.retention.profiles", profilesRes.error.message);
+    return {
+      cohortBasis: "signup_date",
+      activityDefinition,
+      cutoffAt,
+      timezone: "UTC",
+      range,
+      days: [],
+      weekly: [],
+      status: "error",
+      reason: `Profiles query failed: ${profilesRes.error.message}`,
+    };
+  }
 
-  // Map workspace → owner for activity attribution
-  const { data: wsRows } = await db
+  const profiles = (profilesRes.data ?? []).map((p) => ({
+    id: p.id as string,
+    created_at: p.created_at as string,
+  }));
+  const truncated =
+    profiles.length >= ANALYTICS_SAMPLE_CAP ||
+    (eventsRes.data ?? []).length >= ANALYTICS_SAMPLE_CAP ||
+    (sitesRes.data ?? []).length >= ANALYTICS_SAMPLE_CAP ||
+    (jobsRes.data ?? []).length >= ANALYTICS_SAMPLE_CAP;
+
+  const { data: wsRows, error: wsError } = await db
     .from("workspaces")
     .select("id, owner_id")
     .is("deleted_at", null)
     .limit(ANALYTICS_SAMPLE_CAP);
+  if (wsError) {
+    logAdminFailure("phase6.retention.workspaces", wsError.message);
+    return {
+      cohortBasis: "signup_date",
+      activityDefinition,
+      cutoffAt,
+      timezone: "UTC",
+      range,
+      days: [],
+      weekly: [],
+      status: "error",
+      reason: `Workspaces query failed: ${wsError.message}`,
+    };
+  }
   const ownerByWs = new Map(
     (wsRows ?? []).map((w) => [w.id as string, w.owner_id as string]),
   );
@@ -788,6 +906,7 @@ export async function getRetentionIntelligence(input: {
   const activitiesByUser = new Map<string, string[]>();
   function pushActivity(userId: string | null | undefined, at: string) {
     if (!userId) return;
+    if (Date.parse(at) > Date.parse(cutoffAt)) return;
     const list = activitiesByUser.get(userId) ?? [];
     list.push(at);
     activitiesByUser.set(userId, list);
@@ -808,74 +927,60 @@ export async function getRetentionIntelligence(input: {
 
   const dayOffsets = [1, 7, 14, 30];
   const days: RetentionDay[] = dayOffsets.map((day) => {
-    if (cohortSize < MIN_COHORT_SIZE) {
-      return {
-        day,
-        retained: null,
-        cohortSize,
-        rate: null,
-        status: "insufficient_data",
-        reason: `cohort_size=${cohortSize} < min=${MIN_COHORT_SIZE}`,
-      };
-    }
-    let retained = 0;
-    for (const p of profiles) {
-      const acts = activitiesByUser.get(p.id as string) ?? [];
-      if (
-        acts.some((a) => isRetainedOnDay(p.created_at as string, a, day))
-      ) {
-        retained += 1;
-      }
-    }
-    const rp = retentionPercent(retained, cohortSize);
+    const cell = computeRetentionDayCell({
+      profiles,
+      activitiesByUser,
+      dayOffset: day,
+      cutoffAt,
+    });
     return {
       day,
-      retained,
-      cohortSize,
-      rate: rp.value,
-      status: rp.status,
-      reason: rp.reason,
+      retained: cell.retained,
+      cohortSize: cell.cohortSize,
+      matureSize: cell.matureSize,
+      rate: cell.rate,
+      status: truncated && cell.status === "available" ? "partial" : cell.status,
+      reason:
+        truncated && cell.status === "available"
+          ? `${cell.reason ?? "ok"}; sample may be truncated`
+          : cell.reason,
     };
   });
 
   const weekOffsets = [0, 1, 2, 3, 4, 8, 12];
   const weekly = weekOffsets.map((week) => {
-    if (cohortSize < MIN_COHORT_SIZE) {
-      return {
-        week,
-        retained: null,
-        cohortSize,
-        rate: null,
-        status: "insufficient_data" as const,
-        reason: `cohort_size=${cohortSize} < min=${MIN_COHORT_SIZE}`,
-      };
-    }
-    let retained = 0;
-    for (const p of profiles) {
-      const acts = activitiesByUser.get(p.id as string) ?? [];
-      if (
-        acts.some((a) => isRetainedInWeek(p.created_at as string, a, week))
-      ) {
-        retained += 1;
-      }
-    }
-    const rp = retentionPercent(retained, cohortSize);
+    const cell = computeRetentionWeekCell({
+      profiles,
+      activitiesByUser,
+      weekOffset: week,
+      cutoffAt,
+    });
     return {
       week,
-      retained,
-      cohortSize,
-      rate: rp.value,
-      status: rp.status,
-      reason: rp.reason,
+      retained: cell.retained,
+      cohortSize: cell.cohortSize,
+      matureSize: cell.matureSize,
+      rate: cell.rate,
+      status: truncated && cell.status === "available" ? "partial" : cell.status,
+      reason:
+        truncated && cell.status === "available"
+          ? `${cell.reason ?? "ok"}; sample may be truncated`
+          : cell.reason,
     };
   });
 
   return {
     cohortBasis: "signup_date",
     activityDefinition,
+    cutoffAt,
+    timezone: "UTC",
     range,
     days,
     weekly,
+    status: truncated ? "partial" : "available",
+    reason: truncated
+      ? `Sample truncated at ${ANALYTICS_SAMPLE_CAP}`
+      : undefined,
   };
 }
 
@@ -897,30 +1002,60 @@ export async function getCohortTable(input: {
   cohortBasis: "signup_week";
   rows: CohortRow[];
   note: string;
+  status: "available" | "unavailable" | "error" | "partial";
+  reason?: string;
 }> {
   const retention = await getRetentionIntelligence(input);
   const note =
-    "Rows = signup week (UTC). Columns W0–W12 = activity-based retention. Insufficient data when cohort < min size.";
+    "Rows = signup week (UTC). Columns W0–W12 = activity-based retention with maturity gates. Immature cells = pending (never 0%). Timezone UTC.";
+
+  if (retention.status === "unavailable" || retention.status === "error") {
+    return {
+      cohortBasis: "signup_week",
+      rows: [],
+      note,
+      status: retention.status,
+      reason: retention.reason,
+    };
+  }
 
   if (!supabaseConfigured()) {
-    return { cohortBasis: "signup_week", rows: [], note };
+    return {
+      cohortBasis: "signup_week",
+      rows: [],
+      note,
+      status: "unavailable",
+      reason: "Supabase not configured",
+    };
   }
 
   const db = getSupabaseAdmin();
   const range = retention.range;
-  const { data: profiles } = await db
+  const cutoffAt = retention.cutoffAt;
+  const { data: profiles, error: profilesError } = await db
     .from("profiles")
     .select("id, created_at")
     .gte("created_at", range.start)
     .lt("created_at", range.end)
     .limit(ANALYTICS_SAMPLE_CAP);
 
-  // Rebuild activity map (same as retention) — bounded
+  if (profilesError) {
+    logAdminFailure("phase6.cohorts.profiles", profilesError.message);
+    return {
+      cohortBasis: "signup_week",
+      rows: [],
+      note,
+      status: "error",
+      reason: `Profiles query failed: ${profilesError.message}`,
+    };
+  }
+
   const { data: events } = await db
     .from("product_events")
     .select("user_id, occurred_at")
     .not("user_id", "is", null)
     .gte("occurred_at", range.start)
+    .lte("occurred_at", cutoffAt)
     .limit(ANALYTICS_SAMPLE_CAP);
 
   const byWeek = new Map<string, Array<{ id: string; created_at: string }>>();
@@ -934,8 +1069,10 @@ export async function getCohortTable(input: {
   const acts = new Map<string, string[]>();
   for (const e of events ?? []) {
     const uid = e.user_id as string;
+    const at = e.occurred_at as string;
+    if (Date.parse(at) > Date.parse(cutoffAt)) continue;
     const list = acts.get(uid) ?? [];
-    list.push(e.occurred_at as string);
+    list.push(at);
     acts.set(uid, list);
   }
 
@@ -943,35 +1080,35 @@ export async function getCohortTable(input: {
   const rows: CohortRow[] = [...byWeek.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([weekKey, members]) => {
-      const size = members.length;
       const cells = weekOffsets.map((week) => {
-        if (size < MIN_COHORT_SIZE) {
-          return {
-            week,
-            retained: null,
-            rate: null,
-            status: "insufficient_data" as const,
-          };
-        }
-        let retained = 0;
-        for (const m of members) {
-          const a = acts.get(m.id) ?? [];
-          if (a.some((t) => isRetainedInWeek(m.created_at, t, week))) {
-            retained += 1;
-          }
-        }
-        const rp = retentionPercent(retained, size);
+        const cell = computeRetentionWeekCell({
+          profiles: members,
+          activitiesByUser: acts,
+          weekOffset: week,
+          cutoffAt,
+        });
         return {
           week,
-          retained,
-          rate: rp.value,
-          status: rp.status,
+          retained: cell.retained,
+          rate: cell.rate,
+          status:
+            cell.status === "pending"
+              ? ("pending" as const)
+              : cell.status === "insufficient_data"
+                ? ("insufficient_data" as const)
+                : ("available" as const),
         };
       });
-      return { weekKey, size, cells };
+      return { weekKey, size: members.length, cells };
     });
 
-  return { cohortBasis: "signup_week", rows, note };
+  return {
+    cohortBasis: "signup_week",
+    rows,
+    note,
+    status: retention.status,
+    reason: retention.reason,
+  };
 }
 
 // ─── Feature adoption ─────────────────────────────────────────
@@ -1368,13 +1505,21 @@ export async function getCustomerIntelligence(input: {
 
 export async function getFounderInsightsLite(input: {
   userId: string;
-}): Promise<{ insights: FounderInsight[]; note: string }> {
+}): Promise<{
+  insights: FounderInsight[];
+  note: string;
+  atRisk: MetricResult<number>;
+}> {
   await authorize(input.userId);
   const note =
     "Deterministic rule-based insights from head-counts and bounded rates. Not causal claims.";
 
   if (!supabaseConfigured()) {
-    return { insights: [], note };
+    return {
+      insights: [],
+      note,
+      atRisk: unavailable("Supabase not configured", "at_risk"),
+    };
   }
 
   const db = getSupabaseAdmin();
@@ -1401,6 +1546,7 @@ export async function getFounderInsightsLite(input: {
     getActivationIntelligence({ userId: input.userId, preset: "30d" }),
   ]);
 
+  let atRisk: MetricResult<number>;
   let atRiskCount: number | null = null;
   try {
     const atRiskApprox = await getCustomerIntelligence({
@@ -1409,7 +1555,20 @@ export async function getFounderInsightsLite(input: {
     });
     atRiskCount = atRiskApprox.rows.filter((r) => r.riskFlags.length > 0)
       .length;
-  } catch {
+    atRisk = available(atRiskCount, "workspaces.read rule-based at-risk");
+  } catch (error) {
+    if (error instanceof AdminAuthError && error.code === "FORBIDDEN") {
+      atRisk = {
+        status: "permission_denied",
+        reason: "workspaces.read required to compute at-risk customers",
+        source: "rbac",
+      };
+    } else {
+      atRisk = metricError(
+        error instanceof Error ? error.message : "At-risk query failed",
+        "at_risk",
+      );
+    }
     atRiskCount = null;
   }
 
@@ -1419,8 +1578,6 @@ export async function getFounderInsightsLite(input: {
       ? activation.activationRate.value
       : null;
 
-  // Retention/activation period deltas require daily_metrics history —
-  // pass null rather than inventing a prior period comparison.
   const insights = generateFounderInsights({
     generatedAt: now,
     activationRate: actRate,
@@ -1437,7 +1594,7 @@ export async function getFounderInsightsLite(input: {
     previousPublishingFailures24h: null,
   });
 
-  return { insights, note };
+  return { insights, note, atRisk };
 }
 
 // ─── Data quality ─────────────────────────────────────────────

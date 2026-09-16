@@ -1,10 +1,11 @@
-import type { DashboardKpis } from "@/lib/admin/contracts";
+import type { DashboardKpis, MetricResult } from "@/lib/admin/contracts";
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
 import type { OpsDashboardSignals } from "@/lib/admin/phase5-contracts";
 import type { FounderInsight } from "@/lib/admin/intelligence/founder-insights";
 import { AdminPageHeader, AdminSection, AdminStatusBadge } from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { MetricCell } from "@/components/admin/phase4/MetricCell";
+import { metricDisplay } from "@/components/admin/format";
 import { adminHref } from "@/components/admin/nav";
 import type { Locale } from "@/lib/config/env";
 import type { AdminRole } from "@/lib/admin/permissions";
@@ -17,6 +18,7 @@ export function FounderDashboardLite({
   infra,
   ops,
   insights,
+  atRisk,
 }: {
   locale: Locale;
   role: AdminRole;
@@ -24,9 +26,11 @@ export function FounderDashboardLite({
   infra: InfrastructureOverview;
   ops?: OpsDashboardSignals;
   insights?: FounderInsight[];
+  atRisk?: MetricResult<number>;
 }) {
   void role;
   const isFa = locale === "fa";
+  const atRiskDisplay = atRisk ? metricDisplay(atRisk) : null;
   const tone =
     infra.systemStatus === "critical"
       ? "danger"
@@ -35,7 +39,6 @@ export function FounderDashboardLite({
         : infra.systemStatus === "healthy"
           ? "success"
           : "neutral";
-
   return (
     <div className="space-y-8">
       <AdminPageHeader
@@ -73,6 +76,46 @@ export function FounderDashboardLite({
             <Link href={adminHref(locale, "/errors")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "خطاها" : "Errors"}</Link>
             <Link href={adminHref(locale, "/security")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "امنیت" : "Security"}</Link>
           </div>
+        </AdminSection>
+      ) : null}
+
+      {atRiskDisplay ? (
+        <AdminSection
+          title={isFa ? "مشتریان در ریسک" : "Customers at risk"}
+          description={
+            isFa
+              ? "قانون‌محور — نه 0 جعلی هنگام نبود دسترسی"
+              : "Rule-based — never fake 0 when permission denied"
+          }
+        >
+          {atRiskDisplay.kind === "permission_denied" ? (
+            <p className="text-sm text-[var(--admin-muted)]">
+              Permission denied
+              <span className="mt-1 block text-[11px]">
+                Reason: {atRiskDisplay.reason}
+              </span>
+            </p>
+          ) : atRiskDisplay.kind === "unavailable" ? (
+            <p className="text-sm text-[var(--admin-muted)]">
+              Unavailable
+              <span className="mt-1 block text-[11px]">
+                Reason: {atRiskDisplay.reason}
+              </span>
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="font-display text-2xl tabular-nums text-[var(--admin-fg)]">
+                {atRiskDisplay.text}
+              </p>
+              <Link
+                href={adminHref(locale, "/health")}
+                prefetch={false}
+                className="text-xs text-[var(--admin-muted)] hover:underline"
+              >
+                {isFa ? "جزئیات سلامت" : "Health details"}
+              </Link>
+            </div>
+          )}
         </AdminSection>
       ) : null}
 

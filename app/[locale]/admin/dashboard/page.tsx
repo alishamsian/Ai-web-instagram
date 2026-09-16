@@ -99,7 +99,11 @@ export default async function AdminDashboardPage({
       settledValue(
         "dashboard.insights",
         getFounderInsightsLite({ userId }),
-        { insights: [] as FounderInsight[], note: "unavailable" },
+        {
+          insights: [] as FounderInsight[],
+          note: "unavailable",
+          atRisk: { status: "unavailable" as const, reason: "Temporarily unavailable" },
+        },
       ),
     ]);
 
@@ -109,11 +113,18 @@ export default async function AdminDashboardPage({
     infraSettled.status === "fulfilled" ? infraSettled.value.value : emptyInfra();
   const ops =
     opsSettled.status === "fulfilled" ? opsSettled.value.value : emptyOps();
-  const insights =
+  const insightsResult =
     insightsSettled.status === "fulfilled"
-      ? insightsSettled.value.value.insights
-      : [];
-
+      ? insightsSettled.value.value
+      : {
+          insights: [] as FounderInsight[],
+          note: "unavailable",
+          atRisk: {
+            status: "unavailable" as const,
+            reason: "Temporarily unavailable",
+          },
+        };
+  const insights = insightsResult.insights;
   return (
     <FounderDashboardLite
       locale={locale}
@@ -122,6 +133,7 @@ export default async function AdminDashboardPage({
       infra={infra}
       ops={ops}
       insights={insights}
+      atRisk={insightsResult.atRisk}
     />
   );
 }

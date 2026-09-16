@@ -9,10 +9,10 @@ export function MetricCell({
   style?: "number" | "percent" | "currency";
 }) {
   const d = metricDisplay(metric, { style, compact: true });
-  if (d.kind === "unavailable") {
+  if (d.kind === "unavailable" || d.kind === "permission_denied") {
     return (
       <span className="text-[var(--admin-muted)]" title={d.reason}>
-        —
+        {d.kind === "permission_denied" ? "denied" : "—"}
       </span>
     );
   }

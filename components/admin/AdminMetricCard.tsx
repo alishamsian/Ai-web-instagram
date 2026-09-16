@@ -33,11 +33,15 @@ export function AdminMetricCard({
 
   if (!display) return null;
 
-  if (display.kind === "unavailable") {
+  if (display.kind === "unavailable" || display.kind === "permission_denied") {
     return (
       <MetricUnavailable
         label={label}
-        reason={display.reason}
+        reason={
+          display.kind === "permission_denied"
+            ? `Permission denied: ${display.reason}`
+            : display.reason
+        }
         compact={compact}
       />
     );

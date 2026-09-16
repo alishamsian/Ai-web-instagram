@@ -10,7 +10,8 @@ export type MetricAvailability =
   | "unavailable"
   | "partial"
   | "error"
-  | "insufficient_sample";
+  | "insufficient_sample"
+  | "permission_denied";
 
 export type MetricResult<T> =
   | {
@@ -38,6 +39,11 @@ export type MetricResult<T> =
       status: "insufficient_sample";
       reason: string;
       sampleSize: number;
+      source?: string;
+    }
+  | {
+      status: "permission_denied";
+      reason: string;
       source?: string;
     };
 

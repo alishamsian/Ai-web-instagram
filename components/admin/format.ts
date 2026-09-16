@@ -45,7 +45,11 @@ export function metricDisplay(
 ):
   | { kind: "value"; text: string; source: string }
   | { kind: "unavailable"; reason: string }
+  | { kind: "permission_denied"; reason: string }
   | { kind: "partial"; text: string; warning: string; source: string } {
+  if (metric.status === "permission_denied") {
+    return { kind: "permission_denied", reason: metric.reason };
+  }
   if (metric.status === "unavailable" || metric.status === "error") {
     return { kind: "unavailable", reason: metric.reason };
   }

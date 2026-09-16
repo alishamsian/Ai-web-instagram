@@ -37,10 +37,268 @@ export type FunnelStepStat = {
   conversionFromPrevious: number | null;
   dropOffFromPrevious: number | null;
   medianHoursToNext: number | null;
-  status: "available" | "partial" | "unavailable";
+  status: "available" | "partial" | "unavailable" | "insufficient_data";
   reason?: string;
   source: string;
 };
+
+/** Per-workspace timestamps for causal funnel evaluation. */
+export type FunnelWorkspaceEvents = {
+  workspaceId: string;
+  createdAt: string;
+  /** Earliest completed import in window */
+  importCompletedAt: string | null;
+  /** Earliest website.created_at in window (= generation semantic) */
+  websiteGeneratedAt: string | null;
+  /** Earliest website_edited proxy (optional) */
+  previewProxyAt: string | null;
+  /** Earliest published_at in window */
+  publishedAt: string | null;
+};
+
+/**
+ * Causal funnel (product path):
+ * signup → successful import → website generation → publish
+ *
+ * Rules:
+ * - each stage ≥ previous stage timestamp
+ * - each stage within [createdAt, createdAt+window] and ≤ cutoff
+ * - generation semantic = websites.created_at (earliest valid)
+ * - publish requires published_at ≥ generation
+ *
+ * Preview is NOT on the critical path (no dedicated telemetry).
+ * Preview proxy counts are computed separately among generated workspaces.
+ */
+export function computeCausalFunnel(input: {
+  workspaces: FunnelWorkspaceEvents[];
+  windowDays?: number;
+  cutoffAt: string;
+}): {
+  signup: number;
+  imported: number;
+  generated: number;
+  previewProxy: number;
+  published: number;
+} {
+  const windowDays = input.windowDays ?? ACTIVATION_WINDOW_DAYS;
+  let imported = 0;
+  let generated = 0;
+  let previewProxy = 0;
+  let published = 0;
+
+  for (const ws of input.workspaces) {
+    const importAt = firstValidActivationAt({
+      signupAt: ws.createdAt,
+      candidates: [ws.importCompletedAt],
+      windowDays,
+      cutoffAt: input.cutoffAt,
+    });
+    if (!importAt) continue;
+    imported += 1;
+
+    const genAt = firstValidActivationAt({
+      signupAt: ws.createdAt,
+      candidates: [ws.websiteGeneratedAt],
+      windowDays,
+      cutoffAt: input.cutoffAt,
+    });
+    if (!genAt || Date.parse(genAt) < Date.parse(importAt)) continue;
+    generated += 1;
+
+    const previewAt = firstValidActivationAt({
+      signupAt: ws.createdAt,
+      candidates: [ws.previewProxyAt],
+      windowDays,
+      cutoffAt: input.cutoffAt,
+    });
+    if (previewAt && Date.parse(previewAt) >= Date.parse(genAt)) {
+      previewProxy += 1;
+    }
+
+    const pubAt = firstValidActivationAt({
+      signupAt: ws.createdAt,
+      candidates: [ws.publishedAt],
+      windowDays,
+      cutoffAt: input.cutoffAt,
+    });
+    if (!pubAt || Date.parse(pubAt) < Date.parse(genAt)) continue;
+    published += 1;
+  }
+
+  return {
+    signup: input.workspaces.length,
+    imported,
+    generated,
+    previewProxy,
+    published,
+  };
+}
+
+export function funnelStageConversion(
+  current: number,
+  previous: number,
+): {
+  rate: number | null;
+  status: "available" | "insufficient_data";
+  reason?: string;
+} {
+  if (previous <= 0) {
+    return {
+      rate: null,
+      status: "insufficient_data",
+      reason: "Previous funnel stage has zero eligible workspaces",
+    };
+  }
+  return { rate: current / previous, status: "available" };
+}
+
+/** UTC calendar-day maturity: cutoff must be ≥ signupDay + dayOffset. */
+export function isRetentionDayMature(
+  signupAt: string,
+  dayOffset: number,
+  cutoffAt: string,
+): boolean {
+  const signup = new Date(signupAt);
+  const cutoff = new Date(cutoffAt);
+  const signupDay = Date.UTC(
+    signup.getUTCFullYear(),
+    signup.getUTCMonth(),
+    signup.getUTCDate(),
+  );
+  const cutoffDay = Date.UTC(
+    cutoff.getUTCFullYear(),
+    cutoff.getUTCMonth(),
+    cutoff.getUTCDate(),
+  );
+  const elapsed = Math.round((cutoffDay - signupDay) / 86_400_000);
+  return elapsed >= dayOffset;
+}
+
+export function isRetentionWeekMature(
+  signupAt: string,
+  weekOffset: number,
+  cutoffAt: string,
+): boolean {
+  return isRetentionDayMature(signupAt, weekOffset * 7, cutoffAt);
+}
+
+export type RetentionCellStatus =
+  | "available"
+  | "insufficient_data"
+  | "pending"
+  | "partial";
+
+export function computeRetentionDayCell(input: {
+  profiles: Array<{ id: string; created_at: string }>;
+  activitiesByUser: Map<string, string[]>;
+  dayOffset: number;
+  cutoffAt: string;
+}): {
+  status: RetentionCellStatus;
+  retained: number | null;
+  cohortSize: number;
+  matureSize: number;
+  rate: number | null;
+  reason?: string;
+} {
+  const mature = input.profiles.filter((p) =>
+    isRetentionDayMature(p.created_at, input.dayOffset, input.cutoffAt),
+  );
+  if (mature.length === 0) {
+    return {
+      status: "pending",
+      retained: null,
+      cohortSize: input.profiles.length,
+      matureSize: 0,
+      rate: null,
+      reason: `No cohort members have matured for Day ${input.dayOffset} yet (cutoff=${input.cutoffAt})`,
+    };
+  }
+  if (mature.length < MIN_COHORT_SIZE) {
+    return {
+      status: "insufficient_data",
+      retained: null,
+      cohortSize: input.profiles.length,
+      matureSize: mature.length,
+      rate: null,
+      reason: `mature_size=${mature.length} < min=${MIN_COHORT_SIZE}`,
+    };
+  }
+
+  let retained = 0;
+  for (const p of mature) {
+    const acts = (input.activitiesByUser.get(p.id) ?? []).filter(
+      (a) => Date.parse(a) <= Date.parse(input.cutoffAt),
+    );
+    if (acts.some((a) => isRetainedOnDay(p.created_at, a, input.dayOffset))) {
+      retained += 1;
+    }
+  }
+  return {
+    status: "available",
+    retained,
+    cohortSize: input.profiles.length,
+    matureSize: mature.length,
+    rate: retained / mature.length,
+  };
+}
+
+export function computeRetentionWeekCell(input: {
+  profiles: Array<{ id: string; created_at: string }>;
+  activitiesByUser: Map<string, string[]>;
+  weekOffset: number;
+  cutoffAt: string;
+}): {
+  status: RetentionCellStatus;
+  retained: number | null;
+  cohortSize: number;
+  matureSize: number;
+  rate: number | null;
+  reason?: string;
+} {
+  const mature = input.profiles.filter((p) =>
+    isRetentionWeekMature(p.created_at, input.weekOffset, input.cutoffAt),
+  );
+  if (mature.length === 0) {
+    return {
+      status: "pending",
+      retained: null,
+      cohortSize: input.profiles.length,
+      matureSize: 0,
+      rate: null,
+      reason: `No cohort members have matured for W${input.weekOffset} yet`,
+    };
+  }
+  if (mature.length < MIN_COHORT_SIZE) {
+    return {
+      status: "insufficient_data",
+      retained: null,
+      cohortSize: input.profiles.length,
+      matureSize: mature.length,
+      rate: null,
+      reason: `mature_size=${mature.length} < min=${MIN_COHORT_SIZE}`,
+    };
+  }
+
+  let retained = 0;
+  for (const p of mature) {
+    const acts = (input.activitiesByUser.get(p.id) ?? []).filter(
+      (a) => Date.parse(a) <= Date.parse(input.cutoffAt),
+    );
+    if (
+      acts.some((a) => isRetainedInWeek(p.created_at, a, input.weekOffset))
+    ) {
+      retained += 1;
+    }
+  }
+  return {
+    status: "available",
+    retained,
+    cohortSize: input.profiles.length,
+    matureSize: mature.length,
+    rate: retained / mature.length,
+  };
+}
 
 /** Median of numbers; null if empty. */
 export function median(values: number[]): number | null {

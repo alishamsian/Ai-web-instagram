@@ -67,13 +67,20 @@ export default async function AdminFunnelsPage({
                         ? "success"
                         : stage.status === "partial"
                           ? "warning"
-                          : "neutral"
+                          : stage.status === "insufficient_data"
+                            ? "info"
+                            : "neutral"
                     }
                   >
                     {stage.status}
                   </AdminStatusBadge>
                   <span className="tabular-nums text-sm text-[var(--admin-fg)]">
-                    {stage.workspaces == null ? "—" : stage.workspaces}
+                    {stage.workspaces == null
+                      ? "—"
+                      : stage.status === "insufficient_data" &&
+                          stage.conversionFromPrevious == null
+                        ? `${stage.workspaces} (conv. n/a)`
+                        : stage.workspaces}
                   </span>
                 </div>
               </div>

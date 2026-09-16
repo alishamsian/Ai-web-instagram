@@ -12,7 +12,13 @@ import {
   firstValidActivationAt,
   computeActivationCohort,
   addUtcDaysIso,
+  computeCausalFunnel,
+  funnelStageConversion,
+  isRetentionDayMature,
+  computeRetentionDayCell,
 } from "@/lib/admin/intelligence/metrics";
+import { metricDisplay } from "@/components/admin/format";
+import type { MetricResult } from "@/lib/admin/contracts";
 import { computeHealthScore, HEALTH_WEIGHTS } from "@/lib/admin/intelligence/health-score";
 import { resolveLifecycle } from "@/lib/admin/intelligence/lifecycle";
 import { detectAtRisk } from "@/lib/admin/intelligence/at-risk";
@@ -137,10 +143,204 @@ describe("Phase 6 — activation temporal integrity", () => {
     ).toBe("2026-01-05T00:00:00.000Z");
   });
 
-  it("activation scan end extends cohort end by window days", () => {
-    expect(addUtcDaysIso("2026-01-31T00:00:00.000Z", ACTIVATION_WINDOW_DAYS)).toBe(
-      "2026-03-02T00:00:00.000Z",
-    );
+  it("exact window boundary is inclusive; +1ms is rejected", () => {
+    const signup = "2026-01-01T00:00:00.000Z";
+    const exact = addUtcDaysIso(signup, ACTIVATION_WINDOW_DAYS);
+    expect(
+      isValidActivationTimestamp({
+        signupAt: signup,
+        activationAt: exact,
+        cutoffAt: "2027-01-01T00:00:00.000Z",
+      }),
+    ).toBe(true);
+    const over = new Date(Date.parse(exact) + 1).toISOString();
+    expect(
+      isValidActivationTimestamp({
+        signupAt: signup,
+        activationAt: over,
+        cutoffAt: "2027-01-01T00:00:00.000Z",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("Phase 6 — causal funnel", () => {
+  const cutoff = "2026-06-01T00:00:00.000Z";
+  const base = {
+    workspaceId: "ws1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    importCompletedAt: null as string | null,
+    websiteGeneratedAt: null as string | null,
+    previewProxyAt: null as string | null,
+    publishedAt: null as string | null,
+  };
+
+  it("rejects import before workspace creation", () => {
+    const r = computeCausalFunnel({
+      workspaces: [
+        {
+          ...base,
+          importCompletedAt: "2025-12-31T00:00:00.000Z",
+          websiteGeneratedAt: "2026-01-02T00:00:00.000Z",
+          publishedAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      cutoffAt: cutoff,
+    });
+    expect(r.imported).toBe(0);
+    expect(r.generated).toBe(0);
+    expect(r.published).toBe(0);
+  });
+
+  it("requires generation ≥ import and publish ≥ generation", () => {
+    const valid = computeCausalFunnel({
+      workspaces: [
+        {
+          ...base,
+          importCompletedAt: "2026-01-02T00:00:00.000Z",
+          websiteGeneratedAt: "2026-01-03T00:00:00.000Z",
+          publishedAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      cutoffAt: cutoff,
+    });
+    expect(valid).toEqual({
+      signup: 1,
+      imported: 1,
+      generated: 1,
+      previewProxy: 0,
+      published: 1,
+    });
+
+    const publishBeforeGen = computeCausalFunnel({
+      workspaces: [
+        {
+          ...base,
+          importCompletedAt: "2026-01-02T00:00:00.000Z",
+          websiteGeneratedAt: "2026-01-05T00:00:00.000Z",
+          publishedAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      cutoffAt: cutoff,
+    });
+    expect(publishBeforeGen.generated).toBe(1);
+    expect(publishBeforeGen.published).toBe(0);
+  });
+
+  it("does not count generation without successful import", () => {
+    const r = computeCausalFunnel({
+      workspaces: [
+        {
+          ...base,
+          importCompletedAt: null,
+          websiteGeneratedAt: "2026-01-02T00:00:00.000Z",
+          publishedAt: "2026-01-03T00:00:00.000Z",
+        },
+      ],
+      cutoffAt: cutoff,
+    });
+    expect(r.imported).toBe(0);
+    expect(r.generated).toBe(0);
+    expect(r.published).toBe(0);
+  });
+
+  it("conversion uses previous stage; zero previous → insufficient_data", () => {
+    expect(funnelStageConversion(5, 10).rate).toBe(0.5);
+    const zero = funnelStageConversion(0, 0);
+    expect(zero.status).toBe("insufficient_data");
+    expect(zero.rate).toBeNull();
+  });
+
+  it("preview proxy is counted separately and labeled partial in source code", () => {
+    const r = computeCausalFunnel({
+      workspaces: [
+        {
+          ...base,
+          importCompletedAt: "2026-01-02T00:00:00.000Z",
+          websiteGeneratedAt: "2026-01-03T00:00:00.000Z",
+          previewProxyAt: "2026-01-03T12:00:00.000Z",
+          publishedAt: "2026-01-04T00:00:00.000Z",
+        },
+      ],
+      cutoffAt: cutoff,
+    });
+    expect(r.previewProxy).toBe(1);
+    expect(r.published).toBe(1);
+    const funnelSrc = read("lib/admin/phase6-queries.ts");
+    expect(funnelSrc).toMatch(/Preview proxy based on website_edited/);
+  });
+});
+
+describe("Phase 6 — retention maturity", () => {
+  it("marks immature day cohorts as pending, never 0%", () => {
+    expect(
+      isRetentionDayMature(
+        "2026-09-10T00:00:00.000Z",
+        7,
+        "2026-09-16T00:00:00.000Z",
+      ),
+    ).toBe(false);
+    expect(
+      isRetentionDayMature(
+        "2026-09-10T00:00:00.000Z",
+        1,
+        "2026-09-16T00:00:00.000Z",
+      ),
+    ).toBe(true);
+
+    const cell = computeRetentionDayCell({
+      profiles: [
+        { id: "a", created_at: "2026-09-10T00:00:00.000Z" },
+        { id: "b", created_at: "2026-09-10T00:00:00.000Z" },
+        { id: "c", created_at: "2026-09-10T00:00:00.000Z" },
+        { id: "d", created_at: "2026-09-10T00:00:00.000Z" },
+        { id: "e", created_at: "2026-09-10T00:00:00.000Z" },
+      ],
+      activitiesByUser: new Map(),
+      dayOffset: 30,
+      cutoffAt: "2026-09-16T00:00:00.000Z",
+    });
+    expect(cell.status).toBe("pending");
+    expect(cell.rate).toBeNull();
+  });
+
+  it("computes D1 only on mature members", () => {
+    const profiles = Array.from({ length: 5 }, (_, i) => ({
+      id: `u${i}`,
+      created_at: "2026-09-01T00:00:00.000Z",
+    }));
+    const acts = new Map<string, string[]>([
+      ["u0", ["2026-09-02T12:00:00.000Z"]],
+      ["u1", ["2026-09-02T12:00:00.000Z"]],
+    ]);
+    const cell = computeRetentionDayCell({
+      profiles,
+      activitiesByUser: acts,
+      dayOffset: 1,
+      cutoffAt: "2026-09-16T00:00:00.000Z",
+    });
+    expect(cell.status).toBe("available");
+    expect(cell.matureSize).toBe(5);
+    expect(cell.retained).toBe(2);
+    expect(cell.rate).toBe(0.4);
+  });
+});
+
+describe("Phase 6 — permission_denied vs zero", () => {
+  it("metricDisplay distinguishes permission_denied from zero", () => {
+    const denied: MetricResult<number> = {
+      status: "permission_denied",
+      reason: "workspaces.read required",
+    };
+    const zero: MetricResult<number> = {
+      status: "available",
+      value: 0,
+      source: "t",
+    };
+    expect(metricDisplay(denied).kind).toBe("permission_denied");
+    const z = metricDisplay(zero);
+    expect(z.kind).toBe("value");
+    if (z.kind === "value") expect(z.text).toMatch(/0/);
   });
 });
 

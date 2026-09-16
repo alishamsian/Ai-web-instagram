@@ -74,11 +74,14 @@ Owner→workspaces maps built once (`O(users + workspaces + events)`). Sample ca
 
 ## Retention definition
 
-- **Cohort basis:** signup date (`profiles.created_at`)
-- **Activity:** any of `product_events`, `websites.updated_at`, `import_jobs.updated_at` attributed to the user
-- **NOT** session/login retention (those events are incomplete)
+- **Cohort basis:** signup date (`profiles.created_at`), timezone **UTC**
+- **Activity-based (NOT session/login retention):** `product_events.occurred_at` OR `websites.updated_at` OR `import_jobs.updated_at`
+- **Cutoff:** analysis instant (`now`); all activity must satisfy `activity_at ≤ cutoff`
+- **Maturity (mandatory):** Day N / Week W only include members where `cutoff ≥ signupDay + N` (or `+ W*7`). Immature cells are **`pending`**, never `0%`
+- **Min sample:** `MIN_COHORT_SIZE` (5) on the **mature** subset → otherwise `insufficient_data`
 - Day 1 / 7 / 14 / 30 and weekly W0–W12
-- If cohort size `< MIN_COHORT_SIZE` (5) → **Insufficient data** (never fake 0%)
+
+Do not claim DAU/MAU/session retention without session telemetry.
 
 ## Cohort definition
 

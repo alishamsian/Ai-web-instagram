@@ -12,6 +12,14 @@ function pct(n: number | null) {
   return `${(n * 100).toFixed(1)}%`;
 }
 
+function cellLabel(status: string, rate: number | null) {
+  if (status === "pending") return "Pending (not mature)";
+  if (status === "insufficient_data") return "Insufficient data";
+  if (status === "error") return "Error";
+  if (status === "partial") return `${pct(rate)} (partial)`;
+  return pct(rate);
+}
+
 export default async function AdminRetentionPage({
   params,
   searchParams,
@@ -34,10 +42,17 @@ export default async function AdminRetentionPage({
         title={isFa ? "نگه‌داشت" : "Retention"}
         description={
           isFa
-            ? `Cohort بر اساس تاریخ signup. ${data.activityDefinition}`
-            : `Cohort basis: ${data.cohortBasis}. ${data.activityDefinition}`
+            ? `Cohort بر اساس تاریخ signup (UTC). ${data.activityDefinition}`
+            : `Cohort basis: ${data.cohortBasis} (UTC). Cutoff: ${data.cutoffAt}. ${data.activityDefinition}`
         }
       />
+
+      {data.status === "unavailable" || data.status === "error" ? (
+        <MetricUnavailable
+          label="Retention"
+          reason={data.reason ?? data.status}
+        />
+      ) : null}
 
       <AdminCard>
         <h3 className="text-sm font-medium text-[var(--admin-fg)]">
@@ -48,7 +63,8 @@ export default async function AdminRetentionPage({
             <MetricUnavailable
               label="Retention"
               reason={
-                isFa ? "داده کافی نیست" : "Insufficient or no cohort data"
+                data.reason ??
+                (isFa ? "داده کافی نیست" : "Insufficient or no cohort data")
               }
             />
           </div>
@@ -60,22 +76,20 @@ export default async function AdminRetentionPage({
                 className="rounded-lg border border-[var(--admin-border)] p-3"
               >
                 <p className="text-xs text-[var(--admin-muted)]">Day {d.day}</p>
-                {d.status === "insufficient_data" ? (
-                  <p className="mt-1 text-sm text-[var(--admin-muted)]">
-                    Insufficient data
-                  </p>
-                ) : (
-                  <p className="mt-1 tabular-nums text-lg text-[var(--admin-fg)]">
-                    {pct(d.rate)}
-                  </p>
-                )}
+                <p className="mt-1 text-sm text-[var(--admin-fg)]">
+                  {cellLabel(d.status, d.rate)}
+                </p>
                 <p className="mt-1 text-[11px] text-[var(--admin-muted)]">
-                  n={d.cohortSize}
+                  cohort={d.cohortSize} · mature={d.matureSize}
                   {d.retained != null ? ` · retained=${d.retained}` : ""}
                 </p>
                 <AdminStatusBadge
                   tone={
-                    d.status === "available" ? "success" : "neutral"
+                    d.status === "available"
+                      ? "success"
+                      : d.status === "pending"
+                        ? "info"
+                        : "neutral"
                   }
                 >
                   {d.status}
@@ -97,17 +111,11 @@ export default async function AdminRetentionPage({
               className="rounded-lg border border-[var(--admin-border)] p-3"
             >
               <p className="text-xs text-[var(--admin-muted)]">W{w.week}</p>
-              {w.status === "insufficient_data" ? (
-                <p className="mt-1 text-sm text-[var(--admin-muted)]">
-                  Insufficient data
-                </p>
-              ) : (
-                <p className="mt-1 tabular-nums text-lg text-[var(--admin-fg)]">
-                  {pct(w.rate)}
-                </p>
-              )}
+              <p className="mt-1 text-sm text-[var(--admin-fg)]">
+                {cellLabel(w.status, w.rate)}
+              </p>
               <p className="mt-1 text-[11px] text-[var(--admin-muted)]">
-                n={w.cohortSize}
+                cohort={w.cohortSize} · mature={w.matureSize}
               </p>
             </div>
           ))}
