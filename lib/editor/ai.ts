@@ -1,6 +1,8 @@
 /**
  * AI Co-Designer foundation — produces constrained EditorActions only.
  * Never emits HTML/CSS/JS. Never invents product facts.
+ *
+ * Deterministic intents live here ($0). LLM path is in lib/editor/ai/co-design.ts.
  */
 
 import type { WebsiteConfig } from "@/types/website";
@@ -26,26 +28,35 @@ const DIRECTION_TO_PRESET: Record<MagicDesignDirection, DesignPresetId> = {
   organic: "natural",
 };
 
+export type AiCoDesignerIntent =
+  | "restyle"
+  | "shorten_hero"
+  | "improve_cta"
+  | "translate_hero"
+  | "tighten_mobile_copy"
+  | "set_primary_black"
+  | "hide_selected"
+  | "show_selected"
+  | "make_friendly_cta"
+  | "make_professional_cta";
+
 export type AiCoDesignerRequest = {
-  intent:
-    | "restyle"
-    | "shorten_hero"
-    | "improve_cta"
-    | "translate_hero"
-    | "tighten_mobile_copy";
+  intent: AiCoDesignerIntent;
   direction?: MagicDesignDirection;
   locale?: "fa" | "en";
+  /** Required for selection-scoped intents */
+  selectedSectionId?: string | null;
 };
 
 /**
  * Deterministic structured suggestions — no network.
- * Real LLM providers can wrap this interface later.
  */
 export function proposeEditorActions(
   config: WebsiteConfig,
   request: AiCoDesignerRequest,
 ): EditorAction[] {
   const actions: EditorAction[] = [];
+  const selectedId = request.selectedSectionId ?? null;
 
   switch (request.intent) {
     case "restyle": {
@@ -73,7 +84,8 @@ export function proposeEditorActions(
       }
       break;
     }
-    case "improve_cta": {
+    case "improve_cta":
+    case "make_professional_cta": {
       const isFa = config.settings.language === "fa";
       actions.push({
         type: "setContentPath",
@@ -82,8 +94,16 @@ export function proposeEditorActions(
       });
       break;
     }
+    case "make_friendly_cta": {
+      const isFa = config.settings.language === "fa";
+      actions.push({
+        type: "setContentPath",
+        path: "content.hero.cta",
+        value: isFa ? "بزن بریم ببینیم" : "Come take a look",
+      });
+      break;
+    }
     case "translate_hero": {
-      // Only switch CTA/label style — do not invent brand claims
       const toEn = request.locale === "en" || config.settings.language === "fa";
       if (toEn) {
         actions.push({
@@ -105,6 +125,31 @@ export function proposeEditorActions(
       }
       break;
     }
+    case "set_primary_black": {
+      actions.push({
+        type: "setBrandColor",
+        key: "primary",
+        value: "#111111",
+      });
+      actions.push({
+        type: "setBrandColor",
+        key: "accent",
+        value: "#111111",
+      });
+      break;
+    }
+    case "hide_selected": {
+      if (selectedId) {
+        actions.push({ type: "hideSection", sectionId: selectedId });
+      }
+      break;
+    }
+    case "show_selected": {
+      if (selectedId) {
+        actions.push({ type: "showSection", sectionId: selectedId });
+      }
+      break;
+    }
     default:
       break;
   }
@@ -115,11 +160,23 @@ export function proposeEditorActions(
 /** Guard: AI must never emit product identity mutations. */
 export function isProductProtectedAction(action: EditorAction): boolean {
   if (action.type === "setContentPath") {
-    return action.path.startsWith("content.products.items");
+    return (
+      action.path.startsWith("content.products.items") ||
+      action.path.includes(".price")
+    );
   }
   if (action.type === "setSchemaValue") {
     const path = action.field.path ?? "";
     return path.includes("products.items") || path.includes("price");
   }
+  if (action.type === "patchSectionSettings") {
+    return Object.keys(action.patch).some(
+      (k) =>
+        k.toLowerCase().includes("price") ||
+        k.toLowerCase().includes("product"),
+    );
+  }
   return false;
 }
+
+export { DIRECTION_TO_PRESET };

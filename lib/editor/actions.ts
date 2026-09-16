@@ -21,6 +21,8 @@ import {
   commandSetContentPath,
   commandSetSchemaValue,
   commandSetSeoField,
+  commandSetSectionVariant,
+  commandPatchSectionSettings,
   commandToggleSection,
 } from "@/lib/editor/commands";
 import type { EditorCommandResult } from "@/lib/editor/types";
@@ -32,6 +34,12 @@ export type EditorAction =
   | { type: "setThemePreset"; presetId: DesignPresetId }
   | { type: "setBrandColor"; key: keyof WebsiteConfig["brand"]["colors"]; value: string }
   | { type: "setSeoField"; field: "title" | "description"; value: string }
+  | { type: "setSectionVariant"; sectionId: string; variantId: string }
+  | {
+      type: "patchSectionSettings";
+      sectionId: string;
+      patch: Record<string, unknown>;
+    }
   | { type: "moveSection"; sectionId: string; direction: "up" | "down" }
   | { type: "reorderSections"; fromIndex: number; toIndex: number }
   | { type: "duplicateSection"; sectionId: string }
@@ -108,6 +116,36 @@ export function applyEditorAction(
         ok: true,
         result: commandSetSeoField(config, action.field, action.value),
       };
+    }
+    case "setSectionVariant": {
+      const result = commandSetSectionVariant(
+        config,
+        action.sectionId,
+        action.variantId,
+      );
+      return result
+        ? { ok: true, result }
+        : { ok: false, reason: "Variant not supported" };
+    }
+    case "patchSectionSettings": {
+      const keys = Object.keys(action.patch);
+      if (
+        keys.some(
+          (k) =>
+            k.toLowerCase().includes("price") ||
+            k.toLowerCase().includes("product"),
+        )
+      ) {
+        return { ok: false, reason: "Protected settings patch" };
+      }
+      const result = commandPatchSectionSettings(
+        config,
+        action.sectionId,
+        action.patch,
+      );
+      return result
+        ? { ok: true, result }
+        : { ok: false, reason: "Settings patch failed" };
     }
     case "moveSection": {
       const result = commandMoveSection(

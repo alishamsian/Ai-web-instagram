@@ -139,7 +139,26 @@ export {
   isProductProtectedAction,
   type MagicDesignDirection,
   type AiCoDesignerRequest,
+  type AiCoDesignerIntent,
 } from "@/lib/editor/ai";
+
+export { buildAiEditorContext, type AiEditorContext } from "@/lib/editor/ai/context";
+export { routePromptToIntent, type PromptRouteResult } from "@/lib/editor/ai/intents";
+export {
+  parseAiActionsPayload,
+  type ParsedAiActionsResult,
+} from "@/lib/editor/ai/schema";
+export {
+  validateEditorActions,
+  summarizeActionsForUi,
+  type ActionValidationResult,
+} from "@/lib/editor/ai/validator";
+export {
+  executeAiActionBatch,
+  type ExecuteAiBatchResult,
+} from "@/lib/editor/ai/executor";
+// proposeCoDesign is server-only (uses AI telemetry / admin). Import from
+// `@/lib/editor/ai/co-design` in API routes — do not re-export here.
 
 export {
   resolveEditorKeyCommand,
