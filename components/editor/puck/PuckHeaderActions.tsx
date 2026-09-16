@@ -39,19 +39,29 @@ export function PuckHeaderActions({
   const isFa = locale === "fa";
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1.5">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <span
         className={cn(
-          "me-1 hidden rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline",
-          saveState === "saved" && "bg-emerald-500/15 text-emerald-700",
-          saveState === "saving" && "bg-sky-500/15 text-sky-700",
-          saveState === "dirty" && "bg-amber-500/15 text-amber-800",
-          saveState === "error" && "bg-red-500/15 text-red-700",
-          saveState === "idle" && "bg-zinc-500/10 text-zinc-500",
+          "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide uppercase sm:inline-flex",
+          saveState === "saved" && "bg-emerald-500/15 text-emerald-300",
+          saveState === "saving" && "bg-sky-500/15 text-sky-300",
+          saveState === "dirty" && "bg-amber-500/15 text-amber-200",
+          saveState === "error" && "bg-red-500/15 text-red-300",
+          saveState === "idle" && "bg-white/5 text-zinc-400",
         )}
       >
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            saveState === "saved" && "bg-emerald-400",
+            saveState === "saving" && "animate-pulse bg-sky-400",
+            saveState === "dirty" && "bg-amber-400",
+            saveState === "error" && "bg-red-400",
+            saveState === "idle" && "bg-zinc-500",
+          )}
+        />
         {saveState === "saving" ? (
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1 normal-case tracking-normal">
             <Loader2 className="size-3 animate-spin" />
             {isFa ? "ذخیره…" : "Saving…"}
           </span>
@@ -66,23 +76,37 @@ export function PuckHeaderActions({
         )}
       </span>
 
-      <HeaderBtn onClick={onOpenHistory} title={isFa ? "تاریخچه" : "History"}>
-        <History className="size-3.5" />
-      </HeaderBtn>
-      <HeaderBtn onClick={onOpenQuality} title={isFa ? "کیفیت" : "Quality"}>
-        <Gauge className="size-3.5" />
-      </HeaderBtn>
+      <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
+        <HeaderBtn onClick={onOpenHistory} title={isFa ? "تاریخچه" : "History"}>
+          <History className="size-3.5" />
+        </HeaderBtn>
+        <HeaderBtn onClick={onOpenQuality} title={isFa ? "کیفیت" : "Quality"}>
+          <Gauge className="size-3.5" />
+        </HeaderBtn>
+        <HeaderBtn onClick={onSave} title={isFa ? "ذخیره" : "Save"}>
+          <Save className="size-3.5" />
+        </HeaderBtn>
+      </div>
 
-      <HeaderBtn onClick={onSave} title={isFa ? "ذخیره" : "Save"} emphasis>
-        <Save className="size-3.5" />
-        <span className="hidden sm:inline">{isFa ? "ذخیره" : "Save"}</span>
-      </HeaderBtn>
-
-      <HeaderBtn
+      <button
+        type="button"
         onClick={onPublish}
         disabled={publishing}
-        title={isPublished ? (isFa ? "لغو انتشار" : "Unpublish") : isFa ? "انتشار" : "Publish"}
-        emphasis
+        title={
+          isPublished
+            ? isFa
+              ? "لغو انتشار"
+              : "Unpublish"
+            : isFa
+              ? "انتشار"
+              : "Publish"
+        }
+        className={cn(
+          "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition disabled:opacity-50",
+          isPublished
+            ? "border border-white/15 bg-transparent text-zinc-200 hover:bg-white/10"
+            : "bg-[var(--vitrin-accent,#c4a574)] text-zinc-950 hover:brightness-110",
+        )}
       >
         {publishing ? (
           <Loader2 className="size-3.5 animate-spin" />
@@ -91,26 +115,29 @@ export function PuckHeaderActions({
         ) : (
           isFa ? "انتشار" : "Publish"
         )}
-      </HeaderBtn>
+      </button>
 
-      <Link
-        href={`/${locale}/preview/${websiteId}`}
-        target="_blank"
-        className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-      >
-        <ExternalLink className="size-3.5" />
-        <span className="hidden sm:inline">{isFa ? "پیش‌نمایش" : "Preview"}</span>
-      </Link>
+      <div className="flex items-center gap-0.5 rounded-lg border border-white/10 bg-white/5 p-0.5">
+        <Link
+          href={`/${locale}/preview/${websiteId}`}
+          target="_blank"
+          title={isFa ? "پیش‌نمایش" : "Preview"}
+          className="inline-flex size-8 items-center justify-center rounded-md text-zinc-300 transition hover:bg-white/10 hover:text-white"
+        >
+          <ExternalLink className="size-3.5" />
+        </Link>
+        <Link
+          href={`/${locale}/editor/${websiteId}`}
+          title={isFa ? "ویرایشگر کلاسیک" : "Classic editor"}
+          className="inline-flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/10 hover:text-amber-200"
+        >
+          <ArrowLeftRight className="size-3.5" />
+        </Link>
+      </div>
 
-      <Link
-        href={`/${locale}/editor/${websiteId}`}
-        className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-950 hover:bg-amber-100"
-      >
-        <ArrowLeftRight className="size-3.5" />
-        <span className="hidden sm:inline">{isFa ? "کلاسیک" : "Classic"}</span>
-      </Link>
-
-      {children}
+      <div className="ms-0.5 flex items-center [&_button]:!text-zinc-300 [&_button:hover]:!bg-white/10 [&_button:hover]:!text-white">
+        {children}
+      </div>
     </div>
   );
 }
@@ -119,28 +146,18 @@ function HeaderBtn({
   children,
   onClick,
   title,
-  disabled,
-  emphasis,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   title: string;
-  disabled?: boolean;
-  emphasis?: boolean;
 }) {
   return (
     <button
       type="button"
       title={title}
       aria-label={title}
-      disabled={disabled}
       onClick={onClick}
-      className={cn(
-        "inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium transition disabled:opacity-50",
-        emphasis
-          ? "bg-zinc-900 text-white hover:bg-zinc-800"
-          : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50",
-      )}
+      className="inline-flex size-8 items-center justify-center rounded-md text-zinc-300 transition hover:bg-white/10 hover:text-white"
     >
       {children}
     </button>

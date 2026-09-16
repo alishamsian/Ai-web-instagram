@@ -104,22 +104,24 @@ export function PuckFieldsPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white text-zinc-900">
-      <div className="flex shrink-0 gap-0.5 overflow-x-auto border-b border-zinc-200 p-1.5">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={cn(
-              "shrink-0 rounded-md px-2 py-1.5 text-[11px] font-semibold transition",
-              tab === t.id
-                ? "bg-zinc-900 text-white"
-                : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800",
-            )}
-          >
-            {isFa ? t.fa : t.en}
-          </button>
-        ))}
+      <div className="shrink-0 border-b border-zinc-100 bg-zinc-50/80 px-2 py-2 backdrop-blur-sm">
+        <div className="flex gap-0.5 overflow-x-auto rounded-lg bg-white p-0.5 shadow-[0_0_0_1px_rgba(24,24,27,0.06)]">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-semibold tracking-tight transition",
+                tab === t.id
+                  ? "bg-zinc-900 text-white shadow-sm"
+                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800",
+              )}
+            >
+              {isFa ? t.fa : t.en}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -127,18 +129,18 @@ export function PuckFieldsPanel({
           <div className="space-y-4 p-3">
             {section ? (
               <>
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2.5">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">
+                    <p className="truncate text-sm font-semibold tracking-tight">
                       {humanSectionLabel(section, locale, def?.label ?? null)}
                     </p>
-                    <p className="font-mono text-[10px] text-zinc-400">
+                    <p className="mt-0.5 font-mono text-[10px] text-zinc-400">
                       {section.type}
                     </p>
                   </div>
                   <button
                     type="button"
-                    className="shrink-0 rounded-md border border-zinc-200 px-2 py-1 text-[11px] font-medium hover:bg-zinc-50"
+                    className="shrink-0 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium hover:bg-zinc-50"
                     onClick={() =>
                       bindToggleSectionVisibility({
                         config,

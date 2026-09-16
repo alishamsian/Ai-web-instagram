@@ -348,7 +348,7 @@ export function PuckAiBar({
               onClick={() => void apply()}
               className={cn(
                 "inline-flex items-center justify-center gap-1 rounded-md bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800",
-                sidebar && "flex-1",
+                sidebar && "flex-1 bg-[var(--vitrin-accent,#c4a574)] text-zinc-950 hover:brightness-110",
               )}
             >
               <Check className="size-3.5" />
@@ -391,12 +391,12 @@ export function PuckAiBar({
         {isFa ? "دستور AI" : "AI command"}
       </label>
       <div
-        className={cn(
-          "border border-zinc-300 bg-zinc-50 focus-within:border-zinc-900 focus-within:ring-1 focus-within:ring-zinc-900",
-          sidebar
-            ? "flex flex-col gap-2 rounded-xl p-3"
-            : "flex items-center gap-2 rounded-xl px-3 py-2",
-        )}
+          className={cn(
+            "border border-zinc-300 bg-zinc-50/90 focus-within:border-zinc-900 focus-within:ring-1 focus-within:ring-zinc-900",
+            sidebar
+              ? "flex flex-col gap-2 rounded-2xl p-3 shadow-[0_0_0_1px_rgba(24,24,27,0.03)]"
+              : "flex items-center gap-2 rounded-xl px-3 py-2",
+          )}
       >
         <div className={cn("flex items-start gap-2", sidebar && "w-full")}>
           <Sparkles
@@ -549,18 +549,20 @@ export function PuckAiBar({
         data-puck-ai-bar
         dir={isFa ? "rtl" : "ltr"}
       >
-        <div className="shrink-0 border-b border-zinc-100 px-3 py-3">
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900">
-            <Sparkles className="size-4 text-zinc-500" />
+        <div className="shrink-0 border-b border-zinc-100 bg-[linear-gradient(180deg,#111113_0%,#18181b_100%)] px-3 py-3.5 text-zinc-100">
+          <p className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span className="inline-flex size-7 items-center justify-center rounded-lg bg-[var(--vitrin-accent,#c4a574)]/20 text-[var(--vitrin-accent,#c4a574)]">
+              <Sparkles className="size-3.5" />
+            </span>
             {isFa ? "طراح هوشمند" : "AI Co-Designer"}
           </p>
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">
             {isFa
               ? "تغییر را بنویس؛ پیشنهاد را ببین و اعمال کن."
               : "Describe a change, review the proposal, then apply."}
           </p>
           {selectedSectionId ? (
-            <p className="mt-2 rounded-md bg-zinc-100 px-2 py-1 text-[10px] font-medium text-zinc-600">
+            <p className="mt-2.5 inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-medium text-zinc-300">
               {isFa ? "هدف: سکشن انتخاب‌شده" : "Target: selected section"}
             </p>
           ) : null}

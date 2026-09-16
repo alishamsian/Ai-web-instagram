@@ -1,7 +1,32 @@
-/* Puck editor — lean on official Puck chrome; polish canvas + AI bar */
+/* Vitrin × Puck — studio polish (keeps native Puck layout) */
 
 .puck-editor-shell {
-  --puck-editor-canvas-radius: 12px;
+  /* Slightly cooler, denser chrome than stock Puck */
+  --puck-color-surface: #ffffff;
+  --puck-color-surface-muted: #f4f4f5;
+  --puck-color-surface-subtle: #fafafa;
+  --puck-color-border: #e4e4e7;
+  --puck-color-border-muted: #f4f4f5;
+  --puck-color-text: #09090b;
+  --puck-color-text-secondary: #3f3f46;
+  --puck-color-text-muted: #71717a;
+  --puck-color-interactive: #18181b;
+  --puck-color-interactive-hover: #27272a;
+  --puck-color-interactive-active: #09090b;
+  --puck-color-interactive-subtle: #f4f4f5;
+  --puck-color-interactive-soft: #fafafa;
+  --puck-color-selection-bg: color-mix(in srgb, #18181b 8%, transparent);
+  --puck-color-selection-border: #a1a1aa;
+  --puck-color-line-placeholder: #52525b;
+  --puck-header-color-bg: #09090b;
+  --puck-header-color-text: #fafafa;
+  --puck-radius-m: 8px;
+  --puck-radius-l: 12px;
+  --puck-space-chrome-gutter: 12px;
+  --vitrin-accent: #c4a574;
+  --vitrin-stage: #ececee;
+  font-feature-settings: "ss01" on, "cv11" on;
+  -webkit-font-smoothing: antialiased;
 }
 
 .puck-editor-shell,
@@ -9,23 +34,79 @@
   box-sizing: border-box;
 }
 
-/* Full-height Puck root inside our shell */
 .puck-editor-shell > div,
 .puck-editor-shell [class*="_Puck"] {
   height: 100%;
   min-height: 0;
 }
 
-.puck-editor-shell .puck-preview-host {
-  min-height: 100%;
+/* ——— Header ——— */
+.puck-editor-shell [class*="_PuckHeader"] {
+  border-bottom-color: #1f1f23 !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.puck-editor-shell [class*="_PuckHeader-inner"] {
+  border-left-color: #27272a !important;
+  align-items: center !important;
+}
+
+.puck-editor-shell [class*="_PuckHeader-path"] {
+  color: #a1a1aa !important;
+  letter-spacing: 0.02em;
+}
+
+.puck-editor-shell [class*="_PuckHeader-title"] {
+  letter-spacing: -0.02em;
+}
+
+.puck-editor-shell [class*="_PuckHeader"] button,
+.puck-editor-shell [class*="_PuckHeader"] [class*="_IconButton"] {
+  color: #d4d4d8 !important;
+}
+
+.puck-editor-shell [class*="_PuckHeader"] button:hover,
+.puck-editor-shell [class*="_PuckHeader"] [class*="_IconButton"]:hover {
+  color: #fafafa !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ——— Plugin rail ——— */
+.puck-editor-shell [class*="_Nav_"],
+.puck-editor-shell [class*="_NavItem"] {
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.puck-editor-shell [class*="_NavItem"][aria-pressed="true"],
+.puck-editor-shell [class*="_NavItem"][data-active="true"] {
+  color: var(--vitrin-accent) !important;
+}
+
+/* ——— Canvas stage ——— */
+.puck-editor-shell [class*="_PuckCanvas"],
+.puck-editor-shell [class*="_PuckPreview"] {
+  background:
+    radial-gradient(900px 420px at 50% -10%, rgba(196, 165, 116, 0.12), transparent 60%),
+    radial-gradient(700px 480px at 100% 100%, rgba(24, 24, 27, 0.05), transparent 55%),
+    var(--vitrin-stage) !important;
+}
+
+.puck-editor-shell .puck-preview-host,
+.puck-editor-shell [class*="_PuckPreview-frame"] {
+  border-radius: 14px !important;
+  box-shadow:
+    0 0 0 1px rgba(24, 24, 27, 0.06),
+    0 18px 50px rgba(24, 24, 27, 0.12),
+    0 4px 12px rgba(24, 24, 27, 0.06) !important;
+  overflow: hidden;
   background: #fff;
 }
 
 .puck-editor-shell .vitrin-editor-canvas {
   position: relative;
+  min-height: 100%;
 }
 
-/* Section chrome should sit cleanly over store sections */
 .puck-editor-shell .editor-section-frame {
   outline-offset: -1px;
 }
@@ -34,22 +115,62 @@
   z-index: 5;
 }
 
-/* AI bar sits on top of Puck footer area */
-.puck-editor-shell [data-puck-ai-bar],
-.puck-editor-shell .puck-ai-bar {
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.04);
+/* ——— Sidebars ——— */
+.puck-editor-shell [class*="_RightSideBar"],
+.puck-editor-shell [class*="RightSideBar"],
+.puck-editor-shell [class*="_LeftSideBar"],
+.puck-editor-shell [class*="LeftSideBar"] {
+  background: #fff !important;
+  border-color: #e4e4e7 !important;
 }
 
-/* Right fields rail: remove double scroll jank */
 .puck-editor-shell [class*="_RightSideBar"],
 .puck-editor-shell [class*="RightSideBar"] {
   overflow: hidden !important;
 }
 
-/* Soften empty drop zones */
+.puck-editor-shell [class*="_SidebarSection"] {
+  border-color: #f4f4f5 !important;
+}
+
+/* Component drawer cards */
+.puck-editor-shell [class*="_DrawerItem"],
+.puck-editor-shell [class*="_ComponentList"] button {
+  border-radius: 10px !important;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.puck-editor-shell [class*="_DrawerItem"]:hover,
+.puck-editor-shell [class*="_ComponentList"] button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(24, 24, 27, 0.06);
+}
+
+/* Drop zones */
 .puck-editor-shell [class*="_DropZone"],
 .puck-editor-shell [class*="DropZone"] {
-  min-height: 48px;
+  min-height: 56px;
+  border-radius: 10px;
+}
+
+.puck-editor-shell [class*="_DropLine"] {
+  height: 3px !important;
+  border-radius: 999px;
+  background: var(--vitrin-accent) !important;
+}
+
+/* Action bar on selected blocks */
+.puck-editor-shell [class*="_ActionBar"] {
+  border-radius: 10px !important;
+  box-shadow: 0 10px 28px rgba(24, 24, 27, 0.18) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* AI sidebar */
+.puck-editor-shell [data-puck-ai-bar] {
+  background: linear-gradient(180deg, #fcfcfc 0%, #ffffff 40%);
+}
+
+.puck-editor-shell [data-puck-ai-bar] textarea:focus {
+  outline: none;
 }
