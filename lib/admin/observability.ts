@@ -22,7 +22,6 @@ export type SystemFailureInput = {
   workspaceId?: string | null;
   userId?: string | null;
   metadata?: Record<string, unknown>;
-  /** When true, also upsert/open a deduped incident for critical infra failures. */
   openIncidentIfCritical?: boolean;
 };
 
@@ -64,12 +63,10 @@ export type SecurityEventInput = {
   metadata?: Record<string, unknown>;
 };
 
-/** Create a safe correlation id (UUID). Never embed secrets. */
 export function newCorrelationId(): string {
   return randomUUID();
 }
 
-/** Deterministic fingerprint for error grouping — no raw stacks. */
 export function buildErrorFingerprint(input: {
   source: string;
   errorCode?: string | null;
@@ -78,8 +75,10 @@ export function buildErrorFingerprint(input: {
   const source = (input.source || "unknown").trim().toLowerCase().slice(0, 80);
   const code = (input.errorCode || "unknown").trim().toLowerCase().slice(0, 80);
   const normalized = normalizeMessage(input.message);
-  const raw = `${source}|${code}|${normalized}`;
-  return createHash("sha256").update(raw).digest("hex").slice(0, 32);
+  return createHash("sha256")
+    .update(`${source}|${code}|${normalized}`)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 function normalizeMessage(message: string | null | undefined): string {
@@ -102,19 +101,12 @@ function safeClientMessage(message: string | null | undefined): string | null {
     .slice(0, 300);
 }
 
-/**
- * Record a system failure into system_events + upsert error group.
- * Never throws to callers — failures are logged via logAdminFailure.
- */
+/** Record failure telemetry. Error-group aggregation is atomic in PostgreSQL. */
 export async function recordSystemFailure(
   input: SystemFailureInput,
 ): Promise<{ fingerprint: string; correlationId: string }> {
   const correlationId = input.correlationId ?? newCorrelationId();
-  const fingerprint = buildErrorFingerprint({
-    source: input.source,
-    errorCode: input.errorCode,
-    message: input.message,
-  });
+  const fingerprint = buildErrorFingerprint(input);
   const severity = input.severity ?? "warning";
   const sampleMessage = safeClientMessage(input.message);
 
@@ -138,35 +130,31 @@ export async function recordSystemFailure(
     if (supabaseConfigured()) {
       const db = getSupabaseAdmin();
       const now = new Date().toISOString();
-      const { data: existing } = await db
-        .from("admin_error_groups")
-        .select("id, occurrence_count, status")
-        .eq("fingerprint", fingerprint)
-        .maybeSingle();
+      const { data, error } = await db.rpc("upsert_admin_error_group", {
+        p_fingerprint: fingerprint,
+        p_source: input.source,
+        p_error_code: input.errorCode ?? null,
+        p_normalized_message: normalizeMessage(input.message) || null,
+        p_severity: severity,
+        p_now: now,
+        p_correlation_id: correlationId,
+        p_resource_type: input.resourceType ?? null,
+        p_resource_id: input.resourceId ?? null,
+        p_workspace_id: input.workspaceId ?? null,
+        p_sample_message: sampleMessage,
+      });
 
-      if (existing?.id) {
-        const nextCount = Number(existing.occurrence_count ?? 1) + 1;
-        await db
-          .from("admin_error_groups")
-          .update({
-            occurrence_count: nextCount,
-            last_seen_at: now,
-            last_correlation_id: correlationId,
-            last_resource_type: input.resourceType ?? null,
-            last_resource_id: input.resourceId ?? null,
-            last_workspace_id: input.workspaceId ?? null,
-            sample_message: sampleMessage,
-            severity,
-            updated_at: now,
-            status: existing.status === "resolved" ? "open" : existing.status,
-          })
-          .eq("id", existing.id);
-
-        // Auto-incident only for repeated critical failures (never a single blip).
+      if (error) {
+        if (!/upsert_admin_error_group|schema cache|does not exist/i.test(error.message)) {
+          logAdminFailure("observability.error_groups.upsert", error.message);
+        }
+      } else {
+        const row = Array.isArray(data) ? data[0] : data;
+        const count = Number(row?.occurrence_count ?? 1);
         if (
           input.openIncidentIfCritical &&
           severity === "critical" &&
-          nextCount >= 5
+          count >= 5
         ) {
           await maybeOpenIncidentForFingerprint({
             fingerprint,
@@ -176,29 +164,6 @@ export async function recordSystemFailure(
             correlationId,
             severity,
           });
-        }
-      } else {
-        const { error: insertErr } = await db.from("admin_error_groups").insert({
-          fingerprint,
-          source: input.source,
-          error_code: input.errorCode ?? null,
-          normalized_message: normalizeMessage(input.message) || null,
-          severity,
-          occurrence_count: 1,
-          first_seen_at: now,
-          last_seen_at: now,
-          last_correlation_id: correlationId,
-          last_resource_type: input.resourceType ?? null,
-          last_resource_id: input.resourceId ?? null,
-          last_workspace_id: input.workspaceId ?? null,
-          sample_message: sampleMessage,
-          status: "open",
-        });
-        if (
-          insertErr &&
-          !/admin_error_groups|schema cache|does not exist/i.test(insertErr.message)
-        ) {
-          logAdminFailure("observability.error_groups.insert", insertErr.message);
         }
       }
     }
@@ -255,10 +220,7 @@ async function maybeOpenIncidentForFingerprint(input: {
     .maybeSingle();
   if (open?.id) return;
 
-  const title = `[${input.source}] ${input.errorCode ?? "critical failure"}`.slice(
-    0,
-    200,
-  );
+  const title = `[${input.source}] ${input.errorCode ?? "critical failure"}`.slice(0, 200);
   await db.from("admin_incidents").insert({
     title,
     severity: input.severity === "critical" ? "critical" : "warning",
@@ -267,19 +229,15 @@ async function maybeOpenIncidentForFingerprint(input: {
     summary: input.message,
     correlation_id: input.correlationId,
     root_fingerprint: input.fingerprint,
-    timeline: [
-      {
-        at: new Date().toISOString(),
-        actor: "system",
-        text: "Auto-opened from repeated/critical system failure",
-      },
-    ],
+    timeline: [{
+      at: new Date().toISOString(),
+      actor: "system",
+      text: "Auto-opened from repeated/critical system failure",
+    }],
   });
 }
 
-export async function recordCronRun(
-  input: CronRunInput,
-): Promise<{ id: string | null }> {
+export async function recordCronRun(input: CronRunInput): Promise<{ id: string | null }> {
   if (!supabaseConfigured()) return { id: null };
   try {
     const db = getSupabaseAdmin();
@@ -321,10 +279,7 @@ export async function recordCronRun(
       .select("id")
       .single();
     if (error) {
-      // Pre-migration environments: table may not exist yet.
-      if (/cron_runs|schema cache|does not exist/i.test(error.message)) {
-        return { id: null };
-      }
+      if (/cron_runs|schema cache|does not exist/i.test(error.message)) return { id: null };
       logAdminFailure("observability.cron_runs.insert", error.message);
       return { id: null };
     }
@@ -335,9 +290,7 @@ export async function recordCronRun(
   }
 }
 
-export async function recordSecurityEvent(
-  input: SecurityEventInput,
-): Promise<void> {
+export async function recordSecurityEvent(input: SecurityEventInput): Promise<void> {
   if (!supabaseConfigured()) return;
   try {
     const db = getSupabaseAdmin();
@@ -355,9 +308,7 @@ export async function recordSecurityEvent(
       occurred_at: new Date().toISOString(),
     });
     if (error) {
-      if (/security_events|schema cache|does not exist/i.test(error.message)) {
-        return;
-      }
+      if (/security_events|schema cache|does not exist/i.test(error.message)) return;
       logAdminFailure("observability.security_events", error.message);
     }
   } catch (error) {
