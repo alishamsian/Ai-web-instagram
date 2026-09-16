@@ -1,0 +1,260 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import {
+  median,
+  conversionRate,
+  retentionPercent,
+  isRetainedOnDay,
+  isRetainedInWeek,
+  ACTIVATION_DEFINITION,
+} from "@/lib/admin/intelligence/metrics";
+import { computeHealthScore, HEALTH_WEIGHTS } from "@/lib/admin/intelligence/health-score";
+import { resolveLifecycle } from "@/lib/admin/intelligence/lifecycle";
+import { detectAtRisk } from "@/lib/admin/intelligence/at-risk";
+import { generateFounderInsights } from "@/lib/admin/intelligence/founder-insights";
+import { assessDataQuality } from "@/lib/admin/intelligence/data-quality";
+import { adoptionRate } from "@/lib/admin/intelligence/features";
+import {
+  MAX_ANALYTICS_DAYS,
+  MIN_COHORT_SIZE,
+  ANALYTICS_SAMPLE_CAP,
+  FOUNDER_INSIGHTS_CAP,
+  clampAnalyticsPreset,
+} from "@/lib/admin/intelligence/limits";
+import { roleHasPermission } from "@/lib/admin/permissions";
+import { detectAiAnomalies, percentileSorted } from "@/lib/admin/phase4-anomalies";
+
+const root = process.cwd();
+const read = (path: string) => readFileSync(join(root, path), "utf8");
+
+describe("Phase 6 — activation / funnel math", () => {
+  it("defines activation from real tables, not invented events", () => {
+    expect(ACTIVATION_DEFINITION.id).toBe("v1_publish_or_successful_import");
+    expect(ACTIVATION_DEFINITION.description).toMatch(/websites/);
+  });
+
+  it("computes conversion and median honestly", () => {
+    expect(conversionRate(2, 10)).toBe(0.2);
+    expect(conversionRate(1, 0)).toBeNull();
+    expect(median([])).toBeNull();
+    expect(median([1, 3, 2])).toBe(2);
+    expect(median([1, 2, 3, 4])).toBe(2.5);
+  });
+});
+
+describe("Phase 6 — retention / cohorts", () => {
+  it("requires minimum cohort size before showing retention %", () => {
+    const small = retentionPercent(1, MIN_COHORT_SIZE - 1);
+    expect(small.status).toBe("insufficient_data");
+    expect(small.value).toBeNull();
+    const ok = retentionPercent(3, MIN_COHORT_SIZE);
+    expect(ok.status).toBe("available");
+    expect(ok.value).toBe(3 / MIN_COHORT_SIZE);
+  });
+
+  it("day/week retention matching is UTC calendar based", () => {
+    expect(
+      isRetainedOnDay("2026-01-01T10:00:00Z", "2026-01-02T08:00:00Z", 1),
+    ).toBe(true);
+    expect(
+      isRetainedOnDay("2026-01-01T10:00:00Z", "2026-01-03T08:00:00Z", 1),
+    ).toBe(false);
+    expect(
+      isRetainedInWeek("2026-01-01T00:00:00Z", "2026-01-10T00:00:00Z", 1),
+    ).toBe(true);
+  });
+});
+
+describe("Phase 6 — feature adoption", () => {
+  it("adoption rate null when eligible is zero", () => {
+    expect(adoptionRate(5, 0)).toBeNull();
+    expect(adoptionRate(5, 10)).toBe(0.5);
+  });
+});
+
+describe("Phase 6 — health / lifecycle / risk", () => {
+  it("health score is explainable with central weights", () => {
+    expect(HEALTH_WEIGHTS.publishedWebsite).toBeGreaterThan(0);
+    const healthy = computeHealthScore({
+      daysSinceActivity: 1,
+      hasPublishedWebsite: true,
+      hasWebsite: true,
+      successfulImports: 2,
+      failedJobsRecent: 0,
+      aiRequestsRecent: 3,
+      publicationCount: 1,
+    });
+    expect(healthy.category).toBe("healthy");
+    expect(healthy.score).not.toBeNull();
+    expect(healthy.breakdown.length).toBeGreaterThan(0);
+
+    const insufficient = computeHealthScore({
+      daysSinceActivity: null,
+      hasPublishedWebsite: false,
+      hasWebsite: false,
+      successfulImports: 0,
+      failedJobsRecent: 0,
+      aiRequestsRecent: 0,
+      publicationCount: 0,
+      insufficientSignals: true,
+    });
+    expect(insufficient.category).toBe("insufficient_data");
+    expect(insufficient.score).toBeNull();
+  });
+
+  it("lifecycle and at-risk rules are deterministic", () => {
+    const life = resolveLifecycle({
+      ageDays: 40,
+      hasWebsite: true,
+      hasPublishedWebsite: true,
+      successfulImports: 1,
+      daysSinceActivity: 35,
+      aiRequestsRecent: 0,
+      publicationCount: 0,
+      websiteCount: 1,
+      healthCategory: "neutral",
+    });
+    expect(life.stage).toBe("dormant");
+    expect(life.reasons[0]).toMatch(/inactive/);
+
+    const flags = detectAtRisk({
+      daysSinceActivity: 20,
+      lastActivityAt: "2026-01-01T00:00:00Z",
+      hasPublishedWebsite: true,
+      hasWebsite: true,
+      successfulImports: 0,
+      failedImports: 4,
+      failedJobsRecent: 4,
+      publishingFailuresRecent: 0,
+      ageDays: 30,
+      activityRecent: 1,
+      activityPrevious: 10,
+    });
+    expect(flags.some((f) => f.code === "published_then_inactive")).toBe(true);
+    expect(flags.some((f) => f.code === "repeated_import_failure")).toBe(true);
+    expect(flags.every((f) => f.reason && f.evidence)).toBe(true);
+  });
+});
+
+describe("Phase 6 — AI anomalies / percentiles", () => {
+  it("reuses phase4 deterministic anomaly detection", () => {
+    const anomalies = detectAiAnomalies({
+      recentRequests: 50,
+      recentFailures: 20,
+      recentErrorRate: 0.4,
+      recentP95: 2000,
+      recentTokens: 1000,
+      recentCost: 5,
+      baselineRequests: 50,
+      baselineFailures: 2,
+      baselineErrorRate: 0.04,
+      baselineP95: 500,
+      baselineTokens: 1000,
+      baselineCost: 2,
+      modelFailureShare: [],
+      featureVolume: [],
+      windowLabel: "24h",
+      detectedAt: new Date().toISOString(),
+    });
+    expect(anomalies.some((a) => a.kind === "error_spike")).toBe(true);
+    expect(percentileSorted([1, 2, 3, 4, 5], 50)).toBe(3);
+  });
+});
+
+describe("Phase 6 — founder insights", () => {
+  it("is deterministic, capped, and skips fake deltas", () => {
+    const insights = generateFounderInsights({
+      generatedAt: "2026-09-16T00:00:00Z",
+      activationRate: 0.5,
+      previousActivationRate: null,
+      day7Retention: null,
+      previousDay7Retention: null,
+      failedJobs24h: 30,
+      previousFailedJobs24h: 10,
+      queueDepth: 25,
+      aiErrorRate: null,
+      previousAiErrorRate: null,
+      atRiskCount: 8,
+      publishingFailures24h: null,
+      previousPublishingFailures24h: null,
+    });
+    expect(insights.length).toBeLessThanOrEqual(FOUNDER_INSIGHTS_CAP);
+    expect(insights.some((i) => i.type === "error_spike")).toBe(true);
+    expect(insights.some((i) => i.type === "queue_backlog")).toBe(true);
+    expect(insights.some((i) => i.type === "activation_drop")).toBe(false);
+  });
+});
+
+describe("Phase 6 — data quality separate from metrics", () => {
+  it("flags missing billing as DQ, not $0 revenue", () => {
+    const issues = assessDataQuality({
+      eventsMissingTimestamp: 0,
+      eventsInvalidUserRef: 0,
+      eventsDuplicateFingerprints: 0,
+      staleTelemetryHours: 48,
+      aiUsageMissingCost: 3,
+      billingAmountMissing: true,
+      productEventsSampleSize: 10,
+    });
+    expect(issues.some((i) => i.code === "missing_billing_data")).toBe(true);
+    expect(issues.some((i) => i.code === "stale_telemetry")).toBe(true);
+  });
+});
+
+describe("Phase 6 — performance bounds", () => {
+  it("clamps long presets and documents caps", () => {
+    expect(clampAnalyticsPreset("12m")).toBe("90d");
+    expect(clampAnalyticsPreset("6m")).toBe("90d");
+    expect(clampAnalyticsPreset("30d")).toBe("30d");
+    expect(MAX_ANALYTICS_DAYS).toBe(90);
+    expect(ANALYTICS_SAMPLE_CAP).toBe(5000);
+    const src = read("lib/admin/phase6-queries.ts");
+    expect(src).toMatch(/ANALYTICS_SAMPLE_CAP/);
+    expect(src).toMatch(/assertRangeBounded/);
+    expect(src).not.toMatch(/select\("\*"\)/);
+  });
+});
+
+describe("Phase 6 — security / instrumentation", () => {
+  it("ANALYST remains read-only for mutations", () => {
+    expect(roleHasPermission("ANALYST", "system.read")).toBe(true);
+    expect(roleHasPermission("ANALYST", "system.manage")).toBe(false);
+    expect(roleHasPermission("ANALYST", "jobs.retry")).toBe(false);
+  });
+
+  it("instruments signup/publish/edit/domain without PII in metadata", () => {
+    const auth = read("app/api/auth/route.ts");
+    expect(auth).toMatch(/recordProductEvent/);
+    expect(auth).toMatch(/signup/);
+    expect(auth).not.toMatch(/metadata:.*email/);
+
+    const publish = read("app/api/websites/[id]/publish/route.ts");
+    expect(publish).toMatch(/website_published/);
+
+    const edit = read("app/api/websites/[id]/route.ts");
+    expect(edit).toMatch(/website_edited/);
+
+    const domain = read("app/api/websites/[id]/domain/route.ts");
+    expect(domain).toMatch(/domain_connected/);
+    expect(domain).toMatch(/hostLength/);
+    expect(domain).not.toMatch(/metadata:.*host:/);
+  });
+
+  it("migration is additive with indexes", () => {
+    expect(
+      existsSync(join(root, "supabase/migrations/20260916120000_admin_phase6.sql")),
+    ).toBe(true);
+    const mig = read("supabase/migrations/20260916120000_admin_phase6.sql");
+    expect(mig).toMatch(/create index if not exists/);
+    expect(mig).not.toMatch(/drop table/i);
+  });
+
+  it("dashboard stays lite and docs exist", () => {
+    const page = read("app/[locale]/admin/dashboard/page.tsx");
+    expect(page).toMatch(/getAdminDashboardKpisLite/);
+    expect(page).toMatch(/getFounderInsightsLite/);
+    expect(page).not.toMatch(/getAdminAiOverview/);
+    expect(existsSync(join(root, "docs/admin-phase6.md"))).toBe(true);
+  });
+});

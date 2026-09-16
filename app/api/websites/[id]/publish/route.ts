@@ -51,5 +51,14 @@ export async function POST(
     websiteId: id,
     workspaceId: session.workspace.id,
   });
+  const { recordProductEvent } = await import("@/lib/admin/events");
+  void recordProductEvent({
+    eventName: published ? "website_published" : "website_unpublished",
+    userId: session.user.id,
+    workspaceId: session.workspace.id,
+    websiteId: id,
+    resourceType: "website",
+    resourceId: id,
+  });
   return NextResponse.json(updated);
 }

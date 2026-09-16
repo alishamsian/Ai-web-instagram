@@ -150,6 +150,11 @@ export async function POST(request: Request) {
     if (!limited.ok) return rateLimited(limited.retryAfterSec);
 
     try {
+      const { recordProductEvent } = await import("@/lib/admin/events");
+      void recordProductEvent({
+        eventName: "signup_started",
+        metadata: { source: "auth_api" },
+      });
       const result = await signUpWithPassword({
         email,
         password,
@@ -167,6 +172,12 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      void recordProductEvent({
+        eventName: "signup",
+        userId: result.session.user.id,
+        workspaceId: result.session.workspace.id,
+        metadata: { source: "auth_api" },
+      });
       return NextResponse.json({ user: result.session.user });
     } catch (error) {
       console.error("[auth] signup", error);

@@ -86,6 +86,16 @@ export async function POST(
 
   if (conflict) return NextResponse.json({ error: "HOST_TAKEN" }, { status: 409 });
   if (!created) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  const { recordProductEvent } = await import("@/lib/admin/events");
+  void recordProductEvent({
+    eventName: "domain_connected",
+    userId: session.user.id,
+    workspaceId: session.workspace.id,
+    websiteId: id,
+    resourceType: "domain",
+    resourceId: created.id,
+    metadata: { hostLength: host.length },
+  });
   return NextResponse.json(created);
 }
 

@@ -1,6 +1,7 @@
 import type { DashboardKpis } from "@/lib/admin/contracts";
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
 import type { OpsDashboardSignals } from "@/lib/admin/phase5-contracts";
+import type { FounderInsight } from "@/lib/admin/intelligence/founder-insights";
 import { AdminPageHeader, AdminSection, AdminStatusBadge } from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { MetricCell } from "@/components/admin/phase4/MetricCell";
@@ -15,12 +16,14 @@ export function FounderDashboardLite({
   kpis,
   infra,
   ops,
+  insights,
 }: {
   locale: Locale;
   role: AdminRole;
   kpis: DashboardKpis;
   infra: InfrastructureOverview;
   ops?: OpsDashboardSignals;
+  insights?: FounderInsight[];
 }) {
   void role;
   const isFa = locale === "fa";
@@ -73,6 +76,44 @@ export function FounderDashboardLite({
         </AdminSection>
       ) : null}
 
+      {insights && insights.length > 0 ? (
+        <AdminSection
+          title={isFa ? "بینش‌های عملیاتی" : "Founder Insights"}
+          description={isFa ? "حداکثر ۵ سیگنال قطعی — بدون LLM برای fact" : "Top actionable deterministic signals — no LLM facts"}
+        >
+          <ul className="space-y-2">
+            {insights.slice(0, 5).map((insight) => (
+              <li key={`${insight.type}:${insight.metric}`}>
+                <Link
+                  href={adminHref(locale, insight.href ?? "/analytics")}
+                  prefetch={false}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] px-4 py-3 text-sm hover:bg-[var(--admin-muted-bg)]/50"
+                >
+                  <div>
+                    <p className="font-medium text-[var(--admin-fg)]">{insight.title}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--admin-muted)]">{insight.summary}</p>
+                    <p className="mt-1 text-[10px] text-[var(--admin-muted)]">
+                      {insight.evidence.slice(0, 2).join(" · ")}
+                    </p>
+                  </div>
+                  <AdminStatusBadge
+                    tone={
+                      insight.severity === "critical"
+                        ? "danger"
+                        : insight.severity === "warning"
+                          ? "warning"
+                          : "info"
+                    }
+                  >
+                    {insight.severity}
+                  </AdminStatusBadge>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </AdminSection>
+      ) : null}
+
       <AdminSection title={isFa ? "شاخص‌های اصلی" : "Primary KPIs"} description={isFa ? "منابع واقعی؛ بدون اسکن سنگین AI" : "Real sources; no heavy AI scan"}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <AdminMetricCard label={isFa ? "کاربران جدید" : "New Users"} comparable={kpis.newUsers} href={adminHref(locale, "/users")} />
@@ -120,6 +161,8 @@ export function FounderDashboardLite({
       </AdminSection>
 
       <div className="flex flex-wrap gap-2 text-xs text-[var(--admin-muted)]">
+        <Link href={adminHref(locale, "/analytics")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "هوش تحلیلی" : "Analytics"}</Link>
+        <Link href={adminHref(locale, "/health")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "سلامت مشتری" : "Customer health"}</Link>
         <Link href={adminHref(locale, "/ai")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "AI Control Center" : "AI Control Center"}</Link>
         <Link href={adminHref(locale, "/ai/anomalies")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "ناهنجاری‌ها" : "AI Anomalies"}</Link>
         <Link href={adminHref(locale, "/jobs")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "جاب‌ها" : "Jobs"}</Link>

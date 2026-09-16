@@ -2,30 +2,47 @@ import "server-only";
 
 import { getSupabaseAdmin, supabaseConfigured } from "@/lib/supabase/admin";
 
-/** Canonical product event names. */
+/**
+ * Canonical product event names.
+ * Prefer these over parallel aliases — Phase 6 reuses existing taxonomy.
+ * Aliases (documented only): signup_completed→signup, editor_saved→website_edited,
+ * ai_request_*→ai_generation_*, publication_*→content_published / system publishing tables.
+ */
 export const PRODUCT_EVENT_NAMES = [
   "signup",
+  "signup_started",
   "login",
   "logout",
+  "dashboard_viewed",
   "instagram_connected",
   "import_started",
   "import_completed",
   "import_failed",
   "website_created",
   "website_edited",
+  "website_previewed",
   "website_published",
   "website_unpublished",
+  "website_updated",
   "domain_connected",
   "domain_verified",
+  "editor_opened",
   "content_created",
   "content_published",
+  "publication_created",
+  "publication_scheduled",
+  "publication_published",
+  "publication_failed",
   "ai_generation_started",
   "ai_generation_completed",
   "ai_generation_failed",
+  "plan_viewed",
+  "checkout_started",
   "subscription_started",
   "subscription_upgraded",
   "subscription_downgraded",
   "subscription_canceled",
+  "subscription_changed",
   "order_created",
   "order_paid",
   "order_refunded",

@@ -219,15 +219,15 @@ describe("Admin Phase 3 — Business + Product Intelligence", () => {
     }
   });
 
-  it("retention/cohorts pages mark instrumentation gaps", () => {
+  it("retention/cohorts/funnels use Phase 6 intelligence (honest gaps)", () => {
     expect(read("app/[locale]/admin/analytics/retention/page.tsx")).toMatch(
-      /MetricUnavailable|instrument/i,
+      /getRetentionIntelligence|Insufficient data/i,
     );
     expect(read("app/[locale]/admin/analytics/cohorts/page.tsx")).toMatch(
-      /MetricUnavailable|instrument/i,
+      /getCohortTable|Insufficient data|MetricUnavailable/i,
     );
     expect(read("app/[locale]/admin/analytics/funnels/page.tsx")).toMatch(
-      /getAdminFunnelView/,
+      /getFunnelIntelligence/,
     );
   });
 

@@ -2,12 +2,14 @@ import { requireAdminPage } from "@/lib/admin/gate";
 import { getAdminDashboardKpisLite } from "@/lib/admin/dashboard-lite";
 import { getAdminDashboardSystemStrip } from "@/lib/admin/dashboard-strip";
 import { getAdminOpsDashboardSignals } from "@/lib/admin/phase5-queries";
+import { getFounderInsightsLite } from "@/lib/admin/phase6-queries";
 import { FounderDashboardLite } from "@/components/admin/FounderDashboardLite";
 import { settledValue } from "@/lib/admin/safe";
 import { resolveDateRange, resolveComparisonPeriod, type DateRangePreset } from "@/lib/admin/dates";
 import type { DashboardKpis, MetricResult, ComparableMetric } from "@/lib/admin/contracts";
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
 import type { OpsDashboardSignals } from "@/lib/admin/phase5-contracts";
+import type { FounderInsight } from "@/lib/admin/intelligence/founder-insights";
 
 function u(reason = "Temporarily unavailable"): MetricResult<number> {
   return { status: "unavailable", reason };
@@ -77,23 +79,29 @@ export default async function AdminDashboardPage({
   const { actor, locale, userId } = await requireAdminPage(raw, "system.read");
   const preset = (sp.range as DateRangePreset) || "30d";
 
-  const [kpisSettled, infraSettled, opsSettled] = await Promise.allSettled([
-    settledValue(
-      "dashboard.kpis",
-      getAdminDashboardKpisLite({ userId, preset }),
-      emptyKpis(preset),
-    ),
-    settledValue(
-      "dashboard.strip",
-      getAdminDashboardSystemStrip({ userId }),
-      emptyInfra(),
-    ),
-    settledValue(
-      "dashboard.opsSignals",
-      getAdminOpsDashboardSignals({ userId }),
-      emptyOps(),
-    ),
-  ]);
+  const [kpisSettled, infraSettled, opsSettled, insightsSettled] =
+    await Promise.allSettled([
+      settledValue(
+        "dashboard.kpis",
+        getAdminDashboardKpisLite({ userId, preset }),
+        emptyKpis(preset),
+      ),
+      settledValue(
+        "dashboard.strip",
+        getAdminDashboardSystemStrip({ userId }),
+        emptyInfra(),
+      ),
+      settledValue(
+        "dashboard.opsSignals",
+        getAdminOpsDashboardSignals({ userId }),
+        emptyOps(),
+      ),
+      settledValue(
+        "dashboard.insights",
+        getFounderInsightsLite({ userId }),
+        { insights: [] as FounderInsight[], note: "unavailable" },
+      ),
+    ]);
 
   const kpis =
     kpisSettled.status === "fulfilled" ? kpisSettled.value.value : emptyKpis(preset);
@@ -101,6 +109,10 @@ export default async function AdminDashboardPage({
     infraSettled.status === "fulfilled" ? infraSettled.value.value : emptyInfra();
   const ops =
     opsSettled.status === "fulfilled" ? opsSettled.value.value : emptyOps();
+  const insights =
+    insightsSettled.status === "fulfilled"
+      ? insightsSettled.value.value.insights
+      : [];
 
   return (
     <FounderDashboardLite
@@ -109,6 +121,7 @@ export default async function AdminDashboardPage({
       kpis={kpis}
       infra={infra}
       ops={ops}
+      insights={insights}
     />
   );
 }

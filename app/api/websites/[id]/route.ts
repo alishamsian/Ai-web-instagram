@@ -116,6 +116,17 @@ export async function PATCH(
     );
   }
   if (!updated) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (body.config) {
+    const { recordProductEvent } = await import("@/lib/admin/events");
+    void recordProductEvent({
+      eventName: "website_edited",
+      userId: session.user.id,
+      workspaceId: session.workspace.id,
+      websiteId: id,
+      resourceType: "website",
+      resourceId: id,
+    });
+  }
   return NextResponse.json(updated);
 }
 
