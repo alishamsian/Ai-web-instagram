@@ -3,6 +3,7 @@ import { getAdminDashboardKpisLite } from "@/lib/admin/dashboard-lite";
 import { getAdminDashboardSystemStrip } from "@/lib/admin/dashboard-strip";
 import { getAdminOpsDashboardSignals } from "@/lib/admin/phase5-queries";
 import { getFounderInsightsLite } from "@/lib/admin/phase6-queries";
+import { getFounderBillingSummary } from "@/lib/admin/phase7-queries";
 import { FounderDashboardLite } from "@/components/admin/FounderDashboardLite";
 import { settledValue } from "@/lib/admin/safe";
 import { resolveDateRange, resolveComparisonPeriod, type DateRangePreset } from "@/lib/admin/dates";
@@ -10,6 +11,7 @@ import type { DashboardKpis, MetricResult, ComparableMetric } from "@/lib/admin/
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
 import type { OpsDashboardSignals } from "@/lib/admin/phase5-contracts";
 import type { FounderInsight } from "@/lib/admin/intelligence/founder-insights";
+import type { FounderBillingSummary } from "@/lib/admin/phase7-queries";
 
 function u(reason = "Temporarily unavailable"): MetricResult<number> {
   return { status: "unavailable", reason };
@@ -67,6 +69,17 @@ function emptyOps(): OpsDashboardSignals {
   };
 }
 
+function emptyBilling(): FounderBillingSummary {
+  const m = u("Temporarily unavailable");
+  return {
+    mrr: m,
+    paidWorkspaces: m,
+    failedPayments7d: m,
+    webhookFailed7d: m,
+    atRiskPastDue: m,
+  };
+}
+
 export default async function AdminDashboardPage({
   params,
   searchParams,
@@ -79,7 +92,7 @@ export default async function AdminDashboardPage({
   const { actor, locale, userId } = await requireAdminPage(raw, "system.read");
   const preset = (sp.range as DateRangePreset) || "30d";
 
-  const [kpisSettled, infraSettled, opsSettled, insightsSettled] =
+  const [kpisSettled, infraSettled, opsSettled, insightsSettled, billingSettled] =
     await Promise.allSettled([
       settledValue(
         "dashboard.kpis",
@@ -105,6 +118,11 @@ export default async function AdminDashboardPage({
           atRisk: { status: "unavailable" as const, reason: "Temporarily unavailable" },
         },
       ),
+      settledValue(
+        "dashboard.billing",
+        getFounderBillingSummary({ userId }),
+        emptyBilling(),
+      ),
     ]);
 
   const kpis =
@@ -124,6 +142,10 @@ export default async function AdminDashboardPage({
             reason: "Temporarily unavailable",
           },
         };
+  const billing =
+    billingSettled.status === "fulfilled"
+      ? billingSettled.value.value
+      : emptyBilling();
   const insights = insightsResult.insights;
   return (
     <FounderDashboardLite
@@ -134,6 +156,7 @@ export default async function AdminDashboardPage({
       ops={ops}
       insights={insights}
       atRisk={insightsResult.atRisk}
+      billing={billing}
     />
   );
 }

@@ -642,6 +642,7 @@ export async function processImportJob(
     imported.websiteConfig = config;
 
     let websiteId = generatedWebsiteId;
+    let websiteNewlyCreated = false;
 
     await writeStore((draft) => {
       const current = draft.imports.find((item) => item.id === imported.id);
@@ -689,6 +690,7 @@ export async function processImportJob(
           status: prev.status,
         });
       } else {
+        websiteNewlyCreated = true;
         const createdAt = now();
         draft.websites.unshift({
           id: generatedWebsiteId,
@@ -734,6 +736,17 @@ export async function processImportJob(
       resourceType: "import_job",
       resourceId: jobId,
     });
+    if (websiteNewlyCreated) {
+      void recordProductEvent({
+        eventName: "website_created",
+        userId: job.userId,
+        workspaceId: job.workspaceId,
+        websiteId,
+        resourceType: "website",
+        resourceId: websiteId,
+        metadata: { source: "import_job" },
+      });
+    }
     void recordUsageEvent({
       feature: "instagram_imports",
       workspaceId: job.workspaceId,

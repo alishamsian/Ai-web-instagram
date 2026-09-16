@@ -2,6 +2,7 @@ import type { DashboardKpis, MetricResult } from "@/lib/admin/contracts";
 import type { InfrastructureOverview } from "@/lib/admin/phase4-contracts";
 import type { OpsDashboardSignals } from "@/lib/admin/phase5-contracts";
 import type { FounderInsight } from "@/lib/admin/intelligence/founder-insights";
+import type { FounderBillingSummary } from "@/lib/admin/phase7-queries";
 import { AdminPageHeader, AdminSection, AdminStatusBadge } from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { MetricCell } from "@/components/admin/phase4/MetricCell";
@@ -19,6 +20,7 @@ export function FounderDashboardLite({
   ops,
   insights,
   atRisk,
+  billing,
 }: {
   locale: Locale;
   role: AdminRole;
@@ -27,6 +29,7 @@ export function FounderDashboardLite({
   ops?: OpsDashboardSignals;
   insights?: FounderInsight[];
   atRisk?: MetricResult<number>;
+  billing?: FounderBillingSummary;
 }) {
   void role;
   const isFa = locale === "fa";
@@ -75,6 +78,57 @@ export function FounderDashboardLite({
             <Link href={adminHref(locale, "/incidents")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "حوادث" : "Incidents"}</Link>
             <Link href={adminHref(locale, "/errors")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "خطاها" : "Errors"}</Link>
             <Link href={adminHref(locale, "/security")} prefetch={false} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50">{isFa ? "امنیت" : "Security"}</Link>
+          </div>
+        </AdminSection>
+      ) : null}
+
+      {billing ? (
+        <AdminSection
+          title={isFa ? "صورتحساب (خلاصه)" : "Billing summary"}
+          description={
+            isFa
+              ? "فقط شاخص‌های سبک — بدون قیف کامل"
+              : "Bounded strip only — no full funnel"
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <AdminMetricCard label="MRR" metric={billing.mrr} style="currency" compact />
+            <AdminMetricCard
+              label={isFa ? "ورک‌اسپیس پولی" : "Paid workspaces"}
+              metric={billing.paidWorkspaces}
+              compact
+            />
+            <AdminMetricCard
+              label={isFa ? "پرداخت ناموفق ۷ر" : "Failed payments 7d"}
+              metric={billing.failedPayments7d}
+              compact
+            />
+            <AdminMetricCard
+              label={isFa ? "وب‌هوک ناموفق ۷ر" : "Webhook failed 7d"}
+              metric={billing.webhookFailed7d}
+              compact
+            />
+            <AdminMetricCard
+              label={isFa ? "past_due" : "At-risk past_due"}
+              metric={billing.atRiskPastDue}
+              compact
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <Link
+              href={adminHref(locale, "/billing")}
+              prefetch={false}
+              className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50"
+            >
+              {isFa ? "صورتحساب" : "Billing"}
+            </Link>
+            <Link
+              href={adminHref(locale, "/revenue")}
+              prefetch={false}
+              className="rounded-lg border border-[var(--admin-border)] px-3 py-2 hover:bg-[var(--admin-muted-bg)]/50"
+            >
+              {isFa ? "درآمد" : "Revenue"}
+            </Link>
           </div>
         </AdminSection>
       ) : null}

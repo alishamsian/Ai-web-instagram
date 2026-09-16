@@ -51,9 +51,28 @@ export async function POST(
   }
 
   const { id } = await params;
+  const { recordProductEvent } = await import("@/lib/admin/events");
+  void recordProductEvent({
+    eventName: "domain_connection_started",
+    userId: session.user.id,
+    workspaceId: session.workspace.id,
+    websiteId: id,
+    resourceType: "website",
+    resourceId: id,
+  });
+
   const body = (await request.json()) as { host?: string };
   const host = normalizeHost(body.host ?? "");
   if (!host || !host.includes(".")) {
+    void recordProductEvent({
+      eventName: "domain_connection_failed",
+      userId: session.user.id,
+      workspaceId: session.workspace.id,
+      websiteId: id,
+      resourceType: "website",
+      resourceId: id,
+      metadata: { reason: "invalid_host" },
+    });
     return NextResponse.json({ error: "INVALID_HOST" }, { status: 400 });
   }
 
@@ -84,9 +103,19 @@ export async function POST(
     created = domain;
   });
 
-  if (conflict) return NextResponse.json({ error: "HOST_TAKEN" }, { status: 409 });
+  if (conflict) {
+    void recordProductEvent({
+      eventName: "domain_connection_failed",
+      userId: session.user.id,
+      workspaceId: session.workspace.id,
+      websiteId: id,
+      resourceType: "website",
+      resourceId: id,
+      metadata: { reason: "host_taken" },
+    });
+    return NextResponse.json({ error: "HOST_TAKEN" }, { status: 409 });
+  }
   if (!created) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
-  const { recordProductEvent } = await import("@/lib/admin/events");
   void recordProductEvent({
     eventName: "domain_connected",
     userId: session.user.id,

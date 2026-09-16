@@ -1,24 +1,12 @@
 import { requireAdminPage } from "@/lib/admin/gate";
+import { getRevenueIntelligence } from "@/lib/admin/phase7-queries";
 import { getAdminRevenue } from "@/lib/admin/queries";
 import {
   AdminPageHeader,
   AdminSection,
-  MetricUnavailable,
 } from "@/components/admin/primitives";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import type { DateRangePreset } from "@/lib/admin/dates";
-
-const FUTURE_METRICS = [
-  { id: "arr", label: "ARR", reason: "Payment provider + MRR integration required" },
-  { id: "new-mrr", label: "New MRR", reason: "Payment provider integration required" },
-  { id: "expansion", label: "Expansion", reason: "Plan upgrade amount tracking required" },
-  { id: "contraction", label: "Contraction", reason: "Plan downgrade amount tracking required" },
-  { id: "churn", label: "Churn (revenue)", reason: "Cancellation + amount instrumentation required" },
-  { id: "refunds", label: "Refunds", reason: "Refund ledger / payment provider required" },
-  { id: "arpu", label: "ARPU", reason: "Revenue + active customer count required" },
-  { id: "ltv", label: "LTV", reason: "Cohort revenue instrumentation required" },
-  { id: "cac", label: "CAC", reason: "Acquisition spend integration required" },
-] as const;
 
 export default async function AdminRevenuePage({
   params,
@@ -30,10 +18,11 @@ export default async function AdminRevenuePage({
   const { locale: raw } = await params;
   const sp = await searchParams;
   const { locale, userId } = await requireAdminPage(raw, "billing.read");
-  const revenue = await getAdminRevenue({
-    userId,
-    preset: (sp.range as DateRangePreset) || "30d",
-  });
+  const preset = (sp.range as DateRangePreset) || "30d";
+  const [revenue, intel] = await Promise.all([
+    getAdminRevenue({ userId, preset }),
+    getRevenueIntelligence({ userId, preset }),
+  ]);
   const isFa = locale === "fa";
 
   return (
@@ -42,33 +31,83 @@ export default async function AdminRevenuePage({
         title={isFa ? "درآمد" : "Revenue"}
         description={
           isFa
-            ? "معماری آماده برای Stripe/payment — بدون عدد جعلی"
-            : "Architecture ready for Stripe/payment — no invented figures"
+            ? intel.definition
+            : intel.definition
         }
       />
       <AdminSection title={isFa ? "نمای کلی" : "Overview"}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <AdminMetricCard label="MRR" metric={revenue.mrr} style="currency" />
+          <AdminMetricCard label="MRR" metric={intel.mrr} style="currency" />
+          <AdminMetricCard label="ARR" metric={intel.arr} style="currency" />
           <AdminMetricCard
-            label={isFa ? "درآمد" : "Revenue"}
-            metric={revenue.revenue}
+            label={isFa ? "درآمد ناخالص" : "Gross revenue"}
+            metric={intel.grossRevenue}
             style="currency"
           />
           <AdminMetricCard
-            label={isFa ? "سفارش‌ها" : "Orders"}
-            comparable={revenue.orders}
+            label={isFa ? "بازپرداخت" : "Refunds"}
+            metric={intel.refunds}
+            style="currency"
           />
           <AdminMetricCard
-            label={isFa ? "سفارش پرداخت‌شده" : "Paid Orders"}
-            metric={revenue.paidOrders}
+            label={isFa ? "درآمد خالص" : "Net revenue"}
+            metric={intel.netRevenue}
+            style="currency"
+          />
+          <AdminMetricCard
+            label={isFa ? "اشتراک فعال پولی" : "Active paid subs"}
+            metric={intel.activePaidSubscriptions}
+          />
+          <AdminMetricCard
+            label={isFa ? "پرداخت ناموفق" : "Failed payments"}
+            metric={intel.failedPayments}
+          />
+          <AdminMetricCard
+            label={isFa ? "سفارش‌ها (محصول)" : "Orders (product)"}
+            comparable={revenue.orders}
           />
         </div>
+        {intel.currency ? (
+          <p className="mt-3 text-[11px] text-[var(--admin-muted)]">
+            {isFa ? "ارز اصلی" : "Primary currency"}: {intel.currency}
+          </p>
+        ) : null}
       </AdminSection>
-      <AdminSection title={isFa ? "آماده‌سازی آینده" : "Future-ready slots"}>
+
+      <AdminSection
+        title={isFa ? "حرکت MRR" : "MRR movement"}
+        description={
+          isFa
+            ? "بدون تاریخچه انتقال اشتراک — عدد جعلی نمی‌سازیم"
+            : "No subscription transition history — refusing invented figures"
+        }
+      >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {FUTURE_METRICS.map((m) => (
-            <MetricUnavailable key={m.id} label={m.label} reason={m.reason} />
-          ))}
+          <AdminMetricCard
+            label={isFa ? "MRR جدید" : "New MRR"}
+            metric={intel.newMrr}
+            style="currency"
+          />
+          <AdminMetricCard
+            label={isFa ? "گسترش" : "Expansion"}
+            metric={intel.expansionMrr}
+            style="currency"
+          />
+          <AdminMetricCard
+            label={isFa ? "انقباض" : "Contraction"}
+            metric={intel.contractionMrr}
+            style="currency"
+          />
+          <AdminMetricCard
+            label={isFa ? "ریزش MRR" : "Churned MRR"}
+            metric={intel.churnedMrr}
+            style="currency"
+          />
+          <AdminMetricCard
+            label={isFa ? "فعال‌سازی مجدد" : "Reactivation MRR"}
+            metric={intel.reactivationMrr}
+            style="currency"
+          />
         </div>
       </AdminSection>
     </div>

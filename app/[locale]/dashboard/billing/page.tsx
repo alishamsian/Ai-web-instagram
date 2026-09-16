@@ -12,8 +12,14 @@ import {
   StatusBadge,
 } from "@/components/dashboard/ui";
 import { WaitlistForm } from "@/components/dashboard/WaitlistForm";
+import { CheckoutButton } from "@/components/dashboard/CheckoutButton";
+import { ManageBillingButton } from "@/components/dashboard/ManageBillingButton";
 import { cn } from "@/lib/utils";
 import { isProPlan, normalizePlanId } from "@/lib/config/plans";
+import {
+  isBillingConfigured,
+  listConfiguredPrices,
+} from "@/lib/billing/config";
 
 export default async function BillingPage({
   params,
@@ -27,6 +33,11 @@ export default async function BillingPage({
 
   const current = normalizePlanId(session.workspace.plan);
   const isPaid = isProPlan(current);
+  const billingReady = isBillingConfigured();
+  const proMonthly = listConfiguredPrices().find(
+    (p) => p.plan === "pro" && p.interval === "month",
+  );
+  const showCheckout = billingReady && Boolean(proMonthly?.priceId);
 
   return (
     <PageStack>
@@ -59,12 +70,17 @@ export default async function BillingPage({
           </StatusBadge>
         }
       >
-        <div className="px-5 py-5 text-sm text-muted-foreground">
-          {isPaid
-            ? locale === "fa"
-              ? "قابلیت‌های پلن پولی برای این ورک‌اسپیس فعال است."
-              : "Paid-plan capabilities are active on this workspace."
-            : dict.dashboard.freeForever}
+        <div className="space-y-4 px-5 py-5 text-sm text-muted-foreground">
+          <p>
+            {isPaid
+              ? locale === "fa"
+                ? "قابلیت‌های پلن پولی برای این ورک‌اسپیس فعال است."
+                : "Paid-plan capabilities are active on this workspace."
+              : dict.dashboard.freeForever}
+          </p>
+          {isPaid && billingReady ? (
+            <ManageBillingButton locale={locale} />
+          ) : null}
         </div>
       </Panel>
 
@@ -93,7 +109,11 @@ export default async function BillingPage({
                   </p>
                 </div>
                 <StatusBadge tone={active ? "success" : "neutral"}>
-                  {plan.badge[locale]}
+                  {showCheckout && plan.id === "pro"
+                    ? locale === "fa"
+                      ? "حرفه‌ای"
+                      : "Pro"
+                    : plan.badge[locale]}
                 </StatusBadge>
               </div>
 
@@ -102,9 +122,13 @@ export default async function BillingPage({
                   ? locale === "fa"
                     ? "رایگان"
                     : "Free"
-                  : locale === "fa"
-                    ? "به‌زودی"
-                    : "Soon"}
+                  : showCheckout
+                    ? locale === "fa"
+                      ? "اشتراک"
+                      : "Subscribe"
+                    : locale === "fa"
+                      ? "به‌زودی"
+                      : "Soon"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {plan.period[locale]}
@@ -132,15 +156,27 @@ export default async function BillingPage({
 
               <div className="mt-5">
                 {plan.id === "free" ? (
-                  <Button className="w-full" variant={active ? "outline" : "default"} disabled={active}>
-                    {active
-                      ? dict.dashboard.currentPlan
-                      : plan.cta[locale]}
+                  <Button
+                    className="w-full"
+                    variant={active ? "outline" : "default"}
+                    disabled={active}
+                  >
+                    {active ? dict.dashboard.currentPlan : plan.cta[locale]}
                   </Button>
                 ) : active ? (
-                  <Button className="w-full" variant="outline" disabled>
-                    {dict.dashboard.currentPlan}
-                  </Button>
+                  billingReady ? (
+                    <ManageBillingButton locale={locale} />
+                  ) : (
+                    <Button className="w-full" variant="outline" disabled>
+                      {dict.dashboard.currentPlan}
+                    </Button>
+                  )
+                ) : showCheckout && proMonthly ? (
+                  <CheckoutButton
+                    locale={locale}
+                    priceId={proMonthly.priceId}
+                    label={locale === "fa" ? "ارتقا" : "Upgrade"}
+                  />
                 ) : (
                   <WaitlistForm locale={locale} source="billing" />
                 )}

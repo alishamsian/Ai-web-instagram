@@ -445,22 +445,22 @@ export async function getAdminRevenue(
   await authorize(input.userId, "billing.read");
   const range = rangeFromInput(input);
   const comparison = resolveComparisonPeriod(range);
-  const [ordersC, ordersP] = await Promise.all([
+  const [ordersC, ordersP, intelligence] = await Promise.all([
     sumDailyMetric("orders", range),
     sumDailyMetric("orders", comparison.previous),
+    import("@/lib/admin/phase7-queries").then((m) =>
+      m.getRevenueIntelligence({
+        userId: input.userId,
+        preset: input.preset,
+      }),
+    ),
   ]);
   return {
     range,
-    mrr: unavailable("MRR unavailable — no payment provider", "subscriptions"),
-    revenue: unavailable(
-      "Revenue unavailable — store_orders has no amount",
-      "store_orders",
-    ),
+    mrr: intelligence.mrr,
+    revenue: intelligence.netRevenue,
     orders: comparable(ordersC, ordersP),
-    paidOrders: unavailable(
-      "Paid order status not standardized for revenue",
-      "store_orders",
-    ),
+    paidOrders: intelligence.activePaidSubscriptions,
   };
 }
 

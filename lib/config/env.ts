@@ -68,6 +68,10 @@ export function isAIConfigured() {
   return Boolean(process.env.AI_API_KEY);
 }
 
+export function isBillingConfigured() {
+  return Boolean(process.env.STRIPE_SECRET_KEY?.trim());
+}
+
 export function getRuntimeMode() {
   return {
     auth: isSupabaseConfigured() ? "supabase" : "mock",
@@ -78,5 +82,6 @@ export function getRuntimeMode() {
         ? "supabase"
         : "local",
     ai: isAIConfigured() ? "openai" : "mock",
+    billing: isBillingConfigured() ? "stripe" : "unconfigured",
   } as const;
 }

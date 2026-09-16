@@ -57,6 +57,21 @@ export async function POST(request: Request) {
   const limits = getAuthLimits();
 
   if (body.action === "logout") {
+    try {
+      const { getSession } = await import("@/lib/auth/session");
+      const current = await getSession();
+      if (current) {
+        const { recordProductEvent } = await import("@/lib/admin/events");
+        void recordProductEvent({
+          eventName: "logout",
+          userId: current.user.id,
+          workspaceId: current.workspace.id,
+          metadata: { source: "auth_api" },
+        });
+      }
+    } catch {
+      // logout telemetry must not block logout
+    }
     await clearSession();
     return NextResponse.json({ ok: true });
   }
@@ -207,6 +222,19 @@ export async function POST(request: Request) {
       );
     }
     const adminActor = await resolveAdminActor(result.session.user.id);
+    const { recordProductEvent } = await import("@/lib/admin/events");
+    void recordProductEvent({
+      eventName: "login",
+      userId: result.session.user.id,
+      workspaceId: result.session.workspace.id,
+      metadata: { source: "auth_api" },
+    });
+    const { startUserSession } = await import("@/lib/billing/sessions");
+    void startUserSession({
+      userId: result.session.user.id,
+      workspaceId: result.session.workspace.id,
+      userAgent: request.headers.get("user-agent"),
+    });
     return NextResponse.json({
       user: result.session.user,
       isAdmin: Boolean(adminActor),

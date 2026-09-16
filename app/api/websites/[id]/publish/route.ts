@@ -15,6 +15,17 @@ export async function POST(
   let updated = null;
   let noProducts = false;
 
+  const { recordProductEvent } = await import("@/lib/admin/events");
+  void recordProductEvent({
+    eventName: "publish_flow_started",
+    userId: session.user.id,
+    workspaceId: session.workspace.id,
+    websiteId: id,
+    resourceType: "website",
+    resourceId: id,
+    metadata: { published },
+  });
+
   await writeStore((store) => {
     const website = store.websites.find(
       (item) => item.id === id && item.workspaceId === session.workspace.id,
@@ -51,7 +62,6 @@ export async function POST(
     websiteId: id,
     workspaceId: session.workspace.id,
   });
-  const { recordProductEvent } = await import("@/lib/admin/events");
   void recordProductEvent({
     eventName: published ? "website_published" : "website_unpublished",
     userId: session.user.id,
@@ -59,6 +69,15 @@ export async function POST(
     websiteId: id,
     resourceType: "website",
     resourceId: id,
+  });
+  void recordProductEvent({
+    eventName: "publish_flow_completed",
+    userId: session.user.id,
+    workspaceId: session.workspace.id,
+    websiteId: id,
+    resourceType: "website",
+    resourceId: id,
+    metadata: { published },
   });
   return NextResponse.json(updated);
 }

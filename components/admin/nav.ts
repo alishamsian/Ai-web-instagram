@@ -66,6 +66,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { id: "users", href: "/users", label: { fa: "کاربران", en: "Users" }, icon: Users },
       { id: "workspaces", href: "/workspaces", label: { fa: "ورک‌اسپیس‌ها", en: "Workspaces" }, icon: Building2 },
       { id: "subscriptions", href: "/subscriptions", label: { fa: "اشتراک‌ها", en: "Subscriptions" }, icon: CreditCard },
+      { id: "billing", href: "/billing", label: { fa: "صورتحساب", en: "Billing" }, icon: CreditCard },
       { id: "revenue", href: "/revenue", label: { fa: "درآمد", en: "Revenue" }, icon: CreditCard },
       { id: "orders", href: "/orders", label: { fa: "سفارش‌ها", en: "Orders" }, icon: ShoppingBag },
     ],
@@ -103,6 +104,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     id: "analytics",
     label: { fa: "آنالیتیکس", en: "Analytics" },
     items: [
+      { id: "growth", href: "/growth", label: { fa: "رشد", en: "Growth" }, icon: BarChart3 },
       { id: "a-product", href: "/analytics/product", label: { fa: "محصول", en: "Product" }, icon: BarChart3 },
       { id: "a-users", href: "/analytics/users", label: { fa: "کاربران", en: "Users" }, icon: Users },
       { id: "a-retention", href: "/analytics/retention", label: { fa: "نگه‌داشت", en: "Retention" }, icon: BarChart3 },
