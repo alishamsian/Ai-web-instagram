@@ -12,6 +12,7 @@ export async function GET() {
   const publishable = getSupabasePublishableKey();
   const publicOk = isSupabasePublicConfigured();
   const adminOk = isSupabaseConfigured();
+  const isProd = process.env.NODE_ENV === "production";
 
   let schema: "ok" | "missing" | "error" | "skipped" = "skipped";
   let schemaDetail: string | null = null;
@@ -35,15 +36,20 @@ export async function GET() {
         body.includes("Could not find the table")
       ) {
         schema = "missing";
-        schemaDetail =
-          "Tables missing — app uses Supabase Storage blob until schema.sql is applied.";
+        schemaDetail = isProd
+          ? "schema_missing"
+          : "Tables missing — app uses Supabase Storage blob until schema.sql is applied.";
       } else {
         schema = "error";
-        schemaDetail = body.slice(0, 200);
+        schemaDetail = isProd ? "schema_probe_failed" : body.slice(0, 200);
       }
     } catch (error) {
       schema = "error";
-      schemaDetail = error instanceof Error ? error.message : "probe_failed";
+      schemaDetail = isProd
+        ? "schema_probe_failed"
+        : error instanceof Error
+          ? error.message
+          : "probe_failed";
     }
   }
 
@@ -57,7 +63,11 @@ export async function GET() {
       storage = "ok";
     } catch (error) {
       storage = "error";
-      storageDetail = error instanceof Error ? error.message : "storage_failed";
+      storageDetail = isProd
+        ? "storage_probe_failed"
+        : error instanceof Error
+          ? error.message
+          : "storage_failed";
     }
   }
 

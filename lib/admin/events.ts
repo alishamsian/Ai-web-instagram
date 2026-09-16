@@ -52,7 +52,13 @@ export const PRODUCT_EVENT_NAMES = [
   "domain_connection_failed",
   "publish_flow_started",
   "publish_flow_completed",
+  "publish_failed",
   "editor_saved",
+  "website_saved",
+  "workspace_created",
+  "template_selected",
+  "ai_edit_applied",
+  "preview_opened",
   "order_created",
   "order_paid",
   "order_refunded",
@@ -108,15 +114,21 @@ function toIso(value?: string | Date) {
   return typeof value === "string" ? value : value.toISOString();
 }
 
-/** Strip keys that look secret-like from metadata. */
+/** Strip keys that look secret-like or oversized PII from metadata. */
 export function sanitizeEventMetadata(
   metadata: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
   if (!metadata) return {};
-  const blocked = /secret|password|token|apikey|api_key|authorization|cookie/i;
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(metadata)) {
-    if (blocked.test(key)) continue;
+    const lower = key.toLowerCase();
+    if (
+      /secret|password|apikey|api_key|authorization|cookie/.test(lower) ||
+      /(^|_)(token|prompt|raw_prompt|user_prompt)$/.test(lower) ||
+      /^(prompt|raw_prompt|user_prompt|token)$/.test(lower)
+    ) {
+      continue;
+    }
     if (typeof value === "string" && value.length > 2000) {
       out[key] = `${value.slice(0, 2000)}…`;
       continue;
