@@ -103,19 +103,19 @@ export function PuckFieldsPanel({
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white text-zinc-900">
-      <div className="shrink-0 border-b border-zinc-100 bg-zinc-50/80 px-2 py-2 backdrop-blur-sm">
-        <div className="flex gap-0.5 overflow-x-auto rounded-lg bg-white p-0.5 shadow-[0_0_0_1px_rgba(24,24,27,0.06)]">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--puck-color-surface,#fff)] text-[var(--puck-color-text,#181818)]">
+      <div className="shrink-0 border-b border-[var(--puck-color-border,#dcdcdc)] px-3 py-2">
+        <div className="flex gap-1 overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                "shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-semibold tracking-tight transition",
+                "shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition",
                 tab === t.id
-                  ? "bg-zinc-900 text-white shadow-sm"
-                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800",
+                  ? "bg-[var(--puck-color-interactive-subtle,#e7eef7)] text-[var(--puck-color-interactive,#0158ad)]"
+                  : "text-[var(--puck-color-text-muted,#767676)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)] hover:text-[var(--puck-color-text,#181818)]",
               )}
             >
               {isFa ? t.fa : t.en}
@@ -129,18 +129,18 @@ export function PuckFieldsPanel({
           <div className="space-y-4 p-3">
             {section ? (
               <>
-                <div className="flex items-start justify-between gap-2 rounded-xl border border-zinc-100 bg-zinc-50/70 px-3 py-2.5">
+                <div className="flex items-start justify-between gap-2 border-b border-[var(--puck-color-border,#dcdcdc)] px-1 pb-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold tracking-tight">
+                    <p className="truncate text-sm font-medium">
                       {humanSectionLabel(section, locale, def?.label ?? null)}
                     </p>
-                    <p className="mt-0.5 font-mono text-[10px] text-zinc-400">
+                    <p className="mt-0.5 text-[11px] text-[var(--puck-color-text-muted,#767676)]">
                       {section.type}
                     </p>
                   </div>
                   <button
                     type="button"
-                    className="shrink-0 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium hover:bg-zinc-50"
+                    className="shrink-0 rounded-md border border-[var(--puck-color-border,#dcdcdc)] bg-[var(--puck-color-surface,#fff)] px-2 py-1 text-[11px] font-medium hover:bg-[var(--puck-color-grey-11,#f5f5f5)]"
                     onClick={() =>
                       bindToggleSectionVisibility({
                         config,
@@ -176,7 +176,7 @@ export function PuckFieldsPanel({
                       placeholder={isFa ? "جستجوی فیلد…" : "Search fields…"}
                       className="h-8 text-xs"
                     />
-                    <div className="rounded-lg border border-zinc-100 bg-zinc-50/60 p-2">
+                    <div className="pt-1">
                       <SchemaInspectorPanel
                         config={config}
                         section={section}
@@ -191,18 +191,8 @@ export function PuckFieldsPanel({
                   </>
                 ) : null}
 
-                <div className="border-t border-zinc-100 pt-3">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-                    {isFa ? "فیلدهای Puck" : "Puck fields"}
-                  </p>
-                  <div
-                    className={cn(
-                      "rounded-lg border border-zinc-100 bg-zinc-50/40 p-1",
-                      isLoading && "opacity-60",
-                    )}
-                  >
-                    {children}
-                  </div>
+                <div className="border-t border-[var(--puck-color-border,#dcdcdc)] pt-3">
+                  <div className={cn(isLoading && "opacity-60")}>{children}</div>
                 </div>
               </>
             ) : (

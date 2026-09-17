@@ -1,35 +1,9 @@
-/* Vitrin × Puck — studio polish (keeps native Puck layout) */
+/* Vitrin × Puck — stay close to the official demo chrome */
 
 .puck-editor-shell {
-  /* Slightly cooler, denser chrome than stock Puck */
-  --puck-color-surface: #ffffff;
-  --puck-color-surface-muted: #f4f4f5;
-  --puck-color-surface-subtle: #fafafa;
-  --puck-color-border: #e4e4e7;
-  --puck-color-border-muted: #f4f4f5;
-  --puck-color-text: #09090b;
-  --puck-color-text-secondary: #3f3f46;
-  --puck-color-text-muted: #71717a;
-  --puck-color-interactive: #18181b;
-  --puck-color-interactive-hover: #27272a;
-  --puck-color-interactive-active: #09090b;
-  --puck-color-interactive-subtle: #f4f4f5;
-  --puck-color-interactive-soft: #fafafa;
-  --puck-color-selection-bg: color-mix(in srgb, #18181b 8%, transparent);
-  --puck-color-selection-border: #a1a1aa;
-  --puck-color-line-placeholder: #52525b;
-  --puck-header-color-bg: #09090b;
-  --puck-header-color-text: #fafafa;
-  --puck-radius-m: 8px;
-  --puck-radius-l: 12px;
-  --puck-space-chrome-gutter: 12px;
-  --vitrin-accent: #c4a574;
-  --vitrin-stage: #ececee;
-  --puck-mobile-dock-h: 0px;
-  font-feature-settings: "ss01" on, "cv11" on;
-  -webkit-font-smoothing: antialiased;
   position: relative;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 .puck-editor-shell,
@@ -43,352 +17,34 @@
   min-height: 0;
 }
 
-/* ——— Header ——— */
-.puck-editor-shell [class*="_PuckHeader"] {
-  border-bottom-color: #1f1f23 !important;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-}
-
-.puck-editor-shell [class*="_PuckHeader-inner"] {
-  border-left-color: #27272a !important;
-  align-items: center !important;
-}
-
-.puck-editor-shell [class*="_PuckHeader-path"] {
-  color: #a1a1aa !important;
-  letter-spacing: 0.02em;
-}
-
-.puck-editor-shell [class*="_PuckHeader-title"] {
-  letter-spacing: -0.02em;
-}
-
-.puck-editor-shell [class*="_PuckHeader"] button,
-.puck-editor-shell [class*="_PuckHeader"] [class*="_IconButton"] {
-  color: #d4d4d8 !important;
-}
-
-.puck-editor-shell [class*="_PuckHeader"] button:hover,
-.puck-editor-shell [class*="_PuckHeader"] [class*="_IconButton"]:hover {
-  color: #fafafa !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-}
-
-/* ——— Plugin rail ——— */
-.puck-editor-shell [class*="_Nav_"],
-.puck-editor-shell [class*="_NavItem"] {
-  transition: background-color 140ms ease, color 140ms ease;
-}
-
-.puck-editor-shell [class*="_NavItem"][aria-pressed="true"],
-.puck-editor-shell [class*="_NavItem"][data-active="true"] {
-  color: var(--vitrin-accent) !important;
-}
-
-/* ——— Canvas stage ——— */
-.puck-editor-shell [class*="_PuckCanvas"],
-.puck-editor-shell [class*="_PuckPreview"] {
-  background:
-    radial-gradient(900px 420px at 50% -10%, rgba(196, 165, 116, 0.12), transparent 60%),
-    radial-gradient(700px 480px at 100% 100%, rgba(24, 24, 27, 0.05), transparent 55%),
-    var(--vitrin-stage) !important;
-}
-
-.puck-editor-shell .puck-preview-host,
-.puck-editor-shell [class*="_PuckPreview-frame"] {
-  border-radius: 14px !important;
-  box-shadow:
-    0 0 0 1px rgba(24, 24, 27, 0.06),
-    0 18px 50px rgba(24, 24, 27, 0.12),
-    0 4px 12px rgba(24, 24, 27, 0.06) !important;
-  overflow: hidden;
+/* Preview host inside iframe — same white page as demo canvas */
+.puck-editor-shell .vitrin-editor-canvas,
+.puck-preview-host {
+  position: relative;
+  min-height: 100%;
   background: #fff;
 }
 
-.puck-editor-shell .vitrin-editor-canvas {
-  position: relative;
-  min-height: 100%;
-}
-
-/* Responsive preview iframe — media queries use this frame's width */
 .puck-editor-shell [class*="_PuckPreview"] iframe {
   background: #fff;
   border: 0;
-  border-radius: 14px;
   display: block;
   max-width: 100%;
 }
 
-.puck-editor-shell .editor-section-frame {
-  outline-offset: -1px;
-}
-
-.puck-editor-shell .editor-section-selected {
-  z-index: 5;
-}
-
-/* ——— Sidebars ——— */
-.puck-editor-shell [class*="_RightSideBar"],
-.puck-editor-shell [class*="RightSideBar"],
-.puck-editor-shell [class*="_LeftSideBar"],
-.puck-editor-shell [class*="LeftSideBar"],
-.puck-editor-shell [class*="_Sidebar"] {
-  background: #fff !important;
-  border-color: #e4e4e7 !important;
-}
-
+/* Fields panel fills right rail like demo Page fields */
 .puck-editor-shell [class*="_RightSideBar"],
 .puck-editor-shell [class*="RightSideBar"] {
   overflow: hidden !important;
 }
 
-.puck-editor-shell [class*="_SidebarSection"] {
-  border-color: #f4f4f5 !important;
-}
-
-/* Component drawer cards */
-.puck-editor-shell [class*="_DrawerItem"],
-.puck-editor-shell [class*="_ComponentList"] button {
-  border-radius: 10px !important;
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
-}
-
-.puck-editor-shell [class*="_DrawerItem"]:hover,
-.puck-editor-shell [class*="_ComponentList"] button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(24, 24, 27, 0.06);
-}
-
-/* Drop zones */
-.puck-editor-shell [class*="_DropZone"],
-.puck-editor-shell [class*="DropZone"] {
-  min-height: 56px;
-  border-radius: 10px;
-}
-
-.puck-editor-shell [class*="_DropLine"] {
-  height: 3px !important;
-  border-radius: 999px;
-  background: var(--vitrin-accent) !important;
-}
-
-/* Action bar on selected blocks */
-.puck-editor-shell [class*="_ActionBar"] {
-  border-radius: 10px !important;
-  box-shadow: 0 10px 28px rgba(24, 24, 27, 0.18) !important;
-  backdrop-filter: blur(8px);
-}
-
-/* AI sidebar */
+/* Soften our AI plugin to match light demo rail */
 .puck-editor-shell [data-puck-ai-bar] {
-  background: linear-gradient(180deg, #fcfcfc 0%, #ffffff 40%);
-}
-
-.puck-editor-shell [data-puck-ai-bar] textarea:focus {
-  outline: none;
-}
-
-/* ——— Mobile dock (portaled) ——— */
-.puck-mobile-dock {
-  display: none;
-}
-
-/* ========== PHONE (< 638px) ========== */
-@media (max-width: 637px) {
-  .puck-editor-shell {
-    --puck-space-chrome-gutter: 8px;
-    --puck-mobile-dock-h: calc(52px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .puck-mobile-dock {
-    position: absolute;
-    z-index: 40;
-    inset-inline: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 52px;
-    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
-    background: rgba(9, 9, 11, 0.94);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(16px) saturate(1.1);
-    -webkit-backdrop-filter: blur(16px) saturate(1.1);
-  }
-
-  /* Lift plugin nav above the dock */
-  .puck-editor-shell [class*="_PuckLayout-nav"],
-  .puck-editor-shell [class*="_PuckLayout-nav_"] {
-    margin-bottom: var(--puck-mobile-dock-h);
-    border-top-color: #e4e4e7 !important;
-    background: #fafafa !important;
-    padding-bottom: 2px;
-  }
-
-  .puck-editor-shell [class*="_Nav-list"] {
-    justify-content: space-around;
-    gap: 0 !important;
-    padding-inline: 4px;
-  }
-
-  .puck-editor-shell [class*="_NavItem"] {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /* Compact header — title only, menu chevron */
-  .puck-editor-shell [class*="_PuckHeader"] {
-    padding-inline-start: 0 !important;
-    padding-left: 0 !important;
-  }
-
-  .puck-editor-shell [class*="_PuckHeader-inner"] {
-    grid-template-columns: 1fr auto !important;
-    grid-template-areas: "middle right" !important;
-    gap: 8px !important;
-    padding: 8px 10px !important;
-    align-items: center !important;
-    border-left: none !important;
-  }
-
-  .puck-editor-shell [class*="_PuckHeader-toggle"] {
-    display: none !important;
-  }
-
-  .puck-editor-shell [class*="_PuckHeader-path"] {
-    display: none !important;
-  }
-
-  .puck-editor-shell [class*="_PuckHeader-title"] {
-    font-size: 14px !important;
-    line-height: 1.2 !important;
-    max-width: 58vw;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Menu dropdown as dark sheet under header */
-  .puck-editor-shell [class*="_MenuBar"]:not([class*="menuOpen"]) {
-    display: none !important;
-  }
-
-  .puck-editor-shell [class*="_MenuBar"][class*="menuOpen"] {
-    display: block !important;
-    background: #111113 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    padding: 10px 12px 14px !important;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-  }
-
-  .puck-editor-shell [class*="_MenuBar-inner"] {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 10px !important;
-  }
-
-  .puck-editor-shell [class*="_MenuBar-history"] {
-    justify-content: center;
-    gap: 4px;
-  }
-
-  /* Canvas: edge-to-edge stage */
-  .puck-editor-shell [class*="_PuckCanvas"] {
-    padding: 6px !important;
-    padding-bottom: 8px !important;
-  }
-
-  .puck-editor-shell .puck-preview-host,
-  .puck-editor-shell [class*="_PuckPreview-frame"],
-  .puck-editor-shell [class*="_PuckPreview"] iframe {
-    border-radius: 10px !important;
-    box-shadow:
-      0 0 0 1px rgba(24, 24, 27, 0.08),
-      0 10px 28px rgba(24, 24, 27, 0.1) !important;
-  }
-
-  /* Bottom sheet sidebars — rounded top, shadow */
-  .puck-editor-shell [class*="_Sidebar--isVisible"],
-  .puck-editor-shell [class*="_Sidebar"][class*="isVisible"] {
-    border-radius: 16px 16px 0 0 !important;
-    box-shadow: 0 -12px 40px rgba(24, 24, 27, 0.18) !important;
-    border-block-start: none !important;
-    overflow: hidden !important;
-  }
-
-  .puck-editor-shell [class*="_Sidebar--isVisible"]::before,
-  .puck-editor-shell [class*="_Sidebar"][class*="isVisible"]::before {
-    content: "";
-    display: block;
-    width: 36px;
-    height: 4px;
-    margin: 8px auto 4px;
-    border-radius: 999px;
-    background: #d4d4d8;
-    flex-shrink: 0;
-  }
-
-  .puck-editor-shell [class*="_Sidebar"] {
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-/* ========== TABLET (638–989px) ========== */
-@media (min-width: 638px) and (max-width: 989px) {
-  .puck-editor-shell {
-    --puck-space-chrome-gutter: 10px;
-  }
-
-  .puck-mobile-dock {
-    display: none !important;
-  }
-
-  .puck-editor-shell [class*="_PuckLayout-inner"] {
-    --puck-sidebar-width: minmax(200px, 240px) !important;
-  }
-
-  /* RTL-safe plugin offset */
-  .puck-editor-shell [class*="_PuckHeader"] {
-    padding-left: 0 !important;
-    padding-inline-start: 68px !important;
-  }
-
-  .puck-editor-shell [class*="_PuckHeader-path"] {
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .puck-editor-shell [class*="_PuckCanvas"] {
-    padding: 10px !important;
-  }
-
-  .puck-editor-shell .puck-preview-host,
-  .puck-editor-shell [class*="_PuckPreview-frame"] {
-    border-radius: 12px !important;
-  }
-}
-
-/* ========== DESKTOP (≥ 990px) ========== */
-@media (min-width: 990px) {
-  .puck-mobile-dock {
-    display: none !important;
-  }
-
-  .puck-editor-shell [class*="_PuckHeader"] {
-    padding-left: 0 !important;
-    padding-inline-start: 68px !important;
-  }
-}
-
-.puck-editor-shell [class*="_PuckHeader--hidePlugins"] {
-  padding-inline-start: 0 !important;
+  background: var(--puck-color-surface-subtle, #fafafa);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .puck-editor-shell [class*="_DrawerItem"],
-  .puck-editor-shell [class*="_ComponentList"] button {
+  .puck-editor-shell * {
     transition: none !important;
   }
 }

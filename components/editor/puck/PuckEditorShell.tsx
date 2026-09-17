@@ -455,33 +455,53 @@ export function PuckEditorShell({
           headerTitle={config.brand.name || website.slug}
           headerPath={`/${website.slug}`}
           plugins={[aiPlugin]}
+          // Exact default viewports from the official Puck demo
           viewports={[
             {
-              width: 1440,
+              width: 360,
               height: "auto",
-              label: isFa ? "دسکتاپ" : "Desktop",
-              icon: "Monitor",
+              label: isFa ? "کوچک" : "Small",
+              icon: "Smartphone",
             },
             {
               width: 768,
               height: "auto",
-              label: isFa ? "تبلت" : "Tablet",
+              label: isFa ? "متوسط" : "Medium",
               icon: "Tablet",
             },
             {
-              width: 390,
+              width: 1280,
               height: "auto",
-              label: isFa ? "موبایل" : "Mobile",
-              icon: "Smartphone",
+              label: isFa ? "بزرگ" : "Large",
+              icon: "Monitor",
+            },
+            {
+              width: "100%",
+              height: "auto",
+              label: isFa ? "تمام‌عرض" : "Full-width",
+              icon: "FullWidth",
             },
           ]}
-          // Iframe so CSS media queries follow the selected device width
-          // (mobile / tablet / desktop), not the host browser window.
           iframe={{
             enabled: true,
             waitForStyles: true,
             syncHostStyles: true,
           }}
+          onPublish={() => {
+            setPublishError(null);
+            setPublishOpen(true);
+          }}
+          dictionary={
+            isFa
+              ? {
+                  "header-publish": "انتشار",
+                  "header-view-page": "مشاهده صفحه",
+                  "plugin-blocks": "بلوک‌ها",
+                  "plugin-outline": "ساختار",
+                  "plugin-fields": "فیلدها",
+                }
+              : undefined
+          }
           dnd={{ behavior: "auto" }}
           overrides={{
             // Providers must live inside the iframe — React context does not

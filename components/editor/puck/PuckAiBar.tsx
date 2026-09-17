@@ -347,8 +347,8 @@ export function PuckAiBar({
               type="button"
               onClick={() => void apply()}
               className={cn(
-                "inline-flex items-center justify-center gap-1 rounded-md bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-zinc-800",
-                sidebar && "flex-1 bg-[var(--vitrin-accent,#c4a574)] text-zinc-950 hover:brightness-110",
+                "inline-flex items-center justify-center gap-1 rounded-md bg-[var(--puck-color-interactive,#0158ad)] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[var(--puck-color-interactive-hover,#014292)]",
+                sidebar && "flex-1",
               )}
             >
               <Check className="size-3.5" />
@@ -506,7 +506,7 @@ export function PuckAiBar({
               disabled={!prompt.trim() || busy}
               onClick={() => void submit()}
               className={cn(
-                "shrink-0 rounded-md bg-zinc-900 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-zinc-800 disabled:opacity-40",
+                "shrink-0 rounded-md bg-[var(--puck-color-interactive,#0158ad)] px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-[var(--puck-color-interactive-hover,#014292)] disabled:opacity-40",
                 sidebar && "ms-auto",
               )}
             >
@@ -549,20 +549,20 @@ export function PuckAiBar({
         data-puck-ai-bar
         dir={isFa ? "rtl" : "ltr"}
       >
-        <div className="shrink-0 border-b border-zinc-100 bg-[linear-gradient(180deg,#111113_0%,#18181b_100%)] px-3 py-3.5 text-zinc-100">
-          <p className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-            <span className="inline-flex size-7 items-center justify-center rounded-lg bg-[var(--vitrin-accent,#c4a574)]/20 text-[var(--vitrin-accent,#c4a574)]">
+        <div className="shrink-0 border-b border-[var(--puck-color-border,#dcdcdc)] bg-[var(--puck-color-surface-subtle,#fafafa)] px-3 py-3">
+          <p className="flex items-center gap-2 text-sm font-medium text-[var(--puck-color-text,#181818)]">
+            <span className="inline-flex size-7 items-center justify-center rounded-md bg-[var(--puck-color-interactive-subtle,#e7eef7)] text-[var(--puck-color-interactive,#0158ad)]">
               <Sparkles className="size-3.5" />
             </span>
             {isFa ? "طراح هوشمند" : "AI Co-Designer"}
           </p>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-400">
+          <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--puck-color-text-muted,#767676)]">
             {isFa
               ? "تغییر را بنویس؛ پیشنهاد را ببین و اعمال کن."
               : "Describe a change, review the proposal, then apply."}
           </p>
           {selectedSectionId ? (
-            <p className="mt-2.5 inline-flex rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-medium text-zinc-300">
+            <p className="mt-2 inline-flex rounded-md bg-[var(--puck-color-interactive-subtle,#e7eef7)] px-2 py-0.5 text-[10px] font-medium text-[var(--puck-color-interactive,#0158ad)]">
               {isFa ? "هدف: سکشن انتخاب‌شده" : "Target: selected section"}
             </p>
           ) : null}
