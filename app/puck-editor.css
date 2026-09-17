@@ -1,50 +1,31 @@
-/* Vitrin × Puck — stay close to the official demo chrome */
+/* Vitrin × Puck — isolate demo chrome; do not restyle Puck internals */
 
 .puck-editor-shell {
   position: relative;
   overflow: hidden;
+  height: 100dvh;
+  background: var(--puck-color-grey-12, #fafafa);
+  /* Puck chrome is LTR; site content RTL stays inside the preview iframe */
+  direction: ltr;
   -webkit-font-smoothing: antialiased;
 }
 
-.puck-editor-shell,
-.puck-editor-shell * {
-  box-sizing: border-box;
-}
-
-.puck-editor-shell > div,
-.puck-editor-shell [class*="_Puck"] {
+.puck-editor-shell > .puck-editor-shell__root,
+.puck-editor-shell > div:first-child {
   height: 100%;
   min-height: 0;
 }
 
-/* Preview host inside iframe — same white page as demo canvas */
-.puck-editor-shell .vitrin-editor-canvas,
-.puck-preview-host {
+/* Preview page only — never apply height hacks to all _Puck* nodes */
+.puck-preview-host,
+.vitrin-editor-canvas {
   position: relative;
   min-height: 100%;
   background: #fff;
 }
 
-.puck-editor-shell [class*="_PuckPreview"] iframe {
-  background: #fff;
-  border: 0;
+.puck-editor-shell iframe {
   display: block;
-  max-width: 100%;
-}
-
-/* Fields panel fills right rail like demo Page fields */
-.puck-editor-shell [class*="_RightSideBar"],
-.puck-editor-shell [class*="RightSideBar"] {
-  overflow: hidden !important;
-}
-
-/* Soften our AI plugin to match light demo rail */
-.puck-editor-shell [data-puck-ai-bar] {
-  background: var(--puck-color-surface-subtle, #fafafa);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .puck-editor-shell * {
-    transition: none !important;
-  }
+  border: 0;
+  background: #fff;
 }

@@ -1,83 +1,39 @@
 "use client";
 
-/**
- * Keep shell usable across breakpoints while matching demo defaults:
- * Small 360 / Medium 768 / Large 1280 / Full-width.
- */
+/** Light breakpoint helpers — do not fight Puck's own mobile layout. */
 
 import { useEffect, useRef } from "react";
 import { usePuck } from "@puckeditor/core";
 
 const PHONE = "(max-width: 637px)";
-const TABLET = "(min-width: 638px) and (max-width: 989px)";
-
-function hostDeviceWidth(width: number): number | "100%" {
-  if (width <= 480) return 360;
-  if (width <= 900) return 768;
-  if (width <= 1280) return 1280;
-  return "100%";
-}
 
 export function PuckResponsiveChrome() {
-  const { dispatch, appState, selectedItem } = usePuck();
-  const lastBucket = useRef<"phone" | "tablet" | "desktop" | null>(null);
-  const didInitViewport = useRef(false);
+  const { dispatch, selectedItem } = usePuck();
+  const didInit = useRef(false);
 
   useEffect(() => {
-    const phoneMq = window.matchMedia(PHONE);
-    const tabletMq = window.matchMedia(TABLET);
-
-    const apply = () => {
-      const phone = phoneMq.matches;
-      const tablet = tabletMq.matches;
-      const bucket = phone ? "phone" : tablet ? "tablet" : "desktop";
-
-      if (!didInitViewport.current) {
-        didInitViewport.current = true;
-        const w = hostDeviceWidth(window.innerWidth);
-        const current = appState.ui.viewports.current.width;
-        if (current !== w) {
-          dispatch({
-            type: "setUi",
-            ui: {
-              viewports: {
-                ...appState.ui.viewports,
-                current: { width: w, height: "auto" },
-              },
-            },
-          });
-        }
-      }
-
-      if (lastBucket.current === bucket) return;
-      lastBucket.current = bucket;
-
-      if (phone) {
-        dispatch({
-          type: "setUi",
-          ui: { leftSideBarVisible: false, rightSideBarVisible: false },
-        });
-      } else if (tablet) {
-        dispatch({
-          type: "setUi",
-          ui: { leftSideBarVisible: false, rightSideBarVisible: true },
-        });
-      } else {
-        dispatch({
-          type: "setUi",
-          ui: { leftSideBarVisible: true, rightSideBarVisible: true },
-        });
-      }
-    };
-
-    apply();
-    phoneMq.addEventListener("change", apply);
-    tabletMq.addEventListener("change", apply);
-    return () => {
-      phoneMq.removeEventListener("change", apply);
-      tabletMq.removeEventListener("change", apply);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (didInit.current) return;
+    didInit.current = true;
+    // Match demo: start with Small viewport on phones so canvas controls make sense.
+    if (window.matchMedia(PHONE).matches) {
+      dispatch({
+        type: "setUi",
+        ui: {
+          leftSideBarVisible: false,
+          rightSideBarVisible: false,
+        },
+      });
+      dispatch({
+        type: "setUi",
+        ui: (ui) => ({
+          ...ui,
+          viewports: {
+            ...ui.viewports,
+            current: { width: 360, height: "auto" as const },
+          },
+        }),
+      });
+    }
   }, [dispatch]);
 
   useEffect(() => {

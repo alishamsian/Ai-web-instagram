@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Right-rail fields: Puck's native section fields + Classic product surfaces.
+ * Right rail: native Puck fields first (demo look), with Classic site tools
+ * as a secondary strip — not a competing custom chrome.
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -48,7 +49,7 @@ const SCHEMA_GROUPS: ElementSchemaGroup[] = [
   "responsive",
 ];
 
-type Tab = "section" | "content" | "brand" | "media" | "seo" | "site";
+type Tab = "fields" | "content" | "brand" | "media" | "seo" | "site";
 
 function viewportFromWidth(width: number | "100%"): ViewportBucket {
   if (width === "100%" || typeof width !== "number") return "desktop";
@@ -77,7 +78,7 @@ export function PuckFieldsPanel({
   const isFa = locale === "fa";
   const dict = useMemo(() => getDictionary(locale), [locale]);
   const { selectedItem, appState } = usePuck();
-  const [tab, setTab] = useState<Tab>("section");
+  const [tab, setTab] = useState<Tab>("fields");
   const [query, setQuery] = useState("");
   const [siteSub, setSiteSub] = useState<"settings" | "templates" | "versions">(
     "settings",
@@ -94,7 +95,7 @@ export function PuckFieldsPanel({
   const change = (next: WebsiteConfig) => onConfigChange(next);
 
   const tabs: { id: Tab; fa: string; en: string }[] = [
-    { id: "section", fa: "سکشن", en: "Section" },
+    { id: "fields", fa: "فیلدها", en: "Fields" },
     { id: "content", fa: "محتوا", en: "Content" },
     { id: "brand", fa: "برند", en: "Brand" },
     { id: "media", fa: "رسانه", en: "Media" },
@@ -104,18 +105,18 @@ export function PuckFieldsPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--puck-color-surface,#fff)] text-[var(--puck-color-text,#181818)]">
-      <div className="shrink-0 border-b border-[var(--puck-color-border,#dcdcdc)] px-3 py-2">
-        <div className="flex gap-1 overflow-x-auto">
+      <div className="shrink-0 border-b border-[var(--puck-color-border,#dcdcdc)] px-2 py-2">
+        <div className="flex gap-0.5 overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                "shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition",
+                "shrink-0 rounded-[2px] px-2 py-1 text-xs font-medium transition",
                 tab === t.id
                   ? "bg-[var(--puck-color-interactive-subtle,#e7eef7)] text-[var(--puck-color-interactive,#0158ad)]"
-                  : "text-[var(--puck-color-text-muted,#767676)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)] hover:text-[var(--puck-color-text,#181818)]",
+                  : "text-[var(--puck-color-text-muted,#767676)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)]",
               )}
             >
               {isFa ? t.fa : t.en}
@@ -125,11 +126,11 @@ export function PuckFieldsPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === "section" ? (
-          <div className="space-y-4 p-3">
+        {tab === "fields" ? (
+          <div className={cn("p-0", isLoading && "opacity-60")}>
             {section ? (
-              <>
-                <div className="flex items-start justify-between gap-2 border-b border-[var(--puck-color-border,#dcdcdc)] px-1 pb-3">
+              <div className="space-y-3 border-b border-[var(--puck-color-border,#dcdcdc)] p-3">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
                       {humanSectionLabel(section, locale, def?.label ?? null)}
@@ -140,7 +141,7 @@ export function PuckFieldsPanel({
                   </div>
                   <button
                     type="button"
-                    className="shrink-0 rounded-md border border-[var(--puck-color-border,#dcdcdc)] bg-[var(--puck-color-surface,#fff)] px-2 py-1 text-[11px] font-medium hover:bg-[var(--puck-color-grey-11,#f5f5f5)]"
+                    className="shrink-0 rounded-[2px] border border-[var(--puck-color-border,#dcdcdc)] px-2 py-1 text-[11px] font-medium hover:bg-[var(--puck-color-grey-11,#f5f5f5)]"
                     onClick={() =>
                       bindToggleSectionVisibility({
                         config,
@@ -158,7 +159,6 @@ export function PuckFieldsPanel({
                         : "Show"}
                   </button>
                 </div>
-
                 <SectionVariantLibrary
                   config={config}
                   sectionId={section.id}
@@ -167,7 +167,6 @@ export function PuckFieldsPanel({
                   locale={locale}
                   onChange={onConfigChange}
                 />
-
                 {schema ? (
                   <>
                     <Input
@@ -176,40 +175,22 @@ export function PuckFieldsPanel({
                       placeholder={isFa ? "جستجوی فیلد…" : "Search fields…"}
                       className="h-8 text-xs"
                     />
-                    <div className="pt-1">
-                      <SchemaInspectorPanel
-                        config={config}
-                        section={section}
-                        schema={schema}
-                        groups={SCHEMA_GROUPS}
-                        locale={locale}
-                        viewport={viewport}
-                        query={query}
-                        onChange={change}
-                      />
-                    </div>
+                    <SchemaInspectorPanel
+                      config={config}
+                      section={section}
+                      schema={schema}
+                      groups={SCHEMA_GROUPS}
+                      locale={locale}
+                      viewport={viewport}
+                      query={query}
+                      onChange={change}
+                    />
                   </>
                 ) : null}
-
-                <div className="border-t border-[var(--puck-color-border,#dcdcdc)] pt-3">
-                  <div className={cn(isLoading && "opacity-60")}>{children}</div>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-3">
-                <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-8 text-center">
-                  <p className="text-sm font-medium text-zinc-800">
-                    {isFa ? "سکشنی انتخاب نشده" : "No section selected"}
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                    {isFa
-                      ? "یک بلوک را روی بوم انتخاب کنید، یا از تب‌های محتوا/برند استفاده کنید."
-                      : "Select a block on the canvas, or use Content / Brand tabs."}
-                  </p>
-                </div>
-                <div className={cn(isLoading && "opacity-60")}>{children}</div>
               </div>
-            )}
+            ) : null}
+            {/* Native Puck fields — same surface as demo "Page" panel */}
+            <div className="p-1">{children}</div>
           </div>
         ) : null}
 
@@ -246,27 +227,27 @@ export function PuckFieldsPanel({
         ) : null}
 
         {tab === "site" ? (
-          <div className="space-y-3 p-3">
-            <div className="flex gap-1 rounded-lg border border-zinc-200 p-0.5">
+          <div className="space-y-4 p-3">
+            <div className="flex gap-1">
               {(
                 [
-                  { id: "settings" as const, fa: "تنظیمات", en: "Settings" },
-                  { id: "templates" as const, fa: "قالب", en: "Template" },
-                  { id: "versions" as const, fa: "نسخه‌ها", en: "Versions" },
+                  ["settings", isFa ? "تنظیمات" : "Settings"],
+                  ["templates", isFa ? "قالب" : "Templates"],
+                  ["versions", isFa ? "نسخه‌ها" : "Versions"],
                 ] as const
-              ).map((s) => (
+              ).map(([id, label]) => (
                 <button
-                  key={s.id}
+                  key={id}
                   type="button"
-                  onClick={() => setSiteSub(s.id)}
+                  onClick={() => setSiteSub(id)}
                   className={cn(
-                    "flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium",
-                    siteSub === s.id
-                      ? "bg-zinc-900 text-white"
-                      : "text-zinc-600 hover:bg-zinc-100",
+                    "rounded-[2px] px-2 py-1 text-xs font-medium",
+                    siteSub === id
+                      ? "bg-[var(--puck-color-interactive-subtle,#e7eef7)] text-[var(--puck-color-interactive,#0158ad)]"
+                      : "text-[var(--puck-color-text-muted,#767676)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)]",
                   )}
                 >
-                  {isFa ? s.fa : s.en}
+                  {label}
                 </button>
               ))}
             </div>
@@ -274,8 +255,8 @@ export function PuckFieldsPanel({
               <SettingsPanel
                 config={config}
                 dict={dict}
-                onChange={change}
                 canRemoveBranding={canRemoveBranding}
+                onChange={change}
               />
             ) : null}
             {siteSub === "templates" ? (

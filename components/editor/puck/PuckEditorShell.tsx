@@ -442,8 +442,8 @@ export function PuckEditorShell({
 
   return (
     <div
-      className="puck-editor-shell h-dvh bg-[var(--puck-color-grey-12,#f5f5f5)]"
-      dir={dir}
+      className="puck-editor-shell h-dvh"
+      dir="ltr"
       lang={canvasLang}
     >
       <PuckAiPanelProvider value={aiPanelValue}>
@@ -455,7 +455,6 @@ export function PuckEditorShell({
           headerTitle={config.brand.name || website.slug}
           headerPath={`/${website.slug}`}
           plugins={[aiPlugin]}
-          // Exact default viewports from the official Puck demo
           viewports={[
             {
               width: 360,
@@ -485,6 +484,8 @@ export function PuckEditorShell({
           iframe={{
             enabled: true,
             waitForStyles: true,
+            // Copy host stylesheets so store/site CSS works in preview,
+            // without our old height:!important hacks on every _Puck node.
             syncHostStyles: true,
           }}
           onPublish={() => {
@@ -495,7 +496,6 @@ export function PuckEditorShell({
             isFa
               ? {
                   "header-publish": "انتشار",
-                  "header-view-page": "مشاهده صفحه",
                   "plugin-blocks": "بلوک‌ها",
                   "plugin-outline": "ساختار",
                   "plugin-fields": "فیلدها",
@@ -504,8 +504,6 @@ export function PuckEditorShell({
           }
           dnd={{ behavior: "auto" }}
           overrides={{
-            // Providers must live inside the iframe — React context does not
-            // cross the frame boundary used for true responsive preview.
             iframe: ({ children }) => (
               <PuckWebsiteProvider config={config} locale={locale}>
                 <StoreCartProvider
@@ -535,7 +533,7 @@ export function PuckEditorShell({
               <>
                 <PuckAiHotkey />
                 <PuckResponsiveChrome />
-                <div className="flex h-full min-h-0 flex-col">
+                <div className="puck-editor-shell__root flex h-full min-h-0 flex-col">
                   {errorMessage ? (
                     <div
                       role="alert"

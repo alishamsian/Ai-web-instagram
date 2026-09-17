@@ -1,16 +1,14 @@
 "use client";
 
 /**
- * Header actions matching the official Puck demo pattern:
- * secondary outline controls + default Publish (`children`).
- * https://demo.puckeditor.com/edit
+ * Demo-matching header actions: View page + default Publish (`children`).
+ * Extra tools stay icon-only and collapse on narrow widths.
  */
 
 import Link from "next/link";
 import {
   ArrowLeftRight,
   ExternalLink,
-  Gauge,
   History,
   Loader2,
   Save,
@@ -28,7 +26,7 @@ export function PuckHeaderActions({
   onSave,
   onPublish,
   onOpenHistory,
-  onOpenQuality,
+  onOpenQuality: _onOpenQuality,
   children,
 }: {
   locale: Locale;
@@ -43,93 +41,71 @@ export function PuckHeaderActions({
   children: React.ReactNode;
 }) {
   const isFa = locale === "fa";
+  void _onOpenQuality;
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-2">
       <span
         className={cn(
-          "hidden items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium sm:inline-flex",
+          "hidden text-[11px] font-medium md:inline",
           saveState === "saved" && "text-[var(--puck-color-green-04,#0c680c)]",
           saveState === "saving" && "text-[var(--puck-color-azure-04,#0158ad)]",
           saveState === "dirty" && "text-[var(--puck-color-yellow-04,#645a00)]",
           saveState === "error" && "text-[var(--puck-color-rose-04,#a81a66)]",
           saveState === "idle" && "text-[var(--puck-color-text-muted,#767676)]",
         )}
-        title={
-          saveState === "saving"
-            ? isFa
-              ? "در حال ذخیره…"
-              : "Saving…"
-            : saveState === "dirty"
-              ? isFa
-                ? "ذخیره‌نشده"
-                : "Unsaved"
-              : saveState === "saved"
-                ? isFa
-                  ? "ذخیره شد"
-                  : "Saved"
-                : saveState === "error"
-                  ? isFa
-                    ? "خطا"
-                    : "Error"
-                  : undefined
-        }
       >
         {saveState === "saving" ? (
-          <Loader2 className="size-3 animate-spin" />
+          <span className="inline-flex items-center gap-1">
+            <Loader2 className="size-3 animate-spin" />
+            {isFa ? "ذخیره…" : "Saving…"}
+          </span>
+        ) : saveState === "dirty" ? (
+          isFa ? "ذخیره‌نشده" : "Unsaved"
+        ) : saveState === "saved" ? (
+          isFa ? "ذخیره شد" : "Saved"
+        ) : saveState === "error" ? (
+          isFa ? "خطا" : "Error"
         ) : null}
-        {saveState === "saving"
-          ? isFa
-            ? "ذخیره…"
-            : "Saving…"
-          : saveState === "dirty"
-            ? isFa
-              ? "ذخیره‌نشده"
-              : "Unsaved"
-            : saveState === "saved"
-              ? isFa
-                ? "ذخیره شد"
-                : "Saved"
-              : saveState === "error"
-                ? isFa
-                  ? "خطا"
-                  : "Error"
-                : null}
       </span>
 
-      <IconAction
-        onClick={onOpenHistory}
-        title={isFa ? "تاریخچه" : "History"}
+      <button
+        type="button"
+        title={isFa ? "ذخیره" : "Save"}
+        aria-label={isFa ? "ذخیره" : "Save"}
+        onClick={onSave}
+        className="inline-flex size-8 items-center justify-center rounded-[2px] text-[var(--puck-color-text-muted,#767676)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)] hover:text-[var(--puck-color-text,#181818)]"
       >
-        <History className="size-4" />
-      </IconAction>
-      <IconAction
-        onClick={onOpenQuality}
-        title={isFa ? "کیفیت" : "Quality"}
-      >
-        <Gauge className="size-4" />
-      </IconAction>
-      <IconAction onClick={onSave} title={isFa ? "ذخیره" : "Save"}>
         {saveState === "saving" ? (
           <Loader2 className="size-4 animate-spin" />
         ) : (
           <Save className="size-4" />
         )}
-      </IconAction>
+      </button>
+
+      <button
+        type="button"
+        title={isFa ? "تاریخچه" : "History"}
+        aria-label={isFa ? "تاریخچه" : "History"}
+        onClick={onOpenHistory}
+        className="hidden size-8 items-center justify-center rounded-[2px] text-[var(--puck-color-text-muted,#767676)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)] hover:text-[var(--puck-color-text,#181818)] sm:inline-flex"
+      >
+        <History className="size-4" />
+      </button>
 
       <Link
         href={`/${locale}/preview/${websiteId}`}
         target="_blank"
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--puck-color-border,#dcdcdc)] bg-[var(--puck-color-surface,#fff)] px-3 text-xs font-medium text-[var(--puck-color-text,#181818)] transition hover:bg-[var(--puck-color-grey-11,#f5f5f5)]"
+        className="inline-flex h-8 items-center gap-1.5 rounded-[2px] border border-[var(--puck-color-border,#dcdcdc)] bg-white px-3 text-xs font-medium text-[var(--puck-color-text,#181818)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)]"
       >
-        <ExternalLink className="size-3.5 opacity-70" />
+        <ExternalLink className="size-3.5 opacity-60" />
         {isFa ? "مشاهده صفحه" : "View page"}
       </Link>
 
       <Link
         href={`/${locale}/editor/${websiteId}`}
-        title={isFa ? "ویرایشگر کلاسیک" : "Classic editor"}
-        className="inline-flex size-8 items-center justify-center rounded-md text-[var(--puck-color-text-muted,#767676)] transition hover:bg-[var(--puck-color-grey-11,#f5f5f5)] hover:text-[var(--puck-color-text,#181818)]"
+        title={isFa ? "کلاسیک" : "Classic"}
+        className="hidden size-8 items-center justify-center rounded-[2px] text-[var(--puck-color-text-muted,#767676)] hover:bg-[var(--puck-color-grey-11,#f5f5f5)] lg:inline-flex"
       >
         <ArrowLeftRight className="size-4" />
       </Link>
@@ -139,38 +115,14 @@ export function PuckHeaderActions({
           type="button"
           onClick={onPublish}
           disabled={publishing}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--puck-color-border,#dcdcdc)] bg-[var(--puck-color-surface,#fff)] px-3 text-xs font-medium text-[var(--puck-color-text,#181818)] transition hover:bg-[var(--puck-color-grey-11,#f5f5f5)] disabled:opacity-50"
+          className="inline-flex h-8 items-center rounded-[2px] border border-[var(--puck-color-border,#dcdcdc)] bg-white px-3 text-xs font-medium disabled:opacity-50"
         >
-          {publishing ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : null}
+          {publishing ? <Loader2 className="size-3.5 animate-spin" /> : null}
           {isFa ? "لغو انتشار" : "Unpublish"}
         </button>
       ) : (
         children
       )}
     </div>
-  );
-}
-
-function IconAction({
-  children,
-  onClick,
-  title,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onClick={onClick}
-      className="inline-flex size-8 items-center justify-center rounded-md text-[var(--puck-color-text-muted,#767676)] transition hover:bg-[var(--puck-color-grey-11,#f5f5f5)] hover:text-[var(--puck-color-text,#181818)]"
-    >
-      {children}
-    </button>
   );
 }
