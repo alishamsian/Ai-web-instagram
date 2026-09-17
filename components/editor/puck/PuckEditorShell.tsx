@@ -35,6 +35,7 @@ import {
 } from "@/components/editor/puck/PuckEditBridge";
 import { PuckHeaderActions } from "@/components/editor/puck/PuckHeaderActions";
 import { PuckFieldsPanel } from "@/components/editor/puck/PuckFieldsPanel";
+import { PuckResponsiveChrome } from "@/components/editor/puck/PuckResponsiveChrome";
 import { PublishDialog } from "@/components/editor/PublishDialog";
 import { HistoryPanel } from "@/components/editor/HistoryPanel";
 import { QualityPanel } from "@/components/editor/QualityPanel";
@@ -513,6 +514,7 @@ export function PuckEditorShell({
             puck: ({ children }) => (
               <>
                 <PuckAiHotkey />
+                <PuckResponsiveChrome />
                 <div className="flex h-full min-h-0 flex-col">
                   {errorMessage ? (
                     <div
