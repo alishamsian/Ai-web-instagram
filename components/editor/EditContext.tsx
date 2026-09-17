@@ -21,17 +21,21 @@ export type EditorFieldPath =
   | "hero.headline"
   | "hero.subheadline"
   | "hero.cta"
+  | "hero.eyebrow"
   | "about.title"
   | "about.body"
   | "products.title"
+  | "products.description"
   | "services.title"
   | "gallery.title"
   | "faq.title"
   | "contact.title"
+  | "contact.body"
   | "testimonials.title"
   | "promo.kicker"
   | "promo.title"
-  | "promo.cta";
+  | "promo.cta"
+  | "trust.title";
 
 export type SectionAction =
   | "duplicate"

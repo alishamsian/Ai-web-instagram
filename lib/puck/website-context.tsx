@@ -16,6 +16,8 @@ import {
 type PuckWebsiteContextValue = {
   config: WebsiteConfig;
   locale: "fa" | "en";
+  /** Patch WebsiteConfig from schema-bound custom fields */
+  onSchemaFieldChange?: (next: WebsiteConfig, label?: string) => void;
 };
 
 const PuckWebsiteContext = createContext<PuckWebsiteContextValue | null>(null);
@@ -23,15 +25,17 @@ const PuckWebsiteContext = createContext<PuckWebsiteContextValue | null>(null);
 export function PuckWebsiteProvider({
   config,
   locale,
+  onSchemaFieldChange,
   children,
 }: {
   config: WebsiteConfig;
   locale: "fa" | "en";
+  onSchemaFieldChange?: (next: WebsiteConfig, label?: string) => void;
   children: ReactNode;
 }) {
   const value = useMemo(
-    () => ({ config, locale }),
-    [config, locale],
+    () => ({ config, locale, onSchemaFieldChange }),
+    [config, locale, onSchemaFieldChange],
   );
   return (
     <PuckWebsiteContext.Provider value={value}>

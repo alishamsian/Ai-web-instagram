@@ -1,6 +1,6 @@
 "use client";
 
-import type { Config } from "@puckeditor/core";
+import type { Config, Fields } from "@puckeditor/core";
 import type { ComponentConfig } from "@puckeditor/core";
 import type { WebsiteSectionType } from "@/types/website";
 import type { PuckSectionProps } from "@/lib/puck/types";
@@ -8,6 +8,7 @@ import {
   getLibrarySections,
   getSectionDefinition,
   getSectionVariants,
+  getSectionSchema,
   ALL_SECTION_DEFINITIONS,
   type SectionDefinition,
 } from "@/lib/store/registry";
@@ -23,6 +24,13 @@ import {
 import { cn } from "@/lib/utils";
 import { hasSectionRenderer, resolveSectionRenderer } from "@/lib/store/registry";
 import { sectionLabel } from "@/components/editor/editor-utils";
+import {
+  schemaToSettingsObjectFields,
+  schemaContentBoundFieldKeys,
+} from "@/lib/puck/schema-to-fields";
+import { PuckBoundSchemaField } from "@/components/editor/puck/PuckBoundField";
+import { sectionPresentationProps } from "@/lib/store/section-presentation";
+import { createElement } from "react";
 
 function SectionCanvasPreview(props: PuckSectionProps) {
   const ctx = usePuckWebsiteOptional();
@@ -71,11 +79,12 @@ function SectionCanvasPreview(props: PuckSectionProps) {
   const body = (
     <div
       className={cn(
-        "relative",
+        "relative store-section-present",
         !merged.visible && "opacity-40 grayscale",
       )}
       data-puck-section={merged.id}
       data-section-type={merged.type}
+      {...sectionPresentationProps(merged.settings)}
     >
       {!merged.visible ? (
         <div className="pointer-events-none absolute start-3 top-3 z-10 rounded bg-ink/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
@@ -120,10 +129,27 @@ function variantFieldOptions(type: string) {
 
 function buildComponentConfig(
   def: SectionDefinition,
+  locale: "fa" | "en",
 ): ComponentConfig<PuckSectionProps> {
   const variantOptions = variantFieldOptions(def.type);
+  const schema = getSectionSchema(def.type as never) ?? def.schema;
+  const settingsFields = schemaToSettingsObjectFields(schema, locale);
+  const boundFields = schemaContentBoundFieldKeys(schema);
+
+  const contentFields: Fields = {};
+  for (const field of boundFields) {
+    if (field.path === "visible" || field.path === "variant") continue;
+    const key = `__bound_${field.key}`;
+    contentFields[key] = {
+      type: "custom",
+      label: field.label?.[locale] ?? field.label?.en ?? field.key,
+      render: () =>
+        createElement(PuckBoundSchemaField, { field, locale }),
+    };
+  }
+
   return {
-    label: def.label.en,
+    label: locale === "fa" ? def.label.fa : def.label.en,
     defaultProps: {
       id: `${def.type}-new`,
       sectionId: `${def.type}-new`,
@@ -133,26 +159,39 @@ function buildComponentConfig(
       settings: {},
     },
     fields: {
-      sectionId: { type: "text", label: "Section ID" },
-      sectionType: { type: "text", label: "Type" },
       visible: {
-        type: "select",
-        label: "Visibility",
+        type: "radio",
+        label: locale === "fa" ? "نمایش" : "Visibility",
         options: [
-          { label: "Visible", value: true },
-          { label: "Hidden", value: false },
+          { label: locale === "fa" ? "نمایان" : "Visible", value: true },
+          { label: locale === "fa" ? "مخفی" : "Hidden", value: false },
         ],
       },
       ...(variantOptions
         ? {
             variant: {
               type: "select" as const,
-              label: "Variant",
+              label: locale === "fa" ? "واریانت" : "Variant",
               options: variantOptions,
             },
           }
         : {}),
-      // Settings bag is preserved by the adapter; rich inspector lands in Phase 2.
+      ...(Object.keys(settingsFields).length > 0
+        ? {
+            settings: {
+              type: "object" as const,
+              label: locale === "fa" ? "تنظیمات ظاهری" : "Appearance",
+              objectFields: settingsFields,
+            },
+          }
+        : {}),
+      ...contentFields,
+    },
+    resolveFields: async (_data: unknown, { fields }: { fields: Fields }) => {
+      const next = { ...fields } as Fields;
+      delete next.sectionId;
+      delete next.sectionType;
+      return next;
     },
     resolveData: async ({ props }: { props: PuckSectionProps }) => ({
       props: {
@@ -222,7 +261,7 @@ export function buildPuckConfig(options?: {
 
   const components: Record<string, ComponentConfig> = {};
   for (const def of allDefs) {
-    components[def.type] = buildComponentConfig(def) as ComponentConfig;
+    components[def.type] = buildComponentConfig(def, locale) as ComponentConfig;
   }
 
   for (const type of options?.extraSectionTypes ?? []) {

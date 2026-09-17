@@ -1147,6 +1147,53 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     ],
     verticals: ["*"],
     capabilities: withCaps(),
+    schema: {
+      content: {
+        title: {
+          key: "title",
+          kind: "text",
+          label: { fa: "عنوان", en: "Title" },
+          path: "content.testimonials.title",
+        },
+      },
+      layout: {
+        columns: {
+          key: "columns",
+          kind: "number",
+          label: { fa: "ستون‌ها", en: "Columns" },
+          path: "settings.columns",
+          responsive: true,
+          min: 1,
+          max: 3,
+          defaultValue: { mobile: 1, tablet: 2, desktop: 3 },
+        },
+        gap: {
+          key: "gap",
+          kind: "spacing",
+          label: { fa: "فاصله", en: "Gap" },
+          path: "settings.gap",
+          options: [
+            { value: "tight", label: { fa: "فشرده", en: "Tight" } },
+            { value: "comfortable", label: { fa: "متعادل", en: "Comfortable" } },
+            { value: "spacious", label: { fa: "باز", en: "Spacious" } },
+          ],
+          defaultValue: "comfortable",
+        },
+      },
+      style: {
+        alignment: {
+          key: "alignment",
+          kind: "alignment",
+          label: { fa: "تراز", en: "Alignment" },
+          path: "settings.alignment",
+          options: [
+            { value: "start", label: { fa: "شروع", en: "Start" } },
+            { value: "center", label: { fa: "وسط", en: "Center" } },
+          ],
+          defaultValue: "start",
+        },
+      },
+    },
     preview: { thumbnailTone: "neutral", aspect: "16/9" },
   },
   {
@@ -1232,6 +1279,39 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     ],
     verticals: ["*"],
     capabilities: withCaps(),
+    schema: {
+      content: {
+        title: {
+          key: "title",
+          kind: "text",
+          label: { fa: "عنوان", en: "Title" },
+          path: "settings.title",
+        },
+      },
+      layout: {
+        columns: {
+          key: "columns",
+          kind: "number",
+          label: { fa: "ستون‌ها", en: "Columns" },
+          path: "settings.columns",
+          responsive: true,
+          min: 2,
+          max: 4,
+          defaultValue: { mobile: 2, tablet: 3, desktop: 4 },
+        },
+        alignment: {
+          key: "alignment",
+          kind: "alignment",
+          label: { fa: "تراز", en: "Alignment" },
+          path: "settings.alignment",
+          options: [
+            { value: "start", label: { fa: "شروع", en: "Start" } },
+            { value: "center", label: { fa: "وسط", en: "Center" } },
+          ],
+          defaultValue: "center",
+        },
+      },
+    },
     preview: { thumbnailTone: "neutral", aspect: "16/9" },
   },
   {
@@ -1241,6 +1321,30 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     description: { fa: "سوالات پرتکرار", en: "Common questions" },
     verticals: ["*"],
     capabilities: withCaps(),
+    schema: {
+      content: {
+        title: {
+          key: "title",
+          kind: "text",
+          label: { fa: "عنوان", en: "Title" },
+          path: "content.faq.title",
+        },
+      },
+      layout: {
+        maxWidth: {
+          key: "maxWidth",
+          kind: "select",
+          label: { fa: "عرض", en: "Width" },
+          path: "settings.maxWidth",
+          options: [
+            { value: "narrow", label: { fa: "باریک", en: "Narrow" } },
+            { value: "default", label: { fa: "پیش‌فرض", en: "Default" } },
+            { value: "wide", label: { fa: "عریض", en: "Wide" } },
+          ],
+          defaultValue: "default",
+        },
+      },
+    },
     preview: { thumbnailTone: "neutral", aspect: "4/3" },
   },
   {
@@ -1428,6 +1532,57 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     },
     verticals: ["*"],
     capabilities: withCaps(),
+    schema: {
+      content: {
+        kicker: {
+          key: "kicker",
+          kind: "text",
+          label: { fa: "کیکر", en: "Kicker" },
+          path: "content.promo.kicker",
+        },
+        title: {
+          key: "title",
+          kind: "text",
+          label: { fa: "عنوان", en: "Title" },
+          path: "content.promo.title",
+        },
+      },
+      actions: {
+        cta: {
+          key: "cta",
+          kind: "text",
+          label: { fa: "متن دکمه", en: "CTA label" },
+          path: "content.promo.cta",
+        },
+        ctaHref: {
+          key: "ctaHref",
+          kind: "link",
+          label: { fa: "لینک دکمه", en: "CTA link" },
+          path: "content.promo.ctaHref",
+        },
+      },
+      layout: {
+        alignment: {
+          key: "alignment",
+          kind: "alignment",
+          label: { fa: "تراز", en: "Alignment" },
+          path: "settings.alignment",
+          options: [
+            { value: "start", label: { fa: "شروع", en: "Start" } },
+            { value: "center", label: { fa: "وسط", en: "Center" } },
+          ],
+          defaultValue: "center",
+        },
+      },
+      style: {
+        surface: {
+          key: "surface",
+          kind: "color",
+          label: { fa: "سطح", en: "Surface" },
+          path: "settings.surface",
+        },
+      },
+    },
     preview: { thumbnailTone: "dark", aspect: "16/9" },
   },
   {
@@ -1437,6 +1592,40 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     description: { fa: "لیست خدمات", en: "Service offerings" },
     verticals: ["*"],
     capabilities: withCaps(),
+    schema: {
+      content: {
+        title: {
+          key: "title",
+          kind: "text",
+          label: { fa: "عنوان", en: "Title" },
+          path: "content.services.title",
+        },
+      },
+      layout: {
+        columns: {
+          key: "columns",
+          kind: "number",
+          label: { fa: "ستون‌ها", en: "Columns" },
+          path: "settings.columns",
+          responsive: true,
+          min: 1,
+          max: 4,
+          defaultValue: { mobile: 1, tablet: 2, desktop: 3 },
+        },
+        gap: {
+          key: "gap",
+          kind: "spacing",
+          label: { fa: "فاصله", en: "Gap" },
+          path: "settings.gap",
+          options: [
+            { value: "tight", label: { fa: "فشرده", en: "Tight" } },
+            { value: "comfortable", label: { fa: "متعادل", en: "Comfortable" } },
+            { value: "spacious", label: { fa: "باز", en: "Spacious" } },
+          ],
+          defaultValue: "comfortable",
+        },
+      },
+    },
     preview: { thumbnailTone: "neutral", aspect: "4/3" },
   },
   {
@@ -1469,6 +1658,29 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
       duplicate: false,
       hide: true,
     }),
+    schema: {
+      layout: {
+        alignment: {
+          key: "alignment",
+          kind: "alignment",
+          label: { fa: "تراز", en: "Alignment" },
+          path: "settings.alignment",
+          options: [
+            { value: "start", label: { fa: "شروع", en: "Start" } },
+            { value: "center", label: { fa: "وسط", en: "Center" } },
+          ],
+          defaultValue: "start",
+        },
+      },
+      style: {
+        surface: {
+          key: "surface",
+          kind: "color",
+          label: { fa: "سطح", en: "Surface" },
+          path: "settings.surface",
+        },
+      },
+    },
     preview: { thumbnailTone: "dark", aspect: "16/9" },
   },
 ];

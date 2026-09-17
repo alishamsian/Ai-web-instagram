@@ -505,7 +505,13 @@ export function PuckEditorShell({
           dnd={{ behavior: "auto" }}
           overrides={{
             iframe: ({ children }) => (
-              <PuckWebsiteProvider config={config} locale={locale}>
+              <PuckWebsiteProvider
+                config={config}
+                locale={locale}
+                onSchemaFieldChange={(next, label) =>
+                  handleConfigChange(next, label ?? "Edit field")
+                }
+              >
                 <StoreCartProvider
                   storageKey={cartStorageKey}
                   persist={false}

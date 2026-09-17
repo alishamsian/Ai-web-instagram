@@ -1765,3 +1765,63 @@
   .store-wrap { width: min(var(--store-wrap), calc(100% - 1rem)); }
   .store-btn { min-height: 2.65rem; padding-inline: 1rem; font-size: 0.66rem; }
 }
+
+/* Schema-driven presentation (Puck fine editing) */
+.store-section-present[data-align="center"] {
+  text-align: center;
+}
+.store-section-present[data-align="center"] .store-hero__content,
+.store-section-present[data-align="center"] .store-section__head {
+  margin-inline: auto;
+  text-align: center;
+  align-items: center;
+}
+.store-section-present[data-align="end"] {
+  text-align: end;
+}
+.store-section-present[data-max-width="narrow"] {
+  --store-present-wrap: 40rem;
+}
+.store-section-present[data-max-width="default"] {
+  --store-present-wrap: 64rem;
+}
+.store-section-present[data-max-width="wide"] {
+  --store-present-wrap: 80rem;
+}
+.store-section-present[data-max-width] .store-wrap,
+.store-section-present[data-max-width] .store-hero__content {
+  width: min(100%, var(--store-present-wrap, var(--store-wrap)));
+}
+.store-section-present[data-gap="tight"] {
+  --store-present-gap: 0.75rem;
+}
+.store-section-present[data-gap="comfortable"] {
+  --store-present-gap: 1.25rem;
+}
+.store-section-present[data-gap="spacious"] {
+  --store-present-gap: 2rem;
+}
+.store-section-present[data-gap] .store-grid,
+.store-section-present[data-gap] .store-products,
+.store-section-present[data-gap] .store-services {
+  gap: var(--store-present-gap, 1.25rem);
+}
+.store-section-present[data-radius="sm"] img,
+.store-section-present[data-radius="sm"] .store-card {
+  border-radius: 0.35rem;
+}
+.store-section-present[data-radius="md"] img,
+.store-section-present[data-radius="md"] .store-card {
+  border-radius: 0.75rem;
+}
+.store-section-present[data-radius="lg"] img,
+.store-section-present[data-radius="lg"] .store-card {
+  border-radius: 1.25rem;
+}
+.store-section-present[style*="--section-surface"] {
+  background: var(--section-surface);
+}
+.store-section-present[data-overlay="off"] .store-hero--overlay::before,
+.store-section-present[data-overlay="off"] .store-hero__overlay {
+  opacity: 0 !important;
+}
