@@ -19,7 +19,6 @@ import {
   undoHistory,
   createHistoryEntry,
 } from "@/lib/editor/history";
-import { websiteConfigToPuck, puckToWebsiteConfig } from "@/lib/puck";
 import {
   resetRegistryForTests,
   ALL_SECTION_DEFINITIONS,
@@ -289,24 +288,7 @@ describe("AI transaction + undo", () => {
   });
 });
 
-describe("Puck projection after AI", () => {
-  it("round-trips WebsiteConfig after AI batch", () => {
-    const config = baseConfig();
-    const batch = executeAiActionBatch({
-      config,
-      actions: proposeEditorActions(config, {
-        intent: "shorten_hero",
-      }),
-    });
-    expect(batch.ok).toBe(true);
-    if (!batch.ok) return;
-    const puck = websiteConfigToPuck(batch.config);
-    const restored = puckToWebsiteConfig(puck, batch.config);
-    expect(restored.content.hero.headline).toBe(
-      batch.config.content.hero.headline,
-    );
-  });
-
+describe("AI batch preserves structure", () => {
   it("preserves unknown sections through AI-adjacent flow", () => {
     const config = baseConfig();
     config.sections.splice(1, 0, {

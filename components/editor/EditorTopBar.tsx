@@ -270,17 +270,6 @@ export function EditorTopBar({
           <span className="hidden lg:inline">{previewLabel}</span>
         </Link>
 
-        {/* Phase 1: parallel Puck editor — classic remains default */}
-        <Link
-          href={`/${locale}/editor/${websiteId}/puck`}
-          className="editor-ghost-btn hidden md:inline-flex"
-          title={isFa ? "ویرایشگر جدید (آزمایشی)" : "New editor (experimental)"}
-        >
-          <span className="text-[11px] font-medium tracking-wide">
-            {isFa ? "Puck" : "Puck"}
-          </span>
-        </Link>
-
         {status === "published" ? (
           <a
             href={`/s/${websiteSlug}`}

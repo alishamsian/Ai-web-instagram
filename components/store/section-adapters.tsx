@@ -352,7 +352,7 @@ export function renderFooterSection(ctx: StoreSectionContext) {
   );
 }
 
-function nestedSectionFromPuckItem(item: {
+function nestedSectionFromItem(item: {
   type?: string;
   props?: Record<string, unknown>;
 }): import("@/types/website").SectionConfig | null {
@@ -395,7 +395,7 @@ export function renderColumnsSection(ctx: StoreSectionContext) {
 
   const renderColumn = (items: unknown[]) =>
     items.map((raw, index) => {
-      const section = nestedSectionFromPuckItem(
+      const section = nestedSectionFromItem(
         raw as { type?: string; props?: Record<string, unknown> },
       );
       if (!section || section.type === "columns" || section.type === "footer") {

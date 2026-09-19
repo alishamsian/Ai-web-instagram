@@ -1766,7 +1766,7 @@
   .store-btn { min-height: 2.65rem; padding-inline: 1rem; font-size: 0.66rem; }
 }
 
-/* Schema-driven presentation (Puck fine editing) */
+/* Schema-driven presentation (editor fine editing) */
 .store-section-present[data-align="center"] {
   text-align: center;
 }
@@ -1826,7 +1826,7 @@
   opacity: 0 !important;
 }
 
-/* Columns layout (Puck slots + published site) */
+/* Columns layout (nested sections + published site) */
 .store-columns {
   width: 100%;
   padding-block: var(--store-present-gap, 1.5rem);

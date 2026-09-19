@@ -30,7 +30,6 @@ Use this before inviting real customers. Checkboxes are operational — not a cl
 ## Editor / save
 
 - [ ] Classic editor autosave + manual save work
-- [ ] Puck editor autosave + manual save work
 - [ ] Version conflict (409) shows reload/review message (no silent overwrite)
 - [ ] AI Apply + rapid edit does not drop the newer intentional change without conflict UX
 
