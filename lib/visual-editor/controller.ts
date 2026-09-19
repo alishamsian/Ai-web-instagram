@@ -214,12 +214,22 @@ export async function createVisualEditor(
   editor.on("component:selected", () => options.onSelection?.());
   editor.on("component:deselected", () => options.onSelection?.());
 
+  if (process.env.NODE_ENV !== "production") {
+    (
+      globalThis as typeof globalThis & { __veEditor?: Editor }
+    ).__veEditor = editor;
+  }
+
   return editor;
 }
 
 export function destroyVisualEditor(editor: Editor | null | undefined) {
   if (!editor) return;
   try {
+    const g = globalThis as typeof globalThis & { __veEditor?: Editor };
+    if (g.__veEditor === editor) {
+      delete g.__veEditor;
+    }
     editor.destroy();
   } catch {
     // ignore double-destroy
@@ -315,7 +325,7 @@ export function applyMediaToSelectedImage(
   if (!isImage) return false;
   selected.addAttributes({
     src: media.url,
-    alt: media.alt || "",
+    alt: media.alt || selected.getAttributes().alt || "",
     "data-media-id": media.id,
   });
   selected.set("src", media.url);

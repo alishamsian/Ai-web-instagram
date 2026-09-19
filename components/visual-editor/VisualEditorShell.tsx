@@ -242,7 +242,6 @@ export function VisualEditorShell({
         traitsRef.current?.replaceChildren();
         if (editorMountIdRef.current !== mountId) return;
         const project = websiteConfigToVisualProject(configRef.current);
-        lastSavedFingerprint.current = visualProjectFingerprint(project);
         const mediaAssets = Object.entries(configRef.current.media).map(
           ([id, media]) => ({
             id,
@@ -291,6 +290,16 @@ export function VisualEditorShell({
 
         created = editor;
         editorRef.current = editor;
+        // Fingerprint AFTER loadProjectData — GrapesJS normalizes the project on load.
+        lastSavedFingerprint.current = visualProjectFingerprint(
+          serializeVisualProject(editor),
+        );
+        // Drop load/normalization history so Undo starts clean.
+        try {
+          editor.UndoManager.clear();
+        } catch {
+          // older grapes builds may not expose clear
+        }
         setPages(getVisualPages(editor));
         const preferred =
           configRef.current.visualEditor?.activePageId ||

@@ -1,6 +1,9 @@
 /**
  * Sync GrapesJS project HTML/JSON → WebsiteConfig content fields.
  * Preserves all sections not present in the canvas (never silently drops).
+ *
+ * GrapesJS getProjectData() stores pages as frames[].component JSON trees
+ * (not HTML strings). Extraction walks both shapes.
  */
 
 import type { ProjectData } from "grapesjs";
@@ -15,36 +18,65 @@ function decodeEntities(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
-function collectPageHtml(project: ProjectData | Record<string, unknown>): string {
+type GjsNode = {
+  type?: string;
+  tagName?: string;
+  content?: string;
+  attributes?: Record<string, string | undefined>;
+  components?: GjsNode[] | string;
+  style?: Record<string, string>;
+};
+
+/** Collect root component nodes from every page (legacy `component` + `frames`). */
+export function collectPageRoots(
+  project: ProjectData | Record<string, unknown>,
+): unknown[] {
   const pages = (project as { pages?: unknown }).pages;
-  if (!Array.isArray(pages)) return "";
-  return pages
-    .map((page) => {
-      if (!page || typeof page !== "object") return "";
-      const component = (page as { component?: unknown }).component;
-      if (typeof component === "string") return component;
-      if (component && typeof component === "object") {
-        try {
-          return JSON.stringify(component);
-        } catch {
-          return "";
-        }
+  if (!Array.isArray(pages)) return [];
+  const roots: unknown[] = [];
+  for (const page of pages) {
+    if (!page || typeof page !== "object") continue;
+    const p = page as {
+      component?: unknown;
+      frames?: Array<{ component?: unknown }>;
+    };
+    if (p.component != null) roots.push(p.component);
+    if (Array.isArray(p.frames)) {
+      for (const frame of p.frames) {
+        if (frame?.component != null) roots.push(frame.component);
       }
-      return "";
-    })
-    .join("\n");
+    }
+  }
+  return roots;
 }
 
-/** Extract `data-content-path` → text/html/src values from serialized project. */
-export function extractContentPathValues(
-  project: ProjectData | Record<string, unknown>,
-): Record<string, string> {
-  const html = collectPageHtml(project);
-  const values: Record<string, string> = {};
+function collectText(node: GjsNode): string {
+  if (typeof node.content === "string" && node.type === "textnode") {
+    return node.content;
+  }
+  if (typeof node.components === "string") return node.components;
+  if (!Array.isArray(node.components)) {
+    return typeof node.content === "string" ? node.content : "";
+  }
+  return node.components.map(collectText).join("");
+}
 
-  // Prefer attribute-based matches in HTML strings
-  const pathRegex =
-    /data-content-path="([^"]+)"[^>]*>([^<]*)</gi;
+function walkComponentTree(
+  node: unknown,
+  visit: (n: GjsNode) => void,
+): void {
+  if (!node) return;
+  if (typeof node === "string") return;
+  if (typeof node !== "object") return;
+  const n = node as GjsNode;
+  visit(n);
+  if (Array.isArray(n.components)) {
+    for (const child of n.components) walkComponentTree(child, visit);
+  }
+}
+
+function extractFromHtmlBlob(html: string, values: Record<string, string>) {
+  const pathRegex = /data-content-path="([^"]+)"[^>]*>([^<]*)</gi;
   let match: RegExpExecArray | null;
   while ((match = pathRegex.exec(html)) !== null) {
     const path = match[1];
@@ -52,7 +84,6 @@ export function extractContentPathValues(
     if (path) values[path] = text;
   }
 
-  // Images / media with content path + src
   const imgRegex =
     /data-content-path="([^"]+)"[^>]*src="([^"]+)"|src="([^"]+)"[^>]*data-content-path="([^"]+)"/gi;
   while ((match = imgRegex.exec(html)) !== null) {
@@ -61,13 +92,48 @@ export function extractContentPathValues(
     if (path && src) values[path] = src;
   }
 
-  // media-id on images tied to content paths
   const mediaRegex =
     /data-content-path="([^"]+)"[^>]*data-media-id="([^"]+)"|data-media-id="([^"]+)"[^>]*data-content-path="([^"]+)"/gi;
   while ((match = mediaRegex.exec(html)) !== null) {
     const path = match[1] || match[4];
     const mediaId = match[2] || match[3];
     if (path && mediaId) values[path] = mediaId;
+  }
+}
+
+/** Extract `data-content-path` → text/src/media-id values from serialized project. */
+export function extractContentPathValues(
+  project: ProjectData | Record<string, unknown>,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  const roots = collectPageRoots(project);
+
+  for (const root of roots) {
+    if (typeof root === "string") {
+      extractFromHtmlBlob(root, values);
+      continue;
+    }
+    walkComponentTree(root, (n) => {
+      const attrs = n.attributes ?? {};
+      const path = attrs["data-content-path"];
+      if (!path) return;
+
+      const mediaId = attrs["data-media-id"];
+      const src = attrs.src;
+      const isImagePath = path.endsWith(".imageId") || path.includes("image");
+
+      if (mediaId && isImagePath) {
+        values[path] = mediaId;
+        return;
+      }
+      if (src && (n.tagName === "img" || n.type === "image" || isImagePath)) {
+        values[path] = src;
+        return;
+      }
+
+      const text = collectText(n).trim();
+      if (text) values[path] = decodeEntities(text);
+    });
   }
 
   return values;
@@ -76,29 +142,58 @@ export function extractContentPathValues(
 export function extractSectionMeta(
   project: ProjectData | Record<string, unknown>,
 ): Array<{ id: string; type?: string; visible: boolean; variant?: string }> {
-  const html = collectPageHtml(project);
   const result: Array<{
     id: string;
     type?: string;
     visible: boolean;
     variant?: string;
   }> = [];
-  const sectionRegex =
-    /<section[^>]*data-section-id="([^"]+)"[^>]*>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = sectionRegex.exec(html)) !== null) {
-    const tag = match[0];
-    const id = match[1];
-    const type = /data-section-type="([^"]+)"/.exec(tag)?.[1];
-    const variant = /data-section-variant="([^"]+)"/.exec(tag)?.[1];
-    const visibleRaw = /data-visible="([^"]+)"/.exec(tag)?.[1];
-    result.push({
-      id,
-      type,
-      variant: variant || undefined,
-      visible: visibleRaw !== "false",
+  const seen = new Set<string>();
+
+  const push = (meta: {
+    id: string;
+    type?: string;
+    visible: boolean;
+    variant?: string;
+  }) => {
+    if (!meta.id || seen.has(meta.id)) return;
+    seen.add(meta.id);
+    result.push(meta);
+  };
+
+  for (const root of collectPageRoots(project)) {
+    if (typeof root === "string") {
+      const sectionRegex = /<section[^>]*data-section-id="([^"]+)"[^>]*>/gi;
+      let match: RegExpExecArray | null;
+      while ((match = sectionRegex.exec(root)) !== null) {
+        const tag = match[0];
+        push({
+          id: match[1],
+          type: /data-section-type="([^"]+)"/.exec(tag)?.[1],
+          variant: /data-section-variant="([^"]+)"/.exec(tag)?.[1],
+          visible: /data-visible="([^"]+)"/.exec(tag)?.[1] !== "false",
+        });
+      }
+      continue;
+    }
+
+    walkComponentTree(root, (n) => {
+      const attrs = n.attributes ?? {};
+      const id = attrs["data-section-id"];
+      if (!id) return;
+      const tag = (n.tagName || "").toLowerCase();
+      if (tag && tag !== "section" && n.type !== "section") {
+        // Still accept any node carrying section identity
+      }
+      push({
+        id,
+        type: attrs["data-section-type"],
+        variant: attrs["data-section-variant"] || undefined,
+        visible: attrs["data-visible"] !== "false",
+      });
     });
   }
+
   return result;
 }
 

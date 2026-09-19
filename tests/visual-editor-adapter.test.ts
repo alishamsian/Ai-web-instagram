@@ -178,12 +178,114 @@ describe("round-trip sync", () => {
     expect(restored.sections.some((s) => s.id === "mystery-1")).toBe(true);
   });
 
-  it("extracts content paths and section meta", () => {
-    const project = buildProjectFromWebsiteConfig(baseConfig());
+  it("extracts content paths from GrapesJS frames JSON trees", () => {
+    const project = {
+      pages: [
+        {
+          id: "home",
+          name: "Home",
+          frames: [
+            {
+              component: {
+                type: "wrapper",
+                components: [
+                  {
+                    tagName: "h1",
+                    type: "text",
+                    attributes: {
+                      "data-content-path": "content.hero.headline",
+                    },
+                    components: [
+                      { type: "textnode", content: "RTE headline" },
+                    ],
+                  },
+                  {
+                    tagName: "section",
+                    attributes: {
+                      "data-section-id": "hero-1",
+                      "data-section-type": "hero",
+                      "data-visible": "true",
+                    },
+                    components: [],
+                  },
+                  {
+                    tagName: "img",
+                    type: "image",
+                    attributes: {
+                      "data-content-path": "content.hero.imageId",
+                      "data-media-id": "img-1",
+                      src: "https://example.com/a.jpg",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
     const values = extractContentPathValues(project);
-    expect(values["content.hero.headline"]).toBe("عنوان واقعی");
+    expect(values["content.hero.headline"]).toBe("RTE headline");
+    expect(values["content.hero.imageId"]).toBe("img-1");
     const meta = extractSectionMeta(project);
     expect(meta.map((m) => m.id)).toContain("hero-1");
+
+    const restored = applyVisualProjectToWebsiteConfig(baseConfig(), project);
+    expect(restored.content.hero.headline).toBe("RTE headline");
+    expect(restored.content.hero.imageId).toBe("img-1");
+  });
+
+  it("isolates page content across GrapesJS pages in saved project", () => {
+    const original = baseConfig();
+    const project = {
+      pages: [
+        {
+          id: "home",
+          name: "Home",
+          frames: [
+            {
+              component: {
+                type: "wrapper",
+                components: [
+                  {
+                    tagName: "h1",
+                    attributes: { "data-content-path": "content.hero.headline" },
+                    components: [{ type: "textnode", content: "HOME_ONLY" }],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: "about",
+          name: "About",
+          frames: [
+            {
+              component: {
+                type: "wrapper",
+                components: [
+                  {
+                    tagName: "h2",
+                    attributes: { "data-content-path": "content.about.title" },
+                    components: [{ type: "textnode", content: "ABOUT_ONLY" }],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const restored = applyVisualProjectToWebsiteConfig(original, project, {
+      activePageId: "about",
+    });
+    expect(restored.content.hero.headline).toBe("HOME_ONLY");
+    expect(restored.content.about?.title).toBe("ABOUT_ONLY");
+    expect(restored.visualEditor?.activePageId).toBe("about");
+    expect((restored.visualEditor?.project?.pages as unknown[])?.length).toBe(
+      2,
+    );
   });
 });
 

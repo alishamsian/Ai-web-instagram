@@ -415,6 +415,26 @@ ${
         name: "Home",
         component: body,
       },
+      ...(config.content.about?.title?.trim() || config.content.about?.body?.trim()
+        ? [
+            {
+              id: "about",
+              name: "About",
+              component: `<body data-website-page="about" data-ve-source="website-config" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
+                fg,
+              )};background:${escapeHtml(bg)};">
+${renderAbout(
+  config,
+  config.sections.find((s) => s.type === "about") ?? {
+    id: "about-page",
+    type: "about" as const,
+    visible: true,
+  },
+)}
+</body>`,
+            },
+          ]
+        : []),
     ],
     styles: [],
     assets,
