@@ -1,11 +1,10 @@
 /**
- * WebsiteConfig ↔ GrapesJS project adapter.
+ * WebsiteConfig ↔ GrapesJS project adapter (Phase 1.1 hardened).
  *
- * GrapesJS = visual editing engine
- * WebsiteConfig = canonical application model
- *
- * Phase 1: persist GrapesJS project under config.visualEditor without
- * discarding unrelated WebsiteConfig fields.
+ * Rules:
+ * - Real WebsiteConfig always wins over demo seed
+ * - Seed only when site has no renderable content AND no saved visual project
+ * - Round-trip never silently drops brand/content/sections/seo/settings/media
  */
 
 import type { ProjectData } from "grapesjs";
@@ -14,14 +13,22 @@ import {
   buildModernAgencyProject,
   isVisualProjectEmpty,
 } from "@/lib/visual-editor/seed";
+import {
+  buildProjectFromWebsiteConfig,
+  websiteConfigHasRenderableContent,
+} from "@/lib/visual-editor/project-from-config";
+import { syncWebsiteConfigFromVisualProject } from "@/lib/visual-editor/sync-from-project";
 
 export function cloneWebsiteConfig<T extends WebsiteConfig>(config: T): T {
   return structuredClone(config);
 }
 
 /**
- * Resolve the GrapesJS project for the editor.
- * Prefer existing visualEditor.project; otherwise seed from brand (lossless for rest of config).
+ * Resolve GrapesJS project for the editor.
+ * Priority:
+ * 1) Existing saved visualEditor.project
+ * 2) Projection from real WebsiteConfig sections/content
+ * 3) Dev seed only for empty sites
  */
 export function websiteConfigToVisualProject(
   config: WebsiteConfig,
@@ -30,33 +37,25 @@ export function websiteConfigToVisualProject(
   if (!isVisualProjectEmpty(existing)) {
     return existing as ProjectData;
   }
+  if (websiteConfigHasRenderableContent(config)) {
+    return buildProjectFromWebsiteConfig(config);
+  }
+  // Empty development site only
   return buildModernAgencyProject(config);
 }
 
 /**
- * Merge GrapesJS project back into WebsiteConfig.
- * Never drops brand/content/sections/seo/settings/media or unknown future fields.
+ * Merge GrapesJS project back into WebsiteConfig (lossless + content sync).
  */
 export function applyVisualProjectToWebsiteConfig(
   config: WebsiteConfig,
   project: ProjectData | Record<string, unknown>,
   options?: { activePageId?: string },
 ): WebsiteConfig {
-  const next = cloneWebsiteConfig(config);
-  const visualEditor: VisualEditorState = {
-    engine: "grapesjs",
-    version: 1,
-    project: { ...(project as Record<string, unknown>) },
-    activePageId:
-      options?.activePageId ?? config.visualEditor?.activePageId ?? "home",
-  };
-  next.visualEditor = visualEditor;
-
-  // Light, optional brand sync from first page title if brand was empty — never overwrite real names.
+  const next = syncWebsiteConfigFromVisualProject(config, project, options);
   if (!next.brand.name?.trim()) {
     next.brand.name = "Untitled site";
   }
-
   return next;
 }
 
@@ -70,7 +69,6 @@ export function assertAdapterPreservesConfig(
     messages.push("template changed");
   }
   if (JSON.stringify(original.brand) !== JSON.stringify(restored.brand)) {
-    // brand may gain default name only when empty — allow that
     const o = { ...original.brand };
     const r = { ...restored.brand };
     if (o.name?.trim()) {
@@ -79,11 +77,18 @@ export function assertAdapterPreservesConfig(
       }
     }
   }
-  if (JSON.stringify(original.content) !== JSON.stringify(restored.content)) {
-    messages.push("content changed");
+  // content may be intentionally synced from canvas — only flag structural loss of keys
+  for (const key of Object.keys(original.content) as Array<
+    keyof WebsiteConfig["content"]
+  >) {
+    if (original.content[key] != null && restored.content[key] == null) {
+      messages.push(`content.${String(key)} dropped`);
+    }
   }
-  if (JSON.stringify(original.sections) !== JSON.stringify(restored.sections)) {
-    messages.push("sections changed");
+  const originalIds = original.sections.map((s) => s.id).sort();
+  const restoredIds = restored.sections.map((s) => s.id).sort();
+  if (JSON.stringify(originalIds) !== JSON.stringify(restoredIds)) {
+    messages.push("section ids changed/dropped");
   }
   if (JSON.stringify(original.seo) !== JSON.stringify(restored.seo)) {
     messages.push("seo changed");
@@ -96,14 +101,13 @@ export function assertAdapterPreservesConfig(
   if (JSON.stringify(original.media) !== JSON.stringify(restored.media)) {
     messages.push("media changed");
   }
-  // Preserve arbitrary extra keys on the config object (forward-compat)
   for (const key of Object.keys(original)) {
     if (
       key === "visualEditor" ||
+      key === "content" ||
       [
         "template",
         "brand",
-        "content",
         "sections",
         "seo",
         "settings",
@@ -120,3 +124,5 @@ export function assertAdapterPreservesConfig(
   }
   return { ok: messages.length === 0, messages };
 }
+
+export type { VisualEditorState };

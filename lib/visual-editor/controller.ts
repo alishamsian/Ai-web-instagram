@@ -20,6 +20,15 @@ export type CreateVisualEditorOptions = {
   panels: VisualEditorPanels;
   project: ProjectData;
   locale: "fa" | "en";
+  /** Existing site media for AssetManager */
+  mediaAssets?: Array<{
+    id: string;
+    src: string;
+    name?: string;
+    type?: "image" | "video";
+  }>;
+  /** Return false to abort after async import (Strict Mode / remount safety). */
+  isCurrent?: () => boolean;
   onUpdate?: () => void;
   onSelection?: () => void;
 };
@@ -43,10 +52,30 @@ function registerBlocks(editor: Editor, locale: "fa" | "en") {
   }
 }
 
+function enhanceImageComponent(editor: Editor) {
+  editor.DomComponents.addType("image", {
+    extend: "image",
+    model: {
+      defaults: {
+        traits: [
+          { type: "text", name: "src", label: "Source" },
+          { type: "text", name: "alt", label: "Alt" },
+          { type: "text", name: "title", label: "Title" },
+          { type: "text", name: "width", label: "Width" },
+          { type: "text", name: "height", label: "Height" },
+        ],
+      },
+    },
+  });
+}
+
 export async function createVisualEditor(
   options: CreateVisualEditorOptions,
-): Promise<Editor> {
+): Promise<Editor | null> {
   const grapesjs = (await import("grapesjs")).default;
+  if (options.isCurrent && !options.isCurrent()) {
+    return null;
+  }
 
   const config: EditorConfig = {
     container: options.panels.canvas,
@@ -68,6 +97,15 @@ export async function createVisualEditor(
         name: d.grapesName,
         width: d.width,
         widthMedia: d.widthMedia,
+      })),
+    },
+    assetManager: {
+      upload: false,
+      autoAdd: true,
+      assets: (options.mediaAssets ?? []).map((asset) => ({
+        type: asset.type === "video" ? "video" : "image",
+        src: asset.src,
+        name: asset.name || asset.id,
       })),
     },
     panels: { defaults: [] },
@@ -100,16 +138,14 @@ export async function createVisualEditor(
                 "align-items",
                 "flex-wrap",
                 "grid-template-columns",
+                "object-fit",
+                "object-position",
               ],
             },
             {
               name: "Spacing",
               open: true,
-              properties: [
-                "margin",
-                "padding",
-                "gap",
-              ],
+              properties: ["margin", "padding", "gap"],
             },
             {
               name: "Typography",
@@ -147,15 +183,28 @@ export async function createVisualEditor(
   };
 
   const editor = grapesjs.init(config);
-  registerBlocks(editor, options.locale);
-
-  // Append sections blocks into a second container if provided
-  if (options.panels.sections) {
-    // Blocks already registered; GrapesJS BlockManager renders all into appendTo.
-    // Phase 1: sections share the Blocks panel categories — sections panel mirrors via filter UI.
+  if (options.isCurrent && !options.isCurrent()) {
+    destroyVisualEditor(editor);
+    return null;
   }
 
+  registerBlocks(editor, options.locale);
+  enhanceImageComponent(editor);
+
   editor.loadProjectData(options.project);
+
+  // Re-add media assets after project load (project assets may be empty)
+  for (const asset of options.mediaAssets ?? []) {
+    try {
+      editor.AssetManager.add({
+        type: asset.type === "video" ? "video" : "image",
+        src: asset.src,
+        name: asset.name || asset.id,
+      });
+    } catch {
+      // ignore duplicates
+    }
+  }
 
   const emitUpdate = () => options.onUpdate?.();
   editor.on("update", emitUpdate);
@@ -242,4 +291,48 @@ export function toggleSelectedVisibility(editor: Editor) {
   const style = selected.getStyle();
   const hidden = style.display === "none";
   selected.addStyle({ display: hidden ? "" : "none" });
+}
+
+/** Editor-only zoom via GrapesJS Canvas API (never serialized). */
+export function setVisualZoom(editor: Editor, zoom: number | "fit") {
+  if (zoom === "fit") {
+    editor.Canvas.setZoom(100);
+    return;
+  }
+  editor.Canvas.setZoom(zoom);
+}
+
+export function applyMediaToSelectedImage(
+  editor: Editor,
+  media: { id: string; url: string; alt?: string },
+) {
+  const selected = editor.getSelected();
+  if (!selected) return false;
+  const isImage =
+    selected.is("image") ||
+    selected.get("tagName") === "img" ||
+    selected.get("type") === "image";
+  if (!isImage) return false;
+  selected.addAttributes({
+    src: media.url,
+    alt: media.alt || "",
+    "data-media-id": media.id,
+  });
+  selected.set("src", media.url);
+  return true;
+}
+
+export function openAssetManager(editor: Editor) {
+  editor.AssetManager.open({
+    types: ["image"],
+    select(asset, complete) {
+      const selected = editor.getSelected();
+      if (selected && (selected.is("image") || selected.get("tagName") === "img")) {
+        const src = asset.getSrc();
+        selected.addAttributes({ src });
+        selected.set("src", src);
+      }
+      if (complete) editor.AssetManager.close();
+    },
+  });
 }

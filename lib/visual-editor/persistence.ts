@@ -1,5 +1,6 @@
 /**
  * Persistence helpers — reuse Classic Editor save path (PATCH + expectedVersion).
+ * Includes a latest-wins save queue to prevent autosave races.
  */
 
 import type { WebsiteConfig } from "@/types/website";
@@ -9,7 +10,8 @@ export type VisualSaveState =
   | "dirty"
   | "saving"
   | "saved"
-  | "error";
+  | "error"
+  | "conflict";
 
 export type VisualSaveResult =
   | { ok: true; version: number; config: WebsiteConfig }
@@ -51,4 +53,59 @@ export async function saveWebsiteConfigViaApi(params: {
   } catch {
     return { ok: false, message: "Network error while saving." };
   }
+}
+
+/**
+ * Serializes overlapping saves so an older in-flight request cannot overwrite
+ * a newer successful save. Always persists the latest requested config.
+ */
+export function createSaveQueue(params: {
+  websiteId: string;
+  getExpectedVersion: () => number;
+  setExpectedVersion: (version: number) => void;
+}) {
+  let chain: Promise<VisualSaveResult | null> = Promise.resolve(null);
+  let pending: WebsiteConfig | null = null;
+  let running = false;
+
+  const flush = async (): Promise<VisualSaveResult | null> => {
+    if (running) return null;
+    running = true;
+    let last: VisualSaveResult | null = null;
+    try {
+      while (pending) {
+        const config = pending;
+        pending = null;
+        last = await saveWebsiteConfigViaApi({
+          websiteId: params.websiteId,
+          config,
+          expectedVersion: params.getExpectedVersion(),
+        });
+        if (last.ok) {
+          params.setExpectedVersion(last.version);
+        } else {
+          // Stop on conflict/error — caller keeps dirty state
+          break;
+        }
+      }
+    } finally {
+      running = false;
+    }
+    return last;
+  };
+
+  return {
+    enqueue(config: WebsiteConfig): Promise<VisualSaveResult | null> {
+      pending = config;
+      const next = chain.then(flush, flush);
+      chain = next.then(
+        () => null,
+        () => null,
+      );
+      return next;
+    },
+    get isRunning() {
+      return running;
+    },
+  };
 }

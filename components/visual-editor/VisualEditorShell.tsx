@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Visual Editor shell — GrapesJS engine + product chrome.
+ * Visual Editor shell — GrapesJS engine + product chrome (Phase 1.1 hardened).
  * WebsiteConfig remains canonical; GrapesJS project lives under config.visualEditor.
+ * Zoom/device are editor UI only and are never persisted.
  */
 
 import {
@@ -17,24 +18,27 @@ import type { Editor } from "grapesjs";
 import type { WebsiteConfig, WebsiteRecord } from "@/types/website";
 import type { Locale } from "@/lib/config/env";
 import {
+  applyMediaToSelectedImage,
   applyVisualProjectToWebsiteConfig,
   canVisualRedo,
   canVisualUndo,
+  createSaveQueue,
   createVisualEditor,
   deleteSelected,
   destroyVisualEditor,
   duplicateSelected,
   getActiveVisualPageId,
   getVisualPages,
-  saveWebsiteConfigViaApi,
+  openAssetManager,
   selectVisualPage,
   serializeVisualProject,
   setVisualDevice,
+  setVisualZoom,
   toggleSelectedVisibility,
+  visualProjectFingerprint,
   visualRedo,
   visualUndo,
   websiteConfigToVisualProject,
-  zoomToScale,
   type VisualDeviceId,
   type VisualSaveState,
   type VisualZoomMode,
@@ -48,6 +52,7 @@ import {
   ArrowLeft,
   Copy,
   EyeOff,
+  ImageIcon,
   Redo2,
   Save,
   Trash2,
@@ -57,7 +62,7 @@ import {
 type LeftTab = "pages" | "sections" | "blocks" | "components" | "assets";
 type RightTab = "style" | "settings";
 
-const AUTOSAVE_MS = 1000;
+const AUTOSAVE_MS = 1200;
 
 export function VisualEditorShell({
   website,
@@ -73,25 +78,44 @@ export function VisualEditorShell({
   const stylesRef = useRef<HTMLDivElement>(null);
   const traitsRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
-  const configRef = useRef<WebsiteConfig>(website.config);
+  const configRef = useRef<WebsiteConfig>(structuredClone(website.config));
   const versionRef = useRef(website.version);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savingRef = useRef(false);
+  const lastSavedFingerprint = useRef("");
+  const saveQueueRef = useRef<ReturnType<typeof createSaveQueue> | null>(null);
+  /** Guards React Strict Mode / remount races so a late destroy cannot wipe a newer editor. */
+  const editorMountIdRef = useRef(0);
+  const refreshDirtyRef = useRef<() => void>(() => {});
+  const syncHistoryRef = useRef<() => void>(() => {});
 
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<VisualSaveState>("clean");
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [device, setDevice] = useState<VisualDeviceId>("desktop");
   const [zoom, setZoom] = useState<VisualZoomMode>(100);
   const [leftTab, setLeftTab] = useState<LeftTab>("blocks");
   const [rightTab, setRightTab] = useState<RightTab>("style");
   const [pages, setPages] = useState<{ id: string; name: string }[]>([]);
-  const [activePageId, setActivePageId] = useState("home");
+  const [activePageId, setActivePageId] = useState(
+    website.config.visualEditor?.activePageId || "home",
+  );
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
-  const [siteName] = useState(
-    website.config.brand.name || website.slug || "Website",
+  const [selectedIsImage, setSelectedIsImage] = useState(false);
+  const [mediaMap, setMediaMap] = useState(website.config.media);
+  const siteName = website.config.brand.name || website.slug || "Website";
+
+  const mediaList = useMemo(
+    () =>
+      Object.entries(mediaMap).map(([id, media]) => ({
+        id,
+        url: media.url,
+        alt: media.alt,
+        type: media.type,
+      })),
+    [mediaMap],
   );
 
   const syncHistoryFlags = useCallback(() => {
@@ -100,6 +124,24 @@ export function VisualEditorShell({
     setCanUndo(canVisualUndo(ed));
     setCanRedo(canVisualRedo(ed));
   }, []);
+
+  const refreshDirtyFromEditor = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    const project = serializeVisualProject(ed);
+    const fingerprint = visualProjectFingerprint(project);
+    const dirty = fingerprint !== lastSavedFingerprint.current;
+    setSaveState((prev) => {
+      if (prev === "saving" || prev === "conflict") return prev;
+      if (dirty) return "dirty";
+      if (prev === "saved") return prev;
+      return "clean";
+    });
+    syncHistoryFlags();
+    setPages(getVisualPages(ed));
+    const pid = getActiveVisualPageId(ed);
+    if (pid) setActivePageId(pid);
+  }, [syncHistoryFlags]);
 
   const pullConfigFromEditor = useCallback((): WebsiteConfig => {
     const ed = editorRef.current;
@@ -113,40 +155,53 @@ export function VisualEditorShell({
     return next;
   }, []);
 
-  const markDirty = useCallback(() => {
-    setSaveState((prev) => (prev === "saving" ? prev : "dirty"));
-    syncHistoryFlags();
-    const ed = editorRef.current;
-    if (ed) {
-      setPages(getVisualPages(ed));
-      const pid = getActiveVisualPageId(ed);
-      if (pid) setActivePageId(pid);
-    }
-  }, [syncHistoryFlags]);
+  useEffect(() => {
+    refreshDirtyRef.current = refreshDirtyFromEditor;
+    syncHistoryRef.current = syncHistoryFlags;
+  }, [refreshDirtyFromEditor, syncHistoryFlags]);
 
   const persist = useCallback(async () => {
-    if (savingRef.current) return false;
-    savingRef.current = true;
-    setSaveState("saving");
+    const queue = saveQueueRef.current;
+    if (!queue) return false;
     const nextConfig = pullConfigFromEditor();
-    const result = await saveWebsiteConfigViaApi({
-      websiteId: website.id,
-      config: nextConfig,
-      expectedVersion: versionRef.current,
-    });
-    savingRef.current = false;
-    if (!result.ok) {
-      setSaveState("error");
+    setSaveState("saving");
+    setSaveMessage(null);
+    const result = await queue.enqueue(nextConfig);
+    if (!result) {
+      // queued behind another save — state will settle when that finishes
       return false;
     }
-    versionRef.current = result.version;
+    if (!result.ok) {
+      setSaveState(result.conflict ? "conflict" : "error");
+      setSaveMessage(result.message);
+      return false;
+    }
     configRef.current = result.config;
+    setMediaMap(result.config.media);
+    lastSavedFingerprint.current = visualProjectFingerprint(
+      result.config.visualEditor?.project ?? {},
+    );
     setSaveState("saved");
+    setSaveMessage(null);
     window.setTimeout(() => {
       setSaveState((s) => (s === "saved" ? "clean" : s));
     }, 1600);
     return true;
-  }, [pullConfigFromEditor, website.id]);
+  }, [pullConfigFromEditor]);
+
+  useEffect(() => {
+    saveQueueRef.current = createSaveQueue({
+      websiteId: website.id,
+      getExpectedVersion: () => versionRef.current,
+      setExpectedVersion: (v) => {
+        versionRef.current = v;
+      },
+    });
+    lastSavedFingerprint.current = visualProjectFingerprint(
+      website.config.visualEditor?.project ??
+        websiteConfigToVisualProject(website.config),
+    );
+  }, [website.id, website.config]);
 
   useEffect(() => {
     if (saveState !== "dirty") return;
@@ -171,13 +226,31 @@ export function VisualEditorShell({
   }, [saveState]);
 
   useEffect(() => {
-    let cancelled = false;
+    const mountId = ++editorMountIdRef.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    let created: Editor | null = null;
+
     void (async () => {
       try {
+        // Ensure remounts start from a clean host (Strict Mode / HMR).
+        canvas.replaceChildren();
+        blocksRef.current?.replaceChildren();
+        layersRef.current?.replaceChildren();
+        stylesRef.current?.replaceChildren();
+        traitsRef.current?.replaceChildren();
+        if (editorMountIdRef.current !== mountId) return;
         const project = websiteConfigToVisualProject(configRef.current);
+        lastSavedFingerprint.current = visualProjectFingerprint(project);
+        const mediaAssets = Object.entries(configRef.current.media).map(
+          ([id, media]) => ({
+            id,
+            src: media.url,
+            name: media.alt || id,
+            type: media.type,
+          }),
+        );
         const editor = await createVisualEditor({
           panels: {
             canvas,
@@ -188,19 +261,35 @@ export function VisualEditorShell({
           },
           project,
           locale,
+          mediaAssets,
+          isCurrent: () => editorMountIdRef.current === mountId,
           onUpdate: () => {
-            if (!cancelled) markDirty();
+            if (editorMountIdRef.current !== mountId) return;
+            refreshDirtyRef.current();
           },
           onSelection: () => {
-            if (cancelled) return;
+            if (editorMountIdRef.current !== mountId) return;
             const ed = editorRef.current;
-            setHasSelection(Boolean(ed?.getSelected() && !ed.getSelected()?.is("wrapper")));
+            const selected = ed?.getSelected();
+            const ok = Boolean(selected && !selected.is("wrapper"));
+            setHasSelection(ok);
+            setSelectedIsImage(
+              Boolean(
+                selected &&
+                  (selected.is("image") ||
+                    selected.get("tagName") === "img" ||
+                    selected.get("type") === "image"),
+              ),
+            );
           },
         });
-        if (cancelled) {
-          destroyVisualEditor(editor);
+
+        if (!editor || editorMountIdRef.current !== mountId) {
+          if (editor) destroyVisualEditor(editor);
           return;
         }
+
+        created = editor;
         editorRef.current = editor;
         setPages(getVisualPages(editor));
         const preferred =
@@ -210,23 +299,37 @@ export function VisualEditorShell({
         selectVisualPage(editor, preferred);
         setActivePageId(preferred);
         setVisualDevice(editor, "desktop");
-        syncHistoryFlags();
+        setVisualZoom(editor, 100);
+        syncHistoryRef.current();
         setReady(true);
+        setInitError(null);
       } catch (err) {
-        if (!cancelled) {
+        if (editorMountIdRef.current === mountId) {
           setInitError(
-            err instanceof Error ? err.message : "Failed to start visual editor",
+            err instanceof Error
+              ? err.message
+              : "Failed to start visual editor",
           );
+          setReady(false);
         }
       }
     })();
 
     return () => {
-      cancelled = true;
-      destroyVisualEditor(editorRef.current);
-      editorRef.current = null;
+      // Invalidate this mount so any in-flight init destroys itself and cannot
+      // call destroy() on a newer editor sharing the same canvas host.
+      if (editorMountIdRef.current === mountId) {
+        editorMountIdRef.current = mountId + 1;
+      }
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (created) {
+        destroyVisualEditor(created);
+        if (editorRef.current === created) {
+          editorRef.current = null;
+        }
+      }
     };
-  }, [locale, markDirty, syncHistoryFlags]);
+  }, [locale, website.id]);
 
   useEffect(() => {
     const ed = editorRef.current;
@@ -237,21 +340,17 @@ export function VisualEditorShell({
   useEffect(() => {
     const ed = editorRef.current;
     if (!ed || !ready) return;
-    const frame = ed.Canvas.getFrameEl();
-    const wrapper = frame?.parentElement;
-    if (wrapper) {
-      const scale = zoomToScale(zoom);
-      wrapper.style.transform = zoom === "fit" ? "" : `scale(${scale})`;
-      wrapper.style.transformOrigin = "top center";
-    }
+    setVisualZoom(ed, zoom === "fit" ? "fit" : zoom);
   }, [zoom, ready]);
 
   const statusLabel = useMemo(() => {
     if (saveState === "dirty") return isFa ? "ذخیره‌نشده" : "Unsaved changes";
     if (saveState === "saving") return isFa ? "در حال ذخیره…" : "Saving…";
     if (saveState === "saved") return isFa ? "ذخیره شد" : "Saved";
-    if (saveState === "error") return isFa ? "خطا در ذخیره" : "Save error";
-    return isFa ? "ذخیره‌شده" : "Saved";
+    if (saveState === "error") return isFa ? "خطا در ذخیره" : "Save failed";
+    if (saveState === "conflict")
+      return isFa ? "تداخل نسخه" : "Version conflict";
+    return isFa ? "آماده" : "Ready";
   }, [saveState, isFa]);
 
   if (initError) {
@@ -261,19 +360,32 @@ export function VisualEditorShell({
           {isFa ? "ویرایشگر بصری بارگذاری نشد" : "Visual editor failed"}
         </h1>
         <p style={{ color: "#8a8a93", margin: 0 }}>{initError}</p>
-        <Link
-          href={`/${locale}/editor/${website.id}`}
-          className="ve-btn ve-btn--primary"
-          style={{ textDecoration: "none" }}
-        >
-          {isFa ? "بازگشت به Classic" : "Open Classic Editor"}
-        </Link>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            className="ve-btn ve-btn--primary"
+            onClick={() => window.location.reload()}
+          >
+            {isFa ? "تلاش دوباره" : "Retry"}
+          </button>
+          <Link
+            href={`/${locale}/editor/${website.id}`}
+            className="ve-btn"
+            style={{ textDecoration: "none" }}
+          >
+            {isFa ? "بازگشت به Classic" : "Open Classic Editor"}
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="ve-shell" dir="ltr" lang={locale}>
+    <div
+      className="ve-shell"
+      dir={isFa ? "rtl" : "ltr"}
+      lang={locale}
+    >
       {!ready ? (
         <div
           style={{
@@ -288,6 +400,40 @@ export function VisualEditorShell({
               isFa ? "در حال بارگذاری ویرایشگر…" : "Loading website editor…"
             }
           />
+        </div>
+      ) : null}
+
+      {saveState === "conflict" || saveState === "error" ? (
+        <div
+          role="alert"
+          style={{
+            background: saveState === "conflict" ? "#3f2a14" : "#3f1419",
+            color: "#fff",
+            padding: "8px 12px",
+            fontSize: 12,
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span>
+            {saveMessage ||
+              (saveState === "conflict"
+                ? isFa
+                  ? "سایت جای دیگری تغییر کرده. تغییرات شما هنوز اینجاست — صفحه را دوباره بارگذاری کن یا دوباره ذخیره کن."
+                  : "Site changed elsewhere. Your edits are still here — reload or retry save."
+                : isFa
+                  ? "ذخیره ناموفق بود."
+                  : "Save failed.")}
+          </span>
+          <button
+            type="button"
+            className="ve-btn ve-btn--primary"
+            onClick={() => void persist()}
+          >
+            {isFa ? "تلاش دوباره" : "Retry save"}
+          </button>
         </div>
       ) : null}
 
@@ -311,6 +457,7 @@ export function VisualEditorShell({
               type="button"
               className="ve-btn"
               data-active={device === d.id}
+              aria-pressed={device === d.id}
               onClick={() => setDevice(d.id)}
             >
               {isFa ? d.label.fa : d.label.en}
@@ -329,7 +476,7 @@ export function VisualEditorShell({
               const ed = editorRef.current;
               if (!ed) return;
               visualUndo(ed);
-              markDirty();
+              refreshDirtyFromEditor();
             }}
           >
             <Undo2 size={15} />
@@ -344,7 +491,7 @@ export function VisualEditorShell({
               const ed = editorRef.current;
               if (!ed) return;
               visualRedo(ed);
-              markDirty();
+              refreshDirtyFromEditor();
             }}
           >
             <Redo2 size={15} />
@@ -438,9 +585,11 @@ export function VisualEditorShell({
                     onClick={() => {
                       const ed = editorRef.current;
                       if (!ed) return;
+                      // Persist current page into project before switching
+                      pullConfigFromEditor();
                       selectVisualPage(ed, page.id);
                       setActivePageId(page.id);
-                      markDirty();
+                      refreshDirtyFromEditor();
                     }}
                   >
                     {page.name}
@@ -450,7 +599,6 @@ export function VisualEditorShell({
             ) : null}
             <div
               ref={blocksRef}
-              hidden={leftTab !== "blocks" && leftTab !== "sections"}
               style={{
                 display:
                   leftTab === "blocks" || leftTab === "sections"
@@ -461,16 +609,83 @@ export function VisualEditorShell({
             {leftTab === "components" ? (
               <p className="ve-assets-hint">
                 {isFa
-                  ? "رجیستری کامپوننت‌ها در Phase ۲ متصل می‌شود. فعلاً از Blocks و Sections استفاده کنید."
+                  ? "رجیستری کامپوننت‌ها در Phase ۲. از Blocks و Sections استفاده کنید."
                   : "Component registry connects in Phase 2. Use Blocks and Sections for now."}
               </p>
             ) : null}
             {leftTab === "assets" ? (
-              <p className="ve-assets-hint">
-                {isFa
-                  ? "Asset Manager در Phase بعد. تصویر را روی Canvas انتخاب کنید و src را در Settings تغییر دهید."
-                  : "Asset Manager comes next. Select an image on the canvas and edit its src in Settings."}
-              </p>
+              <div>
+                <p className="ve-assets-hint" style={{ marginBottom: 8 }}>
+                  {isFa
+                    ? "رسانه‌های سایت. تصویر را روی Canvas انتخاب کنید سپس یک دارایی را بزنید."
+                    : "Site media. Select an image on the canvas, then click an asset to replace it."}
+                </p>
+                <button
+                  type="button"
+                  className="ve-btn"
+                  style={{ marginBottom: 8, width: "100%" }}
+                  onClick={() => {
+                    const ed = editorRef.current;
+                    if (ed) openAssetManager(ed);
+                  }}
+                >
+                  <ImageIcon size={14} />
+                  {isFa ? "باز کردن Asset Manager" : "Open Asset Manager"}
+                </button>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                  }}
+                >
+                  {mediaList
+                    .filter((m) => m.type === "image")
+                    .map((media) => (
+                      <button
+                        key={media.id}
+                        type="button"
+                        className="ve-page-item"
+                        style={{ padding: 4 }}
+                        title={media.alt || media.id}
+                        onClick={() => {
+                          const ed = editorRef.current;
+                          if (!ed) return;
+                          const ok = applyMediaToSelectedImage(ed, {
+                            id: media.id,
+                            url: media.url,
+                            alt: media.alt,
+                          });
+                          if (!ok) {
+                            openAssetManager(ed);
+                          } else {
+                            refreshDirtyFromEditor();
+                          }
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={media.url}
+                          alt={media.alt || media.id}
+                          style={{
+                            width: "100%",
+                            aspectRatio: "1",
+                            objectFit: "cover",
+                            borderRadius: 6,
+                            display: "block",
+                          }}
+                        />
+                      </button>
+                    ))}
+                  {!mediaList.some((m) => m.type === "image") ? (
+                    <p className="ve-assets-hint">
+                      {isFa
+                        ? "هنوز تصویری نیست — از Classic Editor یا Media API آپلود کنید."
+                        : "No images yet — upload via Classic Editor / Media API."}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
           </div>
         </aside>
@@ -487,7 +702,7 @@ export function VisualEditorShell({
                 const ed = editorRef.current;
                 if (!ed) return;
                 duplicateSelected(ed);
-                markDirty();
+                refreshDirtyFromEditor();
               }}
             >
               <Copy size={14} />
@@ -502,7 +717,7 @@ export function VisualEditorShell({
                 const ed = editorRef.current;
                 if (!ed) return;
                 toggleSelectedVisibility(ed);
-                markDirty();
+                refreshDirtyFromEditor();
               }}
             >
               <EyeOff size={14} />
@@ -517,10 +732,23 @@ export function VisualEditorShell({
                 const ed = editorRef.current;
                 if (!ed) return;
                 deleteSelected(ed);
-                markDirty();
+                refreshDirtyFromEditor();
               }}
             >
               <Trash2 size={14} />
+            </button>
+            <button
+              type="button"
+              className="ve-btn"
+              disabled={!selectedIsImage}
+              aria-label="Replace image"
+              title="Replace image"
+              onClick={() => {
+                const ed = editorRef.current;
+                if (ed) openAssetManager(ed);
+              }}
+            >
+              <ImageIcon size={14} />
             </button>
           </div>
           <div ref={canvasRef} className="ve-canvas-host" />

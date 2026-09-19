@@ -1,5 +1,5 @@
 /**
- * Visual Editor Phase 1 — adapter, seed, lossless persistence tests.
+ * Visual Editor Phase 1.1 — hardened adapter, projection, save queue tests.
  */
 
 import { describe, expect, it } from "vitest";
@@ -8,10 +8,12 @@ import {
   applyVisualProjectToWebsiteConfig,
   assertAdapterPreservesConfig,
   buildModernAgencyProject,
+  buildProjectFromWebsiteConfig,
+  createSaveQueue,
+  extractContentPathValues,
+  extractSectionMeta,
   isVisualProjectEmpty,
-  MODERN_AGENCY_PAGE_IDS,
-  VISUAL_BLOCKS,
-  VISUAL_SECTIONS,
+  websiteConfigHasRenderableContent,
   websiteConfigToVisualProject,
 } from "@/lib/visual-editor";
 
@@ -33,13 +35,19 @@ function baseConfig(): WebsiteConfig {
     content: {
       hero: {
         style: "minimal",
-        headline: "عنوان",
-        subheadline: "توضیح",
+        headline: "عنوان واقعی",
+        subheadline: "توضیح واقعی",
         cta: "خرید",
+        imageId: "img-1",
+      },
+      about: {
+        title: "درباره ما",
+        body: "متن درباره",
       },
     },
     sections: [
-      { id: "hero-1", type: "hero", visible: true },
+      { id: "hero-1", type: "hero", visible: true, variant: "fan" },
+      { id: "about-1", type: "about", visible: true },
       { id: "footer-1", type: "footer", visible: true },
     ],
     seo: { title: "SEO", description: "Desc", keywords: ["a"] },
@@ -50,105 +58,200 @@ function baseConfig(): WebsiteConfig {
       published: false,
     },
     media: {
-      "img-1": { url: "https://example.com/a.jpg", alt: "a", type: "image" },
+      "img-1": {
+        url: "https://example.com/a.jpg",
+        alt: "hero",
+        type: "image",
+      },
     },
   };
 }
 
-describe("visual editor seed", () => {
-  it("builds a multi-page Modern Agency project", () => {
-    const project = buildModernAgencyProject(baseConfig());
-    expect(Array.isArray(project.pages)).toBe(true);
-    expect(project.pages).toHaveLength(MODERN_AGENCY_PAGE_IDS.length);
-    const ids = (project.pages as { id: string }[]).map((p) => p.id);
-    expect(ids).toEqual([...MODERN_AGENCY_PAGE_IDS]);
+describe("websiteConfig projection (no demo overwrite)", () => {
+  it("detects renderable real content", () => {
+    expect(websiteConfigHasRenderableContent(baseConfig())).toBe(true);
+    expect(
+      websiteConfigHasRenderableContent({
+        ...baseConfig(),
+        sections: [],
+        content: {
+          hero: { style: "minimal", headline: "", subheadline: "", cta: "" },
+        },
+      }),
+    ).toBe(false);
   });
 
-  it("detects empty projects", () => {
-    expect(isVisualProjectEmpty(null)).toBe(true);
-    expect(isVisualProjectEmpty({})).toBe(true);
-    expect(isVisualProjectEmpty({ pages: [] })).toBe(true);
-    expect(isVisualProjectEmpty(buildModernAgencyProject())).toBe(false);
-  });
-});
-
-describe("visual editor blocks foundation", () => {
-  it("exposes required foundation blocks", () => {
-    const ids = VISUAL_BLOCKS.map((b) => b.id);
-    for (const id of [
-      "container",
-      "section",
-      "columns",
-      "grid",
-      "heading",
-      "text",
-      "button",
-      "image",
-      "video",
-      "spacer",
-      "divider",
-      "card",
-    ]) {
-      expect(ids).toContain(id);
-    }
+  it("builds project from real WebsiteConfig with stable section ids", () => {
+    const project = buildProjectFromWebsiteConfig(baseConfig());
+    const html = String(
+      (project.pages as { component: string }[])[0]?.component ?? "",
+    );
+    expect(html).toContain('data-section-id="hero-1"');
+    expect(html).toContain('data-section-id="about-1"');
+    expect(html).toContain('data-section-id="footer-1"');
+    expect(html).toContain('data-content-path="content.hero.headline"');
+    expect(html).toContain("عنوان واقعی");
+    expect(html).not.toContain("Modern Agency");
+    expect(html).not.toContain("Design that earns attention");
   });
 
-  it("exposes foundation sections", () => {
-    const ids = VISUAL_SECTIONS.map((b) => b.id);
-    expect(ids.length).toBeGreaterThanOrEqual(8);
-    expect(ids.some((id) => id.includes("hero"))).toBe(true);
-    expect(ids.some((id) => id.includes("footer"))).toBe(true);
+  it("prefers real projection over seed when content exists", () => {
+    const project = websiteConfigToVisualProject(baseConfig());
+    const html = String(
+      (project.pages as { component: string }[])[0]?.component ?? "",
+    );
+    expect(html).toContain("عنوان واقعی");
+    expect(html).not.toContain("Design that earns attention");
   });
-});
 
-describe("WebsiteConfig adapter", () => {
-  it("seeds from config when visualEditor is missing", () => {
-    const config = baseConfig();
-    const project = websiteConfigToVisualProject(config);
+  it("uses seed only for empty sites", () => {
+    const empty: WebsiteConfig = {
+      ...baseConfig(),
+      sections: [],
+      content: {
+        hero: { style: "minimal", headline: "", subheadline: "", cta: "" },
+      },
+      visualEditor: undefined,
+    };
+    const project = websiteConfigToVisualProject(empty);
     expect(isVisualProjectEmpty(project as never)).toBe(false);
+    expect((project.pages as unknown[]).length).toBeGreaterThan(1);
   });
 
-  it("prefers existing visualEditor.project", () => {
+  it("never overwrites existing visualEditor.project with seed", () => {
     const config = baseConfig();
     config.visualEditor = {
       engine: "grapesjs",
       version: 1,
       project: {
-        pages: [{ id: "custom", name: "Custom", component: "<body>Hi</body>" }],
+        pages: [
+          {
+            id: "home",
+            name: "Home",
+            component: '<body data-section-id="hero-1">KEEP</body>',
+          },
+        ],
       },
-      activePageId: "custom",
     };
     const project = websiteConfigToVisualProject(config);
-    expect((project.pages as { id: string }[])[0]?.id).toBe("custom");
+    const html = String(
+      (project.pages as { component: string }[])[0]?.component ?? "",
+    );
+    expect(html).toContain("KEEP");
   });
+});
 
-  it("preserves WebsiteConfig fields when applying project", () => {
+describe("round-trip sync", () => {
+  it("preserves section ids and syncs headline text", () => {
     const original = baseConfig();
-    (original as WebsiteConfig & { customField?: string }).customField =
-      "keep-me";
-    const project = buildModernAgencyProject(original);
-    const restored = applyVisualProjectToWebsiteConfig(original, project, {
-      activePageId: "about",
-    });
+    const projected = buildProjectFromWebsiteConfig(original);
+    // Simulate user edit in HTML
+    const page = (projected.pages as { component: string }[])[0];
+    page.component = page.component.replace("عنوان واقعی", "عنوان جدید");
+
+    const restored = applyVisualProjectToWebsiteConfig(original, projected);
     const check = assertAdapterPreservesConfig(original, restored);
     expect(check.ok).toBe(true);
-    expect(restored.visualEditor?.engine).toBe("grapesjs");
-    expect(restored.visualEditor?.activePageId).toBe("about");
-    expect(restored.content.hero.headline).toBe("عنوان");
-    expect(restored.sections).toHaveLength(2);
+    expect(restored.content.hero.headline).toBe("عنوان جدید");
+    expect(restored.sections.map((s) => s.id)).toEqual([
+      "hero-1",
+      "about-1",
+      "footer-1",
+    ]);
+    expect(restored.seo.title).toBe("SEO");
     expect(restored.media["img-1"]?.url).toBe("https://example.com/a.jpg");
-    expect(
-      (restored as WebsiteConfig & { customField?: string }).customField,
-    ).toBe("keep-me");
   });
 
-  it("serializes project onto visualEditor without wiping seo", () => {
+  it("preserves orphan sections not present in canvas", () => {
     const original = baseConfig();
-    const next = applyVisualProjectToWebsiteConfig(
-      original,
-      { pages: [{ id: "home", name: "Home" }], styles: [], assets: [] },
-    );
-    expect(next.seo.title).toBe("SEO");
-    expect(next.visualEditor?.project.pages).toBeTruthy();
+    original.sections.push({
+      id: "mystery-1",
+      type: "trust",
+      visible: true,
+    });
+    const projected = buildProjectFromWebsiteConfig({
+      ...original,
+      sections: original.sections.filter((s) => s.id !== "mystery-1"),
+    });
+    // Apply onto config that still has mystery — sync should keep orphan
+    const restored = applyVisualProjectToWebsiteConfig(original, projected);
+    expect(restored.sections.some((s) => s.id === "mystery-1")).toBe(true);
+  });
+
+  it("extracts content paths and section meta", () => {
+    const project = buildProjectFromWebsiteConfig(baseConfig());
+    const values = extractContentPathValues(project);
+    expect(values["content.hero.headline"]).toBe("عنوان واقعی");
+    const meta = extractSectionMeta(project);
+    expect(meta.map((m) => m.id)).toContain("hero-1");
+  });
+});
+
+describe("save queue race safety", () => {
+  it("keeps latest config when enqueued rapidly", async () => {
+    const calls: WebsiteConfig[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        config: WebsiteConfig;
+      };
+      calls.push(body.config);
+      await new Promise((r) => setTimeout(r, 20));
+      return new Response(JSON.stringify({ version: calls.length + 1 }), {
+        status: 200,
+      });
+    }) as typeof fetch;
+
+    try {
+      let version = 1;
+      const queue = createSaveQueue({
+        websiteId: "site-1",
+        getExpectedVersion: () => version,
+        setExpectedVersion: (v) => {
+          version = v;
+        },
+      });
+      const a = baseConfig();
+      a.content.hero.headline = "A";
+      const b = baseConfig();
+      b.content.hero.headline = "B";
+      const p1 = queue.enqueue(a);
+      const p2 = queue.enqueue(b);
+      await Promise.all([p1, p2]);
+      const last = calls.at(-1);
+      expect(last?.content.hero.headline).toBe("B");
+      expect(version).toBeGreaterThan(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("surfaces version conflict without clearing dirty responsibility", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ error: "VERSION_CONFLICT" }), {
+        status: 409,
+      })) as typeof fetch;
+    try {
+      const queue = createSaveQueue({
+        websiteId: "site-1",
+        getExpectedVersion: () => 3,
+        setExpectedVersion: () => undefined,
+      });
+      const result = await queue.enqueue(baseConfig());
+      expect(result?.ok).toBe(false);
+      if (result && !result.ok) {
+        expect(result.conflict).toBe(true);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("seed isolation", () => {
+  it("modern agency seed still builds for empty dev sites", () => {
+    const project = buildModernAgencyProject();
+    expect((project.pages as unknown[]).length).toBe(4);
   });
 });

@@ -60,6 +60,8 @@ export function SiteImage({
     );
   }
 
+  // Next/Image requires width+height or fill. Generated demo media sometimes
+  // omits both — provide safe intrinsic defaults without forcing fill.
   return (
     <Image
       {...props}
@@ -67,8 +69,8 @@ export function SiteImage({
       alt={alt}
       className={cn("bg-muted object-cover", className)}
       fill={fill}
-      width={fill ? undefined : width}
-      height={fill ? undefined : height}
+      width={fill ? undefined : (width ?? 1200)}
+      height={fill ? undefined : (height ?? 800)}
       priority={priority}
       sizes={sizes}
       unoptimized={unoptimized ?? true}
