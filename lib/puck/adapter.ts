@@ -14,6 +14,11 @@ import type {
   PuckWebsiteData,
 } from "@/lib/puck/types";
 import { hasSection } from "@/lib/store/registry/catalog";
+import {
+  applyListPropsToContent,
+  listPropsFromContent,
+  mergeColumnsSettings,
+} from "@/lib/puck/advanced";
 
 const ADAPTER_VERSION = 1 as const;
 
@@ -62,18 +67,23 @@ function puckPropsToSection(
     (typeof props.id === "string" && props.id) ||
     `${type}-${Math.random().toString(36).slice(2, 9)}`;
 
+  const resolvedType = asSectionType(
+    typeof props.sectionType === "string" ? props.sectionType : type,
+  );
+
   const section: SectionConfig = {
     id: sectionId,
-    type: asSectionType(
-      typeof props.sectionType === "string" ? props.sectionType : type,
-    ),
+    type: resolvedType,
     visible: props.visible !== false,
   };
 
   const variant = normalizeVariant(props.variant);
   if (variant) section.variant = variant;
 
-  const settings = normalizeSettings(props.settings);
+  let settings = normalizeSettings(props.settings);
+  if (resolvedType === "columns") {
+    settings = mergeColumnsSettings(settings, props);
+  }
   if (settings) section.settings = settings;
 
   return section;
@@ -102,7 +112,10 @@ export function websiteConfigToPuck(config: WebsiteConfig): PuckWebsiteData {
     },
     content: config.sections.map((section) => ({
       type: section.type,
-      props: sectionToPuckProps(section),
+      props: {
+        ...sectionToPuckProps(section),
+        ...listPropsFromContent(config, section),
+      },
     })),
     zones: {},
   };
@@ -112,9 +125,8 @@ export function websiteConfigToPuck(config: WebsiteConfig): PuckWebsiteData {
  * Convert Puck Data back into canonical WebsiteConfig.
  *
  * Structure (section order / add / remove) comes from Puck `content`.
- * When `fallback` is provided (live editor WebsiteConfig), brand / content /
- * seo / settings / media prefer fallback — inspector owns those fields and
- * must not be clobbered by a stale Puck root projection.
+ * Root brand/seo/settings prefer Puck root props when present (root fields),
+ * then fall back to live editor config. Content lists merge from section props.
  */
 export function puckToWebsiteConfig(
   data: PuckWebsiteData,
@@ -132,16 +144,24 @@ export function puckToWebsiteConfig(
   const footers = sections.filter((s) => s.type === "footer");
   const ordered = [...body, ...footers];
 
+  // Content: inspector / bound fields own the bag; section list props overlay arrays/media/richtext.
+  let content = cloneJson(
+    fallback?.content ?? rootProps.content ?? emptyContent(),
+  );
+  for (const item of data.content ?? []) {
+    const props = (item.props ?? {}) as Record<string, unknown>;
+    content = applyListPropsToContent(content, String(item.type), props);
+  }
+
   return {
     template: fallback?.template ?? rootProps.template ?? "store",
-    brand: cloneJson(fallback?.brand ?? rootProps.brand ?? emptyBrand()),
-    content: cloneJson(
-      fallback?.content ?? rootProps.content ?? emptyContent(),
-    ),
+    // Root brand/SEO fields are editable in Puck — prefer root when present.
+    brand: cloneJson(rootProps.brand ?? fallback?.brand ?? emptyBrand()),
+    content,
     sections: ordered,
     seo: cloneJson(
-      fallback?.seo ??
-        rootProps.seo ?? { title: "", description: "", keywords: [] },
+      rootProps.seo ??
+        fallback?.seo ?? { title: "", description: "", keywords: [] },
     ),
     settings: cloneJson(
       fallback?.settings ??

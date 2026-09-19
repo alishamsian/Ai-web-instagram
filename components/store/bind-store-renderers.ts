@@ -20,6 +20,7 @@ import {
   renderPromoSection,
   renderTrustSection,
   renderUnsupportedStoreSection,
+  renderColumnsSection,
 } from "@/components/store/section-adapters";
 import { ensureVariantRenderersBound } from "@/components/store/variants/bind-variant-renderers";
 import {
@@ -76,6 +77,7 @@ export function ensureStoreSectionRenderersBound() {
     trust: renderTrustSection,
     footer: renderFooterSection,
     testimonials: renderTrustSection,
+    columns: renderColumnsSection,
     services: renderUnsupportedStoreSection,
     location: renderUnsupportedStoreSection,
     social: renderUnsupportedStoreSection,

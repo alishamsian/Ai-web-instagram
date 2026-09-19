@@ -21,6 +21,7 @@ import {
   websiteConfigToPuck,
   type PuckWebsiteData,
 } from "@/lib/puck";
+import { PUCK_DICTIONARY_FA } from "@/lib/puck/advanced";
 import { PuckWebsiteProvider } from "@/lib/puck/website-context";
 import { StoreCartProvider } from "@/lib/store/cart";
 import type { PuckSaveState } from "@/components/editor/puck/PuckTopBar";
@@ -135,6 +136,7 @@ export function PuckEditorShell({
   const historyEntriesRef = useRef(historyEntries);
   const historyIndexRef = useRef(historyIndex);
   const suppressPuckEcho = useRef(false);
+  const lastPuckActionLabel = useRef("Layout");
 
   useEffect(() => {
     configRef.current = config;
@@ -153,6 +155,7 @@ export function PuckEditorShell({
     const base = buildPuckConfig({
       vertical: config.settings.vertical,
       locale,
+      getWebsiteConfig: () => configRef.current,
     });
     const known = new Set(Object.keys(base.components ?? {}));
     const extras = [
@@ -165,6 +168,7 @@ export function PuckEditorShell({
       vertical: config.settings.vertical,
       locale,
       extraSectionTypes: extras,
+      getWebsiteConfig: () => configRef.current,
     });
   }, [config.settings.vertical, config.sections, locale]);
 
@@ -330,7 +334,7 @@ export function PuckEditorShell({
       }
       setPuckData(data);
       const next = puckToWebsiteConfig(data, configRef.current);
-      applyConfig(next, "Layout");
+      applyConfig(next, lastPuckActionLabel.current);
     },
     [applyConfig],
   );
@@ -451,6 +455,38 @@ export function PuckEditorShell({
           config={puckConfig}
           data={puckData}
           onChange={handlePuckChange}
+          onAction={(action) => {
+            switch (action.type) {
+              case "insert":
+                lastPuckActionLabel.current = isFa
+                  ? "افزودن بخش"
+                  : "Add section";
+                break;
+              case "reorder":
+                lastPuckActionLabel.current = isFa
+                  ? "جابجایی بخش"
+                  : "Reorder sections";
+                break;
+              case "replace":
+              case "replaceRoot":
+                lastPuckActionLabel.current = isFa
+                  ? "ویرایش فیلد"
+                  : "Edit field";
+                break;
+              case "remove":
+                lastPuckActionLabel.current = isFa
+                  ? "حذف بخش"
+                  : "Remove section";
+                break;
+              case "duplicate":
+                lastPuckActionLabel.current = isFa
+                  ? "تکثیر بخش"
+                  : "Duplicate section";
+                break;
+              default:
+                lastPuckActionLabel.current = isFa ? "چیدمان" : "Layout";
+            }
+          }}
           height="100%"
           headerTitle={config.brand.name || website.slug}
           headerPath={`/${website.slug}`}
@@ -492,16 +528,17 @@ export function PuckEditorShell({
             setPublishError(null);
             setPublishOpen(true);
           }}
-          dictionary={
-            isFa
-              ? {
-                  "header-publish": "انتشار",
-                  "plugin-blocks": "بلوک‌ها",
-                  "plugin-outline": "ساختار",
-                  "plugin-fields": "فیلدها",
-                }
-              : undefined
-          }
+          dictionary={isFa ? PUCK_DICTIONARY_FA : undefined}
+          fieldTransforms={{
+            text: ({ value }) =>
+              typeof value === "string" ? value : value == null ? "" : value,
+            textarea: ({ value }) =>
+              typeof value === "string" ? value : value == null ? "" : value,
+            richtext: ({ value }) =>
+              typeof value === "string" ? value : value == null ? "" : value,
+            external: ({ value }) =>
+              typeof value === "string" ? value : value == null ? "" : value,
+          }}
           dnd={{ behavior: "auto" }}
           overrides={{
             iframe: ({ children }) => (

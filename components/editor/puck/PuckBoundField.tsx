@@ -14,6 +14,7 @@ import {
 import { usePuckWebsiteOptional } from "@/lib/puck/website-context";
 import { findSection } from "@/lib/puck/binding";
 import { cn } from "@/lib/utils";
+import { MediaPicker } from "@/components/editor/MediaPicker";
 
 export function PuckBoundSchemaField({
   field,
@@ -150,17 +151,18 @@ export function PuckBoundSchemaField({
         <span className="text-[11px] font-medium text-[var(--puck-color-text-muted,#767676)]">
           {label}
         </span>
-        <input
-          className="h-8 w-full rounded-[2px] border border-[var(--puck-color-border,#dcdcdc)] bg-white px-2 text-sm"
-          value={typeof value === "string" ? value : ""}
-          placeholder={locale === "fa" ? "شناسه رسانه" : "Media id"}
-          onChange={(e) => commit(e.target.value)}
+        <MediaPicker
+          config={ctx.config}
+          value={typeof value === "string" ? value : undefined}
+          onPick={(id) => commit(id)}
+          onClear={() => commit("")}
+          clearLabel={locale === "fa" ? "پاک کردن" : "Clear"}
+          emptyLabel={
+            locale === "fa"
+              ? "هنوز رسانه‌ای نیست — از تب رسانه اضافه کنید"
+              : "No media yet — add some in the Media tab"
+          }
         />
-        <span className="text-[10px] text-[var(--puck-color-text-muted,#767676)]">
-          {locale === "fa"
-            ? "از تب رسانه هم می‌توانید تصویر را عوض کنید"
-            : "You can also change this in the Media tab"}
-        </span>
       </label>
     );
   }

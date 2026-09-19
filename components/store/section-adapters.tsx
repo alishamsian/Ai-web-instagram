@@ -9,6 +9,10 @@ import {
 } from "@/lib/store/catalog";
 import { resolveResponsiveColumns } from "@/lib/editor/responsive";
 import { resolveSectionVariant } from "@/lib/store/registry/variant-api";
+import {
+  getSectionRenderer,
+  resolveSectionRenderer,
+} from "@/lib/store/registry/catalog";
 import { StoreHero, StoreCategories } from "@/components/store/StoreHero";
 import {
   StoreProductGrid,
@@ -345,6 +349,86 @@ export function renderFooterSection(ctx: StoreSectionContext) {
       config={ctx.config}
       hasCategories={ctx.categories.length > 0}
     />
+  );
+}
+
+function nestedSectionFromPuckItem(item: {
+  type?: string;
+  props?: Record<string, unknown>;
+}): import("@/types/website").SectionConfig | null {
+  if (!item?.type) return null;
+  const props = item.props ?? {};
+  const id =
+    (typeof props.sectionId === "string" && props.sectionId) ||
+    (typeof props.id === "string" && props.id) ||
+    `${item.type}-col-${Math.random().toString(36).slice(2, 7)}`;
+  return {
+    id,
+    type: item.type as import("@/types/website").WebsiteSectionType,
+    visible: props.visible !== false,
+    variant:
+      typeof props.variant === "string" && props.variant.trim()
+        ? props.variant.trim()
+        : undefined,
+    settings:
+      props.settings && typeof props.settings === "object"
+        ? (props.settings as Record<string, unknown>)
+        : undefined,
+  };
+}
+
+export function renderColumnsSection(ctx: StoreSectionContext) {
+  const left = Array.isArray(ctx.section.settings?.left)
+    ? ctx.section.settings!.left
+    : [];
+  const right = Array.isArray(ctx.section.settings?.right)
+    ? ctx.section.settings!.right
+    : [];
+  const gap =
+    typeof ctx.section.settings?.gap === "string"
+      ? ctx.section.settings.gap
+      : "comfortable";
+  const ratio =
+    typeof ctx.section.settings?.ratio === "string"
+      ? ctx.section.settings.ratio
+      : "1-1";
+
+  const renderColumn = (items: unknown[]) =>
+    items.map((raw, index) => {
+      const section = nestedSectionFromPuckItem(
+        raw as { type?: string; props?: Record<string, unknown> },
+      );
+      if (!section || section.type === "columns" || section.type === "footer") {
+        return null;
+      }
+      const childCtx = { ...ctx, section };
+      const renderer =
+        resolveSectionRenderer(section.type, section.variant) ??
+        getSectionRenderer(section.type);
+      if (!renderer) {
+        return (
+          <StoreSectionFallback
+            key={section.id}
+            type={section.type}
+            locale={ctx.config.settings.language}
+            mode={ctx.mode}
+          />
+        );
+      }
+      return <div key={section.id || index}>{renderer(childCtx)}</div>;
+    });
+
+  return (
+    <div
+      className="store-columns store-section-present"
+      data-gap={gap}
+      data-ratio={ratio}
+    >
+      <div className="store-columns__grid">
+        <div className="store-columns__col">{renderColumn(left)}</div>
+        <div className="store-columns__col">{renderColumn(right)}</div>
+      </div>
+    </div>
   );
 }
 

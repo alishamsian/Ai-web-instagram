@@ -900,7 +900,8 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
         title: { key: "title", kind: "text", path: "content.about.title" },
         description: {
           key: "description",
-          kind: "textarea",
+          kind: "richText",
+          label: { fa: "متن", en: "Body" },
           path: "content.about.body",
         },
       },
@@ -1645,6 +1646,49 @@ export const CORE_SECTION_DEFINITIONS: SectionDefinition[] = [
     verticals: ["*"],
     capabilities: withCaps(),
     library: false,
+  },
+  {
+    type: "columns",
+    category: "content",
+    label: { fa: "دو ستون", en: "Columns" },
+    description: {
+      fa: "چیدمان دو ستونه با اسلات‌های تو در تو",
+      en: "Two-column layout with nested slots",
+    },
+    verticals: ["*"],
+    capabilities: withCaps({ inlineEdit: false }),
+    schema: {
+      layout: {
+        gap: {
+          key: "gap",
+          kind: "spacing",
+          label: { fa: "فاصله", en: "Gap" },
+          path: "settings.gap",
+          options: [
+            { value: "tight", label: { fa: "فشرده", en: "Tight" } },
+            {
+              value: "comfortable",
+              label: { fa: "متعادل", en: "Comfortable" },
+            },
+            { value: "spacious", label: { fa: "باز", en: "Spacious" } },
+          ],
+          defaultValue: "comfortable",
+        },
+        ratio: {
+          key: "ratio",
+          kind: "select",
+          label: { fa: "نسبت", en: "Ratio" },
+          path: "settings.ratio",
+          options: [
+            { value: "1-1", label: { fa: "۱:۱", en: "1:1" } },
+            { value: "1-2", label: { fa: "۱:۲", en: "1:2" } },
+            { value: "2-1", label: { fa: "۲:۱", en: "2:1" } },
+          ],
+          defaultValue: "1-1",
+        },
+      },
+    },
+    preview: { thumbnailTone: "neutral", aspect: "16/9" },
   },
   {
     type: "footer",

@@ -89,8 +89,14 @@ export function elementFieldToPuckField(
   const label = labelOf(field, locale);
   switch (field.kind) {
     case "textarea":
+      return { type: "textarea", label, contentEditable: true };
     case "richText":
-      return { type: "textarea", label };
+      return {
+        type: "richtext",
+        label,
+        contentEditable: true,
+        initialHeight: 140,
+      };
     case "boolean":
       return {
         type: "radio",
@@ -133,7 +139,7 @@ export function elementFieldToPuckField(
         desktop: { type: "number", label: locale === "fa" ? "دسکتاپ" : "Desktop" },
       } };
     case "media":
-      // Handled as custom bound field — fallback text id
+      // Prefer native external via advanced fields; text id as settings fallback
       return { type: "text", label };
     case "text":
     default:

@@ -2,7 +2,7 @@
 
 import type { Config, Fields } from "@puckeditor/core";
 import type { ComponentConfig } from "@puckeditor/core";
-import type { WebsiteSectionType } from "@/types/website";
+import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
 import type { PuckSectionProps } from "@/lib/puck/types";
 import {
   getLibrarySections,
@@ -31,6 +31,30 @@ import {
 import { PuckBoundSchemaField } from "@/components/editor/puck/PuckBoundField";
 import { sectionPresentationProps } from "@/lib/store/section-presentation";
 import { createElement } from "react";
+import { createEntityId } from "@/lib/editor/ids";
+import { isSchemaFieldActive } from "@/lib/store/registry/element-schema";
+import {
+  buildMediaExternalField,
+  faqArrayFields,
+  galleryImageArrayFields,
+  permissionsForSectionType,
+  testimonialArrayFields,
+  trustItemsArrayFields,
+  type FaqItemProp,
+  type TestimonialItemProp,
+} from "@/lib/puck/advanced";
+import { buildColumnsComponent } from "@/lib/puck/columns";
+
+/** Content paths handled by native Puck fields (not bound custom). */
+const NATIVE_BOUND_SKIP = new Set([
+  "content.about.body",
+  "content.hero.imageId",
+  "content.about.imageId",
+  "content.gallery.imageIds",
+  "content.faq.items",
+  "content.testimonials.items",
+  "content.trust.items",
+]);
 
 function SectionCanvasPreview(props: PuckSectionProps) {
   const ctx = usePuckWebsiteOptional();
@@ -127,18 +151,55 @@ function variantFieldOptions(type: string) {
   ];
 }
 
+function advancedFieldsForType(
+  type: string,
+  locale: "fa" | "en",
+  getConfig: () => WebsiteConfig,
+): Fields {
+  const fields: Fields = {};
+  if (type === "faq") {
+    fields.items = faqArrayFields(locale);
+  }
+  if (type === "testimonials") {
+    fields.items = testimonialArrayFields(locale);
+  }
+  if (type === "gallery") {
+    fields.images = galleryImageArrayFields(locale, getConfig);
+  }
+  if (type === "trust") {
+    fields.trustItems = trustItemsArrayFields(locale);
+  }
+  if (type === "about") {
+    fields.richBody = {
+      type: "richtext",
+      label: locale === "fa" ? "متن" : "Body",
+      contentEditable: true,
+      initialHeight: 160,
+    };
+    fields.imageId = buildMediaExternalField(locale, getConfig);
+  }
+  if (type === "hero") {
+    fields.imageId = buildMediaExternalField(locale, getConfig);
+  }
+  return fields;
+}
+
 function buildComponentConfig(
   def: SectionDefinition,
   locale: "fa" | "en",
+  getConfig: () => WebsiteConfig,
 ): ComponentConfig<PuckSectionProps> {
   const variantOptions = variantFieldOptions(def.type);
   const schema = getSectionSchema(def.type as never) ?? def.schema;
   const settingsFields = schemaToSettingsObjectFields(schema, locale);
-  const boundFields = schemaContentBoundFieldKeys(schema);
+  const boundFields = schemaContentBoundFieldKeys(schema).filter(
+    (field) => !field.path || !NATIVE_BOUND_SKIP.has(field.path),
+  );
 
   const contentFields: Fields = {};
   for (const field of boundFields) {
     if (field.path === "visible" || field.path === "variant") continue;
+    if (field.kind === "media") continue;
     const key = `__bound_${field.key}`;
     contentFields[key] = {
       type: "custom",
@@ -147,6 +208,9 @@ function buildComponentConfig(
         createElement(PuckBoundSchemaField, { field, locale }),
     };
   }
+
+  const advanced = advancedFieldsForType(def.type, locale, getConfig);
+  const basePermissions = permissionsForSectionType(def.type);
 
   return {
     label: locale === "fa" ? def.label.fa : def.label.en,
@@ -157,6 +221,12 @@ function buildComponentConfig(
       visible: true,
       variant: "",
       settings: {},
+      ...(def.type === "faq" ? { items: [] } : {}),
+      ...(def.type === "testimonials" ? { items: [] } : {}),
+      ...(def.type === "gallery" ? { images: [] } : {}),
+      ...(def.type === "trust" ? { trustItems: [] } : {}),
+      ...(def.type === "about" ? { richBody: "", imageId: "" } : {}),
+      ...(def.type === "hero" ? { imageId: "" } : {}),
     },
     fields: {
       visible: {
@@ -185,31 +255,86 @@ function buildComponentConfig(
             },
           }
         : {}),
+      ...advanced,
       ...contentFields,
     },
-    resolveFields: async (_data: unknown, { fields }: { fields: Fields }) => {
+    resolveFields: async (
+      data: { props: PuckSectionProps },
+      { fields }: { fields: Fields },
+    ) => {
       const next = { ...fields } as Fields;
       delete next.sectionId;
       delete next.sectionType;
+
+      const props = data.props ?? ({} as PuckSectionProps);
+      const values: Record<string, unknown> = {
+        variant: props.variant ?? "",
+        visible: props.visible !== false,
+        ...(props.settings ?? {}),
+      };
+
+      // Hide bound fields whose dependsOn is inactive
+      for (const field of boundFields) {
+        if (!isSchemaFieldActive(field, values)) {
+          delete next[`__bound_${field.key}`];
+        }
+      }
+
+      // Variant-aware: overlay controls only for overlay hero
+      if (def.type === "hero") {
+        const variant = String(props.variant || "").trim();
+        if (variant && variant !== "overlay" && next.settings?.type === "object") {
+          const settingsField = next.settings;
+          const objectFields = {
+            ...(settingsField.objectFields ?? {}),
+          };
+          delete objectFields.overlay;
+          next.settings = {
+            ...settingsField,
+            type: "object",
+            objectFields,
+          };
+        }
+      }
+
       return next;
     },
-    resolveData: async ({ props }: { props: PuckSectionProps }) => ({
-      props: {
+    resolveData: async ({ props }: { props: PuckSectionProps }) => {
+      const next: Record<string, unknown> = {
         ...props,
         sectionType: def.type as WebsiteSectionType,
         sectionId: props.sectionId || props.id,
-      },
-    }),
+      };
+
+      if (def.type === "faq" && Array.isArray((props as { items?: unknown }).items)) {
+        next.items = (
+          (props as unknown as { items: FaqItemProp[] }).items
+        ).map((item) => ({
+          ...item,
+          id: item.id || createEntityId("faq"),
+        }));
+      }
+      if (
+        def.type === "testimonials" &&
+        Array.isArray((props as { items?: unknown }).items)
+      ) {
+        next.items = (
+          (props as unknown as { items: TestimonialItemProp[] }).items
+        ).map((item) => ({
+          ...item,
+          id: item.id || createEntityId("tst"),
+        }));
+      }
+
+      return { props: next as unknown as PuckSectionProps };
+    },
+    resolvePermissions: basePermissions
+      ? async () => basePermissions
+      : undefined,
     render: (props: PuckSectionProps) => <SectionCanvasPreview {...props} />,
   } as unknown as ComponentConfig<PuckSectionProps>;
 }
 
-export type VitrinPuckConfig = Config;
-
-/**
- * Build Puck Config from the existing Section Registry.
- * Does not invent sections — registry is the source of truth.
- */
 function buildUnsupportedComponentConfig(
   type: string,
 ): ComponentConfig<PuckSectionProps> {
@@ -239,13 +364,34 @@ function buildUnsupportedComponentConfig(
   } as unknown as ComponentConfig<PuckSectionProps>;
 }
 
+export type VitrinPuckConfig = Config;
+
+/**
+ * Build Puck Config from the existing Section Registry.
+ * Does not invent sections — registry is the source of truth.
+ */
 export function buildPuckConfig(options?: {
   vertical?: string | null;
   locale?: "fa" | "en";
   /** Extra section types present in WebsiteConfig but missing from registry. */
   extraSectionTypes?: string[];
+  /** Live WebsiteConfig reader for media external fields. */
+  getWebsiteConfig?: () => WebsiteConfig;
 }): VitrinPuckConfig {
   const locale = options?.locale ?? "en";
+  const getConfig =
+    options?.getWebsiteConfig ??
+    (() =>
+      ({
+        media: {},
+        content: { hero: { style: "minimal", headline: "", subheadline: "", cta: "" } },
+        brand: { name: "", colors: {} },
+        sections: [],
+        seo: { title: "", description: "", keywords: [] },
+        settings: { language: "fa", direction: "rtl", showBranding: true, published: false },
+        template: "store",
+      }) as unknown as WebsiteConfig);
+
   const defs =
     options?.vertical != null && options.vertical !== ""
       ? getLibrarySections() /* filtered further below */
@@ -261,11 +407,22 @@ export function buildPuckConfig(options?: {
 
   const components: Record<string, ComponentConfig> = {};
   for (const def of allDefs) {
-    components[def.type] = buildComponentConfig(def, locale) as ComponentConfig;
+    if (def.type === "columns") continue;
+    components[def.type] = buildComponentConfig(
+      def,
+      locale,
+      getConfig,
+    ) as ComponentConfig;
   }
+
+  components.columns = buildColumnsComponent(locale);
 
   for (const type of options?.extraSectionTypes ?? []) {
     if (!type || components[type]) continue;
+    if (type === "columns") {
+      components.columns = buildColumnsComponent(locale);
+      continue;
+    }
     components[type] = buildUnsupportedComponentConfig(type) as ComponentConfig;
   }
 
@@ -274,6 +431,9 @@ export function buildPuckConfig(options?: {
     const types = allDefs
       .filter((d) => d.category === cat.id && d.library !== false)
       .map((d) => d.type);
+    if (cat.id === "content" && !types.includes("columns")) {
+      types.push("columns");
+    }
     if (!types.length) continue;
     categories[cat.id] = {
       title: locale === "fa" ? cat.fa : cat.en,
@@ -286,11 +446,37 @@ export function buildPuckConfig(options?: {
     components,
     categories,
     root: {
-      label: "Site",
+      label: locale === "fa" ? "سایت" : "Site",
       fields: {
-        adapterVersion: {
-          type: "text",
-          label: "Adapter version",
+        brand: {
+          type: "object",
+          label: locale === "fa" ? "برند" : "Brand",
+          objectFields: {
+            name: {
+              type: "text",
+              label: locale === "fa" ? "نام" : "Name",
+              contentEditable: true,
+            },
+            tagline: {
+              type: "text",
+              label: locale === "fa" ? "شعار" : "Tagline",
+              contentEditable: true,
+            },
+          },
+        },
+        seo: {
+          type: "object",
+          label: "SEO",
+          objectFields: {
+            title: {
+              type: "text",
+              label: locale === "fa" ? "عنوان" : "Title",
+            },
+            description: {
+              type: "textarea",
+              label: locale === "fa" ? "توضیحات" : "Description",
+            },
+          },
         },
       },
     },
