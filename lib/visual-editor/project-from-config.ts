@@ -1,5 +1,5 @@
 /**
- * Project WebsiteConfig → GrapesJS HTML with stable application IDs.
+ * Project WebsiteConfig → GrapesJS HTML with stable application IDs (Phase 2).
  * Seed/demo content is NEVER used when the site already has real sections/content.
  */
 
@@ -9,6 +9,11 @@ import type {
   WebsiteConfig,
   WebsiteSectionType,
 } from "@/types/website";
+import {
+  visualComponentId,
+  VISUAL_PAGE_ABOUT,
+  VISUAL_PAGE_HOME,
+} from "@/lib/visual-editor/ids";
 
 function escapeHtml(value: string): string {
   return value
@@ -35,19 +40,37 @@ function attr(name: string, value: string | boolean | undefined): string {
   return ` ${name}="${escapeHtml(String(value))}"`;
 }
 
+function componentAttrs(
+  sectionId: string,
+  role: string,
+  extra: Record<string, string | undefined> = {},
+): string {
+  const parts = [
+    attr("data-component-id", visualComponentId(sectionId, role)),
+    ...Object.entries(extra).map(([k, v]) => attr(k, v)),
+  ];
+  return parts.join("");
+}
+
 function sectionShell(
   section: SectionConfig,
   inner: string,
   style = "padding:48px 24px;",
 ): string {
   const hidden = section.visible === false;
+  const settingsJson =
+    section.settings && Object.keys(section.settings).length > 0
+      ? JSON.stringify(section.settings)
+      : undefined;
   return `<section${attr("data-section-id", section.id)}${attr(
     "data-section-type",
     section.type,
   )}${attr("data-section-variant", section.variant)}${attr(
     "data-visible",
     section.visible !== false ? "true" : "false",
-  )} style="${style}${hidden ? "opacity:0.45;outline:1px dashed #999;" : ""}">${inner}</section>`;
+  )}${attr("data-section-settings", settingsJson)} style="${style}${
+    hidden ? "opacity:0.45;outline:1px dashed #999;" : ""
+  }">${inner}</section>`;
 }
 
 function renderHero(config: WebsiteConfig, section: SectionConfig): string {
@@ -55,24 +78,31 @@ function renderHero(config: WebsiteConfig, section: SectionConfig): string {
   const img = mediaUrl(config, hero.imageId);
   const imgAlt = mediaAlt(config, hero.imageId);
   const imageBlock = img
-    ? `<img data-content-path="content.hero.imageId" data-media-id="${escapeHtml(
-        hero.imageId ?? "",
-      )}" src="${escapeHtml(img)}" alt="${escapeHtml(
-        imgAlt,
-      )}" style="display:block;width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin-top:24px;" />`
+    ? `<img${componentAttrs(section.id, "image", {
+        "data-content-path": "content.hero.imageId",
+        "data-media-id": hero.imageId ?? "",
+        src: img,
+        alt: imgAlt,
+      })} style="display:block;width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin-top:24px;" />`
     : "";
   return sectionShell(
     section,
     `<div style="max-width:960px;margin:0 auto;text-align:center;">
-      <h1 data-content-path="content.hero.headline" style="font-size:clamp(1.8rem,4vw,3rem);line-height:1.15;margin:0 0 12px;font-weight:600;">${escapeHtml(
+      <h1${componentAttrs(section.id, "headline", {
+        "data-content-path": "content.hero.headline",
+      })} style="font-size:clamp(1.8rem,4vw,3rem);line-height:1.15;margin:0 0 12px;font-weight:600;">${escapeHtml(
         hero.headline || "Headline",
       )}</h1>
-      <p data-content-path="content.hero.subheadline" style="font-size:1.05rem;line-height:1.6;margin:0 0 20px;color:#444;">${escapeHtml(
+      <p${componentAttrs(section.id, "subheadline", {
+        "data-content-path": "content.hero.subheadline",
+      })} style="font-size:1.05rem;line-height:1.6;margin:0 0 20px;color:#444;">${escapeHtml(
         hero.subheadline || "",
       )}</p>
-      <a data-content-path="content.hero.cta" href="${escapeHtml(
-        hero.ctaHref || "#",
-      )}" style="display:inline-block;padding:12px 22px;background:#111;color:#fff;text-decoration:none;border-radius:8px;">${escapeHtml(
+      <a${componentAttrs(section.id, "cta", {
+        "data-content-path": "content.hero.cta",
+        "data-href-path": "content.hero.ctaHref",
+        href: hero.ctaHref || "#",
+      })} style="display:inline-block;padding:12px 22px;background:#111;color:#fff;text-decoration:none;border-radius:8px;">${escapeHtml(
         hero.cta || "CTA",
       )}</a>
       ${imageBlock}
@@ -97,20 +127,25 @@ function renderAbout(config: WebsiteConfig, section: SectionConfig): string {
       img ? "1.1fr 0.9fr" : "1fr"
     };gap:32px;align-items:center;">
       <div>
-        <h2 data-content-path="content.about.title" style="font-size:1.75rem;margin:0 0 12px;">${escapeHtml(
+        <h2${componentAttrs(section.id, "title", {
+          "data-content-path": "content.about.title",
+        })} style="font-size:1.75rem;margin:0 0 12px;">${escapeHtml(
           about.title || "",
         )}</h2>
-        <p data-content-path="content.about.body" style="margin:0;line-height:1.7;color:#444;white-space:pre-wrap;">${escapeHtml(
+        <p${componentAttrs(section.id, "body", {
+          "data-content-path": "content.about.body",
+        })} style="margin:0;line-height:1.7;color:#444;white-space:pre-wrap;">${escapeHtml(
           about.body || "",
         )}</p>
       </div>
       ${
         img
-          ? `<img data-content-path="content.about.imageId" data-media-id="${escapeHtml(
-              about.imageId ?? "",
-            )}" src="${escapeHtml(img)}" alt="${escapeHtml(
-              imgAlt,
-            )}" style="width:100%;border-radius:12px;display:block;" />`
+          ? `<img${componentAttrs(section.id, "image", {
+              "data-content-path": "content.about.imageId",
+              "data-media-id": about.imageId ?? "",
+              src: img,
+              alt: imgAlt,
+            })} style="width:100%;border-radius:12px;display:block;" />`
           : ""
       }
     </div>`,
@@ -127,13 +162,12 @@ function renderGenericTitleBody(
   return sectionShell(
     section,
     `<div style="max-width:960px;margin:0 auto;">
-      <h2${attr("data-content-path", titlePath)} style="font-size:1.75rem;margin:0 0 12px;">${escapeHtml(
-        title,
-      )}</h2>
-      <div${attr(
-        "data-content-path",
-        bodyPath,
-      )} style="color:#444;line-height:1.6;">${escapeHtml(body)}</div>
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": titlePath,
+      })} style="font-size:1.75rem;margin:0 0 12px;">${escapeHtml(title)}</h2>
+      <div${componentAttrs(section.id, "body", {
+        "data-content-path": bodyPath,
+      })} style="color:#444;line-height:1.6;">${escapeHtml(body)}</div>
     </div>`,
   );
 }
@@ -146,17 +180,28 @@ function renderProducts(config: WebsiteConfig, section: SectionConfig): string {
     .map((item, index) => {
       const imageId = item.imageIds?.[0];
       const url = mediaUrl(config, imageId);
-      return `<div data-product-index="${index}" style="border:1px solid #eee;border-radius:12px;overflow:hidden;background:#fff;">
+      const productId = item.id || `product-${index}`;
+      return `<div${componentAttrs(section.id, `product-${index}`, {
+        "data-product-id": productId,
+        "data-product-index": String(index),
+      })} style="border:1px solid #eee;border-radius:12px;overflow:hidden;background:#fff;">
         ${
           url
-            ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(
-                item.name,
-              )}" style="width:100%;height:160px;object-fit:cover;display:block;" />`
+            ? `<img${componentAttrs(section.id, `product-${index}-image`, {
+                "data-content-path": `content.products.items.${index}.imageIds.0`,
+                "data-media-id": imageId,
+                src: url,
+                alt: item.name,
+              })} style="width:100%;height:160px;object-fit:cover;display:block;" />`
             : `<div style="height:120px;background:#f3f3f3;"></div>`
         }
         <div style="padding:14px;">
-          <h3 style="margin:0 0 6px;font-size:1rem;">${escapeHtml(item.name)}</h3>
-          <p style="margin:0;color:#666;font-size:0.9rem;">${escapeHtml(
+          <h3${componentAttrs(section.id, `product-${index}-name`, {
+            "data-content-path": `content.products.items.${index}.name`,
+          })} style="margin:0 0 6px;font-size:1rem;">${escapeHtml(item.name)}</h3>
+          <p${componentAttrs(section.id, `product-${index}-desc`, {
+            "data-content-path": `content.products.items.${index}.description`,
+          })} style="margin:0;color:#666;font-size:0.9rem;">${escapeHtml(
             item.description || "",
           )}</p>
         </div>
@@ -166,7 +211,9 @@ function renderProducts(config: WebsiteConfig, section: SectionConfig): string {
   return sectionShell(
     section,
     `<div style="max-width:1100px;margin:0 auto;">
-      <h2 data-content-path="content.products.title" style="font-size:1.75rem;margin:0 0 24px;text-align:center;">${escapeHtml(
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.products.title",
+      })} style="font-size:1.75rem;margin:0 0 24px;text-align:center;">${escapeHtml(
         title,
       )}</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">${
@@ -180,24 +227,28 @@ function renderGallery(config: WebsiteConfig, section: SectionConfig): string {
   const gallery = config.content.gallery;
   const ids = gallery?.imageIds ?? [];
   const images = ids
-    .map((id) => {
+    .map((id, index) => {
       const url = mediaUrl(config, id);
       if (!url) return "";
-      return `<img data-media-id="${escapeHtml(id)}" src="${escapeHtml(
-        url,
-      )}" alt="${escapeHtml(
-        mediaAlt(config, id),
-      )}" style="width:100%;height:180px;object-fit:cover;border-radius:10px;display:block;" />`;
+      return `<img${componentAttrs(section.id, `gallery-${index}`, {
+        "data-media-id": id,
+        "data-gallery-index": String(index),
+        "data-content-path": "content.gallery.imageIds",
+        src: url,
+        alt: mediaAlt(config, id),
+      })} style="width:100%;height:180px;object-fit:cover;border-radius:10px;display:block;" />`;
     })
     .filter(Boolean)
     .join("");
   return sectionShell(
     section,
     `<div style="max-width:1100px;margin:0 auto;">
-      <h2 data-content-path="content.gallery.title" style="font-size:1.75rem;margin:0 0 24px;text-align:center;">${escapeHtml(
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.gallery.title",
+      })} style="font-size:1.75rem;margin:0 0 24px;text-align:center;">${escapeHtml(
         gallery?.title || "Gallery",
       )}</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;">${
+      <div data-gallery-root="true" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;">${
         images || `<p style="color:#888;text-align:center;">No images</p>`
       }</div>
     </div>`,
@@ -210,19 +261,28 @@ function renderTestimonials(
 ): string {
   const block = config.content.testimonials;
   const items = (block?.items ?? [])
-    .map(
-      (item) => `<blockquote style="margin:0;padding:20px;border:1px solid #eee;border-radius:12px;">
-      <p style="margin:0 0 10px;line-height:1.6;">${escapeHtml(item.quote)}</p>
-      <footer style="color:#666;font-size:0.9rem;">— ${escapeHtml(
+    .map((item, index) => {
+      const tid = item.id || `t-${index}`;
+      return `<blockquote${componentAttrs(section.id, `testimonial-${index}`, {
+        "data-testimonial-id": tid,
+      })} style="margin:0;padding:20px;border:1px solid #eee;border-radius:12px;">
+      <p${componentAttrs(section.id, `testimonial-${index}-quote`, {
+        "data-content-path": `content.testimonials.items.${index}.quote`,
+      })} style="margin:0 0 10px;line-height:1.6;">${escapeHtml(item.quote)}</p>
+      <footer${componentAttrs(section.id, `testimonial-${index}-author`, {
+        "data-content-path": `content.testimonials.items.${index}.author`,
+      })} style="color:#666;font-size:0.9rem;">— ${escapeHtml(
         item.author,
       )}</footer>
-    </blockquote>`,
-    )
+    </blockquote>`;
+    })
     .join("");
   return sectionShell(
     section,
     `<div style="max-width:960px;margin:0 auto;">
-      <h2 data-content-path="content.testimonials.title" style="font-size:1.75rem;margin:0 0 24px;text-align:center;">${escapeHtml(
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.testimonials.title",
+      })} style="font-size:1.75rem;margin:0 0 24px;text-align:center;">${escapeHtml(
         block?.title || "Testimonials",
       )}</h2>
       <div style="display:grid;gap:12px;">${items || "<p style='color:#888;'>No testimonials</p>"}</div>
@@ -233,21 +293,30 @@ function renderTestimonials(
 function renderFaq(config: WebsiteConfig, section: SectionConfig): string {
   const faq = config.content.faq;
   const items = (faq?.items ?? [])
-    .map(
-      (item) => `<details style="border:1px solid #eee;border-radius:10px;padding:12px 14px;">
-      <summary style="font-weight:550;cursor:pointer;">${escapeHtml(
+    .map((item, index) => {
+      const fid = item.id || `faq-${index}`;
+      return `<details${componentAttrs(section.id, `faq-${index}`, {
+        "data-faq-id": fid,
+      })} style="border:1px solid #eee;border-radius:10px;padding:12px 14px;">
+      <summary${componentAttrs(section.id, `faq-${index}-q`, {
+        "data-content-path": `content.faq.items.${index}.question`,
+      })} style="font-weight:550;cursor:pointer;">${escapeHtml(
         item.question,
       )}</summary>
-      <p style="margin:10px 0 0;color:#555;line-height:1.6;">${escapeHtml(
+      <p${componentAttrs(section.id, `faq-${index}-a`, {
+        "data-content-path": `content.faq.items.${index}.answer`,
+      })} style="margin:10px 0 0;color:#555;line-height:1.6;">${escapeHtml(
         item.answer,
       )}</p>
-    </details>`,
-    )
+    </details>`;
+    })
     .join("");
   return sectionShell(
     section,
     `<div style="max-width:720px;margin:0 auto;">
-      <h2 data-content-path="content.faq.title" style="font-size:1.75rem;margin:0 0 20px;text-align:center;">${escapeHtml(
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.faq.title",
+      })} style="font-size:1.75rem;margin:0 0 20px;text-align:center;">${escapeHtml(
         faq?.title || "FAQ",
       )}</h2>
       <div style="display:grid;gap:10px;">${items || "<p style='color:#888;'>No questions</p>"}</div>
@@ -260,10 +329,14 @@ function renderContact(config: WebsiteConfig, section: SectionConfig): string {
   return sectionShell(
     section,
     `<div style="max-width:640px;margin:0 auto;">
-      <h2 data-content-path="content.contact.title" style="font-size:1.75rem;margin:0 0 12px;text-align:center;">${escapeHtml(
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.contact.title",
+      })} style="font-size:1.75rem;margin:0 0 12px;text-align:center;">${escapeHtml(
         contact?.title || "Contact",
       )}</h2>
-      <p data-content-path="content.contact.body" style="margin:0 0 16px;color:#444;line-height:1.6;text-align:center;">${escapeHtml(
+      <p${componentAttrs(section.id, "body", {
+        "data-content-path": "content.contact.body",
+      })} style="margin:0 0 16px;color:#444;line-height:1.6;text-align:center;">${escapeHtml(
         contact?.body || "",
       )}</p>
       <p style="margin:0;text-align:center;color:#666;font-size:0.95rem;">${escapeHtml(
@@ -280,15 +353,21 @@ function renderPromo(config: WebsiteConfig, section: SectionConfig): string {
   return sectionShell(
     section,
     `<div style="max-width:720px;margin:0 auto;text-align:center;color:#fff;">
-      <p data-content-path="content.promo.kicker" style="margin:0 0 8px;opacity:0.8;letter-spacing:0.08em;text-transform:uppercase;font-size:12px;">${escapeHtml(
+      <p${componentAttrs(section.id, "kicker", {
+        "data-content-path": "content.promo.kicker",
+      })} style="margin:0 0 8px;opacity:0.8;letter-spacing:0.08em;text-transform:uppercase;font-size:12px;">${escapeHtml(
         promo?.kicker || "",
       )}</p>
-      <h2 data-content-path="content.promo.title" style="font-size:1.8rem;margin:0 0 16px;">${escapeHtml(
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.promo.title",
+      })} style="font-size:1.8rem;margin:0 0 16px;">${escapeHtml(
         promo?.title || "",
       )}</h2>
-      <a data-content-path="content.promo.cta" href="${escapeHtml(
-        promo?.ctaHref || "#",
-      )}" style="display:inline-block;padding:12px 22px;background:#fff;color:#111;text-decoration:none;border-radius:8px;font-weight:550;">${escapeHtml(
+      <a${componentAttrs(section.id, "cta", {
+        "data-content-path": "content.promo.cta",
+        "data-href-path": "content.promo.ctaHref",
+        href: promo?.ctaHref || "#",
+      })} style="display:inline-block;padding:12px 22px;background:#fff;color:#111;text-decoration:none;border-radius:8px;font-weight:550;">${escapeHtml(
         promo?.cta || "Learn more",
       )}</a>
     </div>`,
@@ -301,7 +380,9 @@ function renderFooter(config: WebsiteConfig, section: SectionConfig): string {
   return sectionShell(
     section,
     `<div style="max-width:960px;margin:0 auto;text-align:center;color:#aaa;">
-      <p style="margin:0;font-size:0.9rem;">© ${escapeHtml(name)}</p>
+      <p${componentAttrs(section.id, "copyright")} style="margin:0;font-size:0.9rem;">© ${escapeHtml(
+        name,
+      )}</p>
     </div>`,
     "padding:36px 24px;background:#0f0f12;",
   );
@@ -314,7 +395,7 @@ function renderFallback(section: SectionConfig): string {
       <strong style="display:block;margin-bottom:6px;">${escapeHtml(
         section.type,
       )}</strong>
-      <span style="font-size:0.85rem;">Section preserved (visual preview limited in Phase 1)</span>
+      <span style="font-size:0.85rem;">Section preserved (visual mapping limited — data kept in WebsiteConfig)</span>
     </div>`,
   );
 }
@@ -390,7 +471,7 @@ export function buildProjectFromWebsiteConfig(
     .map((section) => renderSection(config, section))
     .join("\n");
 
-  const body = `<body data-website-page="home" data-ve-source="website-config" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
+  const body = `<body data-website-page="${VISUAL_PAGE_HOME}" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
     fg,
   )};background:${escapeHtml(bg)};">
 ${
@@ -408,21 +489,24 @@ ${
     id,
   }));
 
-  return {
-    pages: [
-      {
-        id: "home",
-        name: "Home",
-        component: body,
-      },
-      ...(config.content.about?.title?.trim() || config.content.about?.body?.trim()
-        ? [
-            {
-              id: "about",
-              name: "About",
-              component: `<body data-website-page="about" data-ve-source="website-config" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
-                fg,
-              )};background:${escapeHtml(bg)};">
+  const pages: ProjectData["pages"] = [
+    {
+      id: VISUAL_PAGE_HOME,
+      name: "Home",
+      component: body,
+    },
+  ];
+
+  if (
+    config.content.about?.title?.trim() ||
+    config.content.about?.body?.trim()
+  ) {
+    pages.push({
+      id: VISUAL_PAGE_ABOUT,
+      name: "About",
+      component: `<body data-website-page="${VISUAL_PAGE_ABOUT}" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
+        fg,
+      )};background:${escapeHtml(bg)};">
 ${renderAbout(
   config,
   config.sections.find((s) => s.type === "about") ?? {
@@ -432,10 +516,11 @@ ${renderAbout(
   },
 )}
 </body>`,
-            },
-          ]
-        : []),
-    ],
+    });
+  }
+
+  return {
+    pages,
     styles: [],
     assets,
   };

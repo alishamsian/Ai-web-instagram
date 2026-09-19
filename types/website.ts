@@ -71,11 +71,21 @@ export interface WebsiteConfig {
 /** Persisted GrapesJS project JSON + metadata. Unknown keys must survive round-trips. */
 export type VisualEditorProjectData = Record<string, unknown>;
 
+/**
+ * GrapesJS visual-editor projection state.
+ * - version 1: Phase 1 foundation
+ * - version 2: Phase 2 stable IDs + source fingerprint reconcile
+ */
 export interface VisualEditorState {
   engine: "grapesjs";
-  version: 1;
+  version: 1 | 2;
   project: VisualEditorProjectData;
   activePageId?: string;
+  /**
+   * Fingerprint of content/sections/media at last visual sync.
+   * When this drifts from live WebsiteConfig, reserved pages are rebuilt.
+   */
+  sourceFingerprint?: string;
 }
 export interface WebsiteRecord {
   id: string;

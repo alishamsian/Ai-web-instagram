@@ -1,10 +1,12 @@
 /**
- * WebsiteConfig ↔ GrapesJS project adapter (Phase 1.1 hardened).
+ * WebsiteConfig ↔ GrapesJS project adapter (Phase 2).
  *
  * Rules:
+ * - WebsiteConfig is canonical; GrapesJS is an editing projection
  * - Real WebsiteConfig always wins over demo seed
  * - Seed only when site has no renderable content AND no saved visual project
  * - Round-trip never silently drops brand/content/sections/seo/settings/media
+ * - Classic drift is detected via sourceFingerprint; reserved pages rebuild, extras keep
  */
 
 import type { ProjectData } from "grapesjs";
@@ -18,34 +20,60 @@ import {
   websiteConfigHasRenderableContent,
 } from "@/lib/visual-editor/project-from-config";
 import { syncWebsiteConfigFromVisualProject } from "@/lib/visual-editor/sync-from-project";
+import { websiteConfigSourceFingerprint } from "@/lib/visual-editor/content-fingerprint";
+import { mergeProjectedWithSavedProject } from "@/lib/visual-editor/merge-project";
 
 export function cloneWebsiteConfig<T extends WebsiteConfig>(config: T): T {
   return structuredClone(config);
 }
 
 /**
+ * Whether the saved visual project still matches live WebsiteConfig projection inputs.
+ * Missing fingerprint (v1) → treat as matching (preserve layout until next visual save).
+ */
+export function visualProjectMatchesSource(config: WebsiteConfig): boolean {
+  const saved = config.visualEditor?.sourceFingerprint;
+  if (!saved) return true;
+  return saved === websiteConfigSourceFingerprint(config);
+}
+
+/**
  * Resolve GrapesJS project for the editor.
  * Priority:
- * 1) Existing saved visualEditor.project
- * 2) Projection from real WebsiteConfig sections/content
- * 3) Dev seed only for empty sites
+ * 1) Existing saved visualEditor.project (when fingerprint matches / missing)
+ * 2) Merge: rebuild reserved pages from WebsiteConfig + keep extra GrapesJS pages
+ * 3) Fresh projection from WebsiteConfig
+ * 4) Dev seed only for empty sites
  */
 export function websiteConfigToVisualProject(
   config: WebsiteConfig,
 ): ProjectData {
   const existing = config.visualEditor?.project;
-  if (!isVisualProjectEmpty(existing)) {
+  const hasSaved = !isVisualProjectEmpty(existing);
+
+  if (hasSaved && visualProjectMatchesSource(config)) {
     return existing as ProjectData;
   }
+
   if (websiteConfigHasRenderableContent(config)) {
-    return buildProjectFromWebsiteConfig(config);
+    const projected = buildProjectFromWebsiteConfig(config);
+    if (hasSaved) {
+      return mergeProjectedWithSavedProject(projected, existing!);
+    }
+    return projected;
   }
-  // Empty development site only
+
+  if (hasSaved) {
+    // Empty content but layout exists — keep layout (user may clear content later)
+    return existing as ProjectData;
+  }
+
   return buildModernAgencyProject(config);
 }
 
 /**
  * Merge GrapesJS project back into WebsiteConfig (lossless + content sync).
+ * Persists adapter version 2 + sourceFingerprint for Classic drift detection.
  */
 export function applyVisualProjectToWebsiteConfig(
   config: WebsiteConfig,
@@ -77,7 +105,6 @@ export function assertAdapterPreservesConfig(
       }
     }
   }
-  // content may be intentionally synced from canvas — only flag structural loss of keys
   for (const key of Object.keys(original.content) as Array<
     keyof WebsiteConfig["content"]
   >) {

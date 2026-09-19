@@ -72,9 +72,6 @@ GrapesJS is created once per mount via refs (not React state).
 `isCurrent` + mount IDs prevent React Strict Mode double-init from wiping the canvas.
 Editor destroy runs only for the editor instance owned by that mount.
 
-## Phase 2 candidates
+## Phase 2
 
-- Full WebsiteConfig ↔ canvas section mapping
-- Media upload UI in Visual Editor
-- Template marketplace / section library depth
-- Application-level history sync with GrapesJS UndoManager
+See [visual-editor-phase2.md](./visual-editor-phase2.md) for stable IDs, source fingerprint reconcile, and lossless sync.

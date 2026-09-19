@@ -8,6 +8,7 @@
 
 import type { ProjectData } from "grapesjs";
 import type { WebsiteConfig, SectionConfig } from "@/types/website";
+import { websiteConfigSourceFingerprint } from "@/lib/visual-editor/content-fingerprint";
 
 function decodeEntities(value: string): string {
   return value
@@ -111,16 +112,34 @@ export function extractContentPathValues(
   for (const root of roots) {
     if (typeof root === "string") {
       extractFromHtmlBlob(root, values);
+      // href paths in HTML
+      const hrefRegex =
+        /data-href-path="([^"]+)"[^>]*href="([^"]+)"|href="([^"]+)"[^>]*data-href-path="([^"]+)"/gi;
+      let match: RegExpExecArray | null;
+      while ((match = hrefRegex.exec(root)) !== null) {
+        const path = match[1] || match[4];
+        const href = match[2] || match[3];
+        if (path && href) values[path] = decodeEntities(href);
+      }
       continue;
     }
     walkComponentTree(root, (n) => {
       const attrs = n.attributes ?? {};
+
+      const hrefPath = attrs["data-href-path"];
+      if (hrefPath && attrs.href) {
+        values[hrefPath] = attrs.href;
+      }
+
       const path = attrs["data-content-path"];
       if (!path) return;
 
+      // Gallery imageIds collected separately
+      if (path === "content.gallery.imageIds") return;
+
       const mediaId = attrs["data-media-id"];
       const src = attrs.src;
-      const isImagePath = path.endsWith(".imageId") || path.includes("image");
+      const isImagePath = path.endsWith(".imageId") || path.includes("imageId");
 
       if (mediaId && isImagePath) {
         values[path] = mediaId;
@@ -139,22 +158,93 @@ export function extractContentPathValues(
   return values;
 }
 
+/** Ordered gallery media ids from canvas (by data-gallery-index / document order). */
+export function extractGalleryImageIds(
+  project: ProjectData | Record<string, unknown>,
+): string[] | null {
+  const collected: Array<{ index: number; id: string }> = [];
+  let order = 0;
+  for (const root of collectPageRoots(project)) {
+    if (typeof root === "string") {
+      const imgRegex =
+        /<img\b[^>]*data-content-path="content\.gallery\.imageIds"[^>]*>|<img\b[^>]*data-content-path='content\.gallery\.imageIds'[^>]*>/gi;
+      let match: RegExpExecArray | null;
+      while ((match = imgRegex.exec(root)) !== null) {
+        const tag = match[0];
+        const id =
+          /data-media-id="([^"]+)"/.exec(tag)?.[1] ||
+          /data-media-id='([^']+)'/.exec(tag)?.[1];
+        if (!id) continue;
+        const indexAttr =
+          /data-gallery-index="([^"]+)"/.exec(tag)?.[1] ||
+          /data-gallery-index='([^']+)'/.exec(tag)?.[1];
+        const index =
+          indexAttr != null && Number.isFinite(Number(indexAttr))
+            ? Number(indexAttr)
+            : order++;
+        collected.push({ index, id });
+      }
+      continue;
+    }
+    walkComponentTree(root, (n) => {
+      const attrs = n.attributes ?? {};
+      if (attrs["data-content-path"] !== "content.gallery.imageIds") return;
+      const id = attrs["data-media-id"];
+      if (!id) return;
+      const index =
+        attrs["data-gallery-index"] != null
+          ? Number(attrs["data-gallery-index"])
+          : order++;
+      collected.push({
+        index: Number.isFinite(index) ? index : order++,
+        id,
+      });
+    });
+  }
+  if (collected.length === 0) return null;
+  collected.sort((a, b) => a.index - b.index);
+  return collected.map((c) => c.id);
+}
+
 export function extractSectionMeta(
   project: ProjectData | Record<string, unknown>,
-): Array<{ id: string; type?: string; visible: boolean; variant?: string }> {
+): Array<{
+  id: string;
+  type?: string;
+  visible: boolean;
+  variant?: string;
+  settings?: Record<string, unknown>;
+}> {
   const result: Array<{
     id: string;
     type?: string;
     visible: boolean;
     variant?: string;
+    settings?: Record<string, unknown>;
   }> = [];
   const seen = new Set<string>();
+
+  const parseSettings = (
+    raw: string | undefined,
+  ): Record<string, unknown> | undefined => {
+    if (!raw) return undefined;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  };
 
   const push = (meta: {
     id: string;
     type?: string;
     visible: boolean;
     variant?: string;
+    settings?: Record<string, unknown>;
   }) => {
     if (!meta.id || seen.has(meta.id)) return;
     seen.add(meta.id);
@@ -172,6 +262,13 @@ export function extractSectionMeta(
           type: /data-section-type="([^"]+)"/.exec(tag)?.[1],
           variant: /data-section-variant="([^"]+)"/.exec(tag)?.[1],
           visible: /data-visible="([^"]+)"/.exec(tag)?.[1] !== "false",
+          settings: parseSettings(
+            /data-section-settings="([^"]*)"/.exec(tag)?.[1]
+              ? decodeEntities(
+                  /data-section-settings="([^"]*)"/.exec(tag)![1],
+                )
+              : undefined,
+          ),
         });
       }
       continue;
@@ -181,15 +278,12 @@ export function extractSectionMeta(
       const attrs = n.attributes ?? {};
       const id = attrs["data-section-id"];
       if (!id) return;
-      const tag = (n.tagName || "").toLowerCase();
-      if (tag && tag !== "section" && n.type !== "section") {
-        // Still accept any node carrying section identity
-      }
       push({
         id,
         type: attrs["data-section-type"],
         variant: attrs["data-section-variant"] || undefined,
         visible: attrs["data-visible"] !== "false",
+        settings: parseSettings(attrs["data-section-settings"]),
       });
     });
   }
@@ -197,33 +291,52 @@ export function extractSectionMeta(
   return result;
 }
 
-function setByPath(
-  config: WebsiteConfig,
-  path: string,
+function resolveMediaId(config: WebsiteConfig, value: string): string | undefined {
+  if (config.media[value]) return value;
+  const found = Object.entries(config.media).find(([, m]) => m.url === value);
+  return found?.[0];
+}
+
+function setNestedString(
+  root: Record<string, unknown>,
+  parts: string[],
   value: string,
-): void {
+): boolean {
+  if (parts.length === 0) return false;
+  let cursor: unknown = root;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const key = parts[i];
+    const nextKey = parts[i + 1];
+    const isIndex = /^\d+$/.test(nextKey);
+    if (cursor == null || typeof cursor !== "object") return false;
+    const obj = cursor as Record<string, unknown>;
+    if (obj[key] == null) {
+      obj[key] = isIndex ? [] : {};
+    }
+    cursor = obj[key];
+  }
+  if (cursor == null || typeof cursor !== "object") return false;
+  const last = parts[parts.length - 1];
+  (cursor as Record<string, unknown>)[last] = value;
+  return true;
+}
+
+function setByPath(config: WebsiteConfig, path: string, value: string): void {
   if (path === "content.hero.headline") config.content.hero.headline = value;
   else if (path === "content.hero.subheadline")
     config.content.hero.subheadline = value;
   else if (path === "content.hero.cta") config.content.hero.cta = value;
+  else if (path === "content.hero.ctaHref") config.content.hero.ctaHref = value;
   else if (path === "content.hero.imageId") {
-    // Prefer media id; if value looks like URL, resolve against media bag
-    if (config.media[value]) {
-      config.content.hero.imageId = value;
-    } else {
-      const found = Object.entries(config.media).find(([, m]) => m.url === value);
-      if (found) config.content.hero.imageId = found[0];
-    }
+    const id = resolveMediaId(config, value);
+    if (id) config.content.hero.imageId = id;
   } else if (path === "content.about.title" && config.content.about) {
     config.content.about.title = value;
   } else if (path === "content.about.body" && config.content.about) {
     config.content.about.body = value;
   } else if (path === "content.about.imageId" && config.content.about) {
-    if (config.media[value]) config.content.about.imageId = value;
-    else {
-      const found = Object.entries(config.media).find(([, m]) => m.url === value);
-      if (found) config.content.about.imageId = found[0];
-    }
+    const id = resolveMediaId(config, value);
+    if (id) config.content.about.imageId = id;
   } else if (path === "content.products.title" && config.content.products) {
     config.content.products.title = value;
   } else if (path === "content.gallery.title" && config.content.gallery) {
@@ -245,16 +358,35 @@ function setByPath(
     config.content.promo.title = value;
   } else if (path === "content.promo.cta" && config.content.promo) {
     config.content.promo.cta = value;
+  } else if (path === "content.promo.ctaHref" && config.content.promo) {
+    config.content.promo.ctaHref = value;
   } else if (path === "content.services.title" && config.content.services) {
     config.content.services.title = value;
+  } else if (path.startsWith("content.")) {
+    // Nested item fields: content.products.items.0.name, faq, testimonials, …
+    const parts = path.split(".");
+    let finalValue = value;
+    if (path.includes("imageId")) {
+      const id = resolveMediaId(config, value);
+      if (id) finalValue = id;
+      else if (/^https?:\/\//i.test(value)) {
+        // Unresolved URL — do not overwrite a media id with a raw URL
+        return;
+      }
+    }
+    setNestedString(
+      config as unknown as Record<string, unknown>,
+      parts,
+      finalValue,
+    );
   }
 }
 
 /**
  * Apply visual project onto WebsiteConfig:
- * - stores project under visualEditor
- * - syncs known content paths
- * - updates section visibility/order when section nodes exist
+ * - stores project under visualEditor (adapter v2)
+ * - syncs known content paths + hrefs + gallery order
+ * - updates section visibility/order/settings when section nodes exist
  * - NEVER drops sections missing from canvas (orphans preserved)
  */
 export function syncWebsiteConfigFromVisualProject(
@@ -266,6 +398,11 @@ export function syncWebsiteConfigFromVisualProject(
   const pathValues = extractContentPathValues(project);
   for (const [path, value] of Object.entries(pathValues)) {
     setByPath(next, path, value);
+  }
+
+  const galleryIds = extractGalleryImageIds(project);
+  if (galleryIds && next.content.gallery) {
+    next.content.gallery.imageIds = galleryIds;
   }
 
   const sectionMeta = extractSectionMeta(project);
@@ -280,14 +417,13 @@ export function syncWebsiteConfigFromVisualProject(
         ...existing,
         visible: meta.visible,
         variant: meta.variant ?? existing.variant,
+        settings: meta.settings ?? existing.settings,
       });
       seen.add(meta.id);
     }
-    // Preserve orphan sections (not rendered / not in canvas) — append after
     for (const section of next.sections) {
       if (!seen.has(section.id)) ordered.push(section);
     }
-    // Keep footer last
     const body = ordered.filter((s) => s.type !== "footer");
     const footers = ordered.filter((s) => s.type === "footer");
     next.sections = [...body, ...footers];
@@ -295,10 +431,11 @@ export function syncWebsiteConfigFromVisualProject(
 
   next.visualEditor = {
     engine: "grapesjs",
-    version: 1,
+    version: 2,
     project: { ...(project as Record<string, unknown>) },
     activePageId:
       options?.activePageId ?? config.visualEditor?.activePageId ?? "home",
+    sourceFingerprint: websiteConfigSourceFingerprint(next),
   };
 
   return next;
