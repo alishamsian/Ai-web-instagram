@@ -1,0 +1,339 @@
+/* Visual Editor shell — product chrome; GrapesJS canvas is isolated inside .ve-canvas-host */
+
+.ve-shell {
+  --ve-bg: #09090b;
+  --ve-elevated: #0f0f12;
+  --ve-soft: #141418;
+  --ve-border: rgba(255, 255, 255, 0.08);
+  --ve-fg: #f4f4f5;
+  --ve-muted: #8a8a93;
+  --ve-accent: #ef6351;
+  --ve-select: #6b93f0;
+  --ve-success: #34d399;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ve-bg);
+  color: var(--ve-fg);
+  font-family: var(--font-geist-sans, system-ui, sans-serif);
+  position: relative;
+}
+
+.ve-shell[dir="rtl"] .ve-topbar__actions {
+  flex-direction: row-reverse;
+}
+
+.ve-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ve-border);
+  background: var(--ve-elevated);
+  flex-shrink: 0;
+}
+
+.ve-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ve-topbar__title {
+  font-size: 13px;
+  font-weight: 550;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ve-topbar__group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ve-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ve-fg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.ve-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ve-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ve-btn[data-active="true"] {
+  background: rgba(107, 147, 240, 0.16);
+  color: #b7cbff;
+}
+
+.ve-btn--primary {
+  background: var(--ve-accent);
+  color: #fff;
+  font-weight: 550;
+}
+
+.ve-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.ve-btn--ghost {
+  color: var(--ve-muted);
+}
+
+.ve-status {
+  font-size: 11px;
+  color: var(--ve-muted);
+  min-width: 7rem;
+  text-align: end;
+}
+
+.ve-status[data-state="dirty"] {
+  color: #fbbf24;
+}
+.ve-status[data-state="saving"] {
+  color: var(--ve-select);
+}
+.ve-status[data-state="saved"] {
+  color: var(--ve-success);
+}
+.ve-status[data-state="error"] {
+  color: #f87171;
+}
+
+.ve-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 280px;
+}
+
+@media (max-width: 1100px) {
+  .ve-body {
+    grid-template-columns: 220px minmax(0, 1fr) 240px;
+  }
+}
+
+@media (max-width: 860px) {
+  .ve-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .ve-sidebar,
+  .ve-inspector {
+    max-height: 180px;
+  }
+}
+
+.ve-sidebar,
+.ve-inspector {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ve-elevated);
+  border-inline-end: 1px solid var(--ve-border);
+}
+
+.ve-inspector {
+  border-inline-end: 0;
+  border-inline-start: 1px solid var(--ve-border);
+}
+
+.ve-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px;
+  border-bottom: 1px solid var(--ve-border);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.ve-tab {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ve-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ve-tab[data-active="true"] {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ve-fg);
+}
+
+.ve-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+
+.ve-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #1a1a1e;
+}
+
+.ve-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--ve-border);
+  background: var(--ve-soft);
+  flex-shrink: 0;
+}
+
+.ve-canvas-host {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+}
+
+.ve-canvas-host .gjs-cv-canvas {
+  background: #2a2a2e !important;
+  top: 0 !important;
+  width: 100%;
+  height: 100%;
+}
+
+.ve-canvas-host .gjs-frame-wrapper {
+  background: #fff;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Hide GrapesJS default chrome leftovers */
+.ve-canvas-host .gjs-pn-panel,
+.ve-shell .gjs-pn-commands,
+.ve-shell .gjs-pn-options,
+.ve-shell .gjs-pn-views,
+.ve-shell .gjs-pn-views-container {
+  display: none !important;
+}
+
+.ve-shell .gjs-blocks-c,
+.ve-shell .gjs-block {
+  background: var(--ve-soft);
+  border: 1px solid var(--ve-border);
+  color: var(--ve-fg);
+  border-radius: 8px;
+}
+
+.ve-shell .gjs-block:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.ve-shell .gjs-block-label {
+  color: var(--ve-fg);
+  font-size: 11px;
+}
+
+.ve-shell .gjs-block-category .gjs-title,
+.ve-shell .gjs-sm-sector .gjs-sm-sector-title,
+.ve-shell .gjs-trt-traits,
+.ve-shell .gjs-layer-title,
+.ve-shell .gjs-layer-name {
+  color: var(--ve-fg) !important;
+  background: transparent !important;
+}
+
+.ve-shell .gjs-sm-property,
+.ve-shell .gjs-sm-label,
+.ve-shell .gjs-field,
+.ve-shell .gjs-field input,
+.ve-shell .gjs-field select,
+.ve-shell .gjs-clm-tags {
+  color: var(--ve-fg) !important;
+  background: var(--ve-soft) !important;
+  border-color: var(--ve-border) !important;
+}
+
+.ve-shell .gjs-layer {
+  background: transparent;
+}
+
+.ve-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ve-page-item {
+  text-align: start;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ve-fg);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ve-page-item[data-active="true"] {
+  background: rgba(107, 147, 240, 0.14);
+  border-color: rgba(107, 147, 240, 0.35);
+}
+
+.ve-loading,
+.ve-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100dvh;
+  background: var(--ve-bg);
+  color: var(--ve-fg);
+  padding: 24px;
+  text-align: center;
+}
+
+.ve-loading__pulse {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--ve-accent);
+  animation: ve-spin 0.8s linear infinite;
+}
+
+@keyframes ve-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ve-assets-hint {
+  font-size: 12px;
+  color: var(--ve-muted);
+  line-height: 1.5;
+  padding: 8px;
+}

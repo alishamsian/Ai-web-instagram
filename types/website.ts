@@ -60,6 +60,22 @@ export interface WebsiteConfig {
   seo: SEOConfig;
   settings: WebsiteSettings;
   media: Record<string, { url: string; alt: string; type: "image" | "video"; videoUrl?: string | null }>;
+  /**
+   * GrapesJS visual-editor projection (optional).
+   * Classic Editor / WebsiteRenderer ignore this field.
+   * Canonical product model remains the rest of WebsiteConfig.
+   */
+  visualEditor?: VisualEditorState;
+}
+
+/** Persisted GrapesJS project JSON + metadata. Unknown keys must survive round-trips. */
+export type VisualEditorProjectData = Record<string, unknown>;
+
+export interface VisualEditorState {
+  engine: "grapesjs";
+  version: 1;
+  project: VisualEditorProjectData;
+  activePageId?: string;
 }
 export interface WebsiteRecord {
   id: string;

@@ -270,6 +270,16 @@ export function EditorTopBar({
           <span className="hidden lg:inline">{previewLabel}</span>
         </Link>
 
+        <Link
+          href={`/${locale}/editor/${websiteId}/visual`}
+          className="editor-ghost-btn hidden md:inline-flex"
+          title={isFa ? "ویرایشگر بصری" : "Visual Editor"}
+        >
+          <span className="text-[11px] font-medium tracking-wide">
+            {isFa ? "بصری" : "Visual"}
+          </span>
+        </Link>
+
         {status === "published" ? (
           <a
             href={`/s/${websiteSlug}`}
