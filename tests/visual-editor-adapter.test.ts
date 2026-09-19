@@ -10,10 +10,14 @@ import {
   buildModernAgencyProject,
   buildProjectFromWebsiteConfig,
   createSaveQueue,
+  extractCanonicalContentPathValues,
   extractContentPathValues,
+  extractPageContentPathValues,
+  extractPageSectionMeta,
   extractSectionMeta,
   isVisualProjectEmpty,
   mergeProjectedWithSavedProject,
+  stableCollectionItemId,
   visualComponentId,
   visualProjectMatchesSource,
   websiteConfigHasRenderableContent,
@@ -583,5 +587,459 @@ describe("Phase 2 stable IDs + lossless adapter", () => {
     expect(
       pages.find((p) => p.id === "custom")?.component,
     ).toContain("KEEP_ME");
+  });
+});
+
+describe("Phase 2.1 page isolation + collection identity", () => {
+  function product(
+    id: string,
+    name: string,
+  ): NonNullable<WebsiteConfig["content"]["products"]>["items"][number] {
+    return {
+      id,
+      name,
+      description: `${name} desc`,
+      category: "general",
+      price: null,
+      currency: null,
+      imageIds: [],
+      confidence: 1,
+    };
+  }
+
+  it("does not let a custom page overwrite home hero headline", () => {
+    const original = baseConfig();
+    original.content.hero.headline = "HOME";
+    const project = {
+      pages: [
+        {
+          id: "home",
+          name: "Home",
+          frames: [
+            {
+              component: {
+                type: "wrapper",
+                components: [
+                  {
+                    tagName: "h1",
+                    attributes: {
+                      "data-content-path": "content.hero.headline",
+                    },
+                    components: [{ type: "textnode", content: "HOME" }],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: "landing",
+          name: "Landing",
+          frames: [
+            {
+              component: {
+                type: "wrapper",
+                components: [
+                  {
+                    tagName: "h1",
+                    attributes: {
+                      "data-content-path": "content.hero.headline",
+                    },
+                    components: [{ type: "textnode", content: "LANDING" }],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const byPage = extractPageContentPathValues(project);
+    expect(byPage.home["content.hero.headline"]).toBe("HOME");
+    expect(byPage.landing["content.hero.headline"]).toBe("LANDING");
+
+    const canonical = extractCanonicalContentPathValues(project);
+    expect(canonical["content.hero.headline"]).toBe("HOME");
+
+    const restored = applyVisualProjectToWebsiteConfig(original, project);
+    expect(restored.content.hero.headline).toBe("HOME");
+    const landingHtml = JSON.stringify(
+      (restored.visualEditor?.project?.pages as unknown[])?.find(
+        (p) => (p as { id?: string }).id === "landing",
+      ),
+    );
+    expect(landingHtml).toContain("LANDING");
+  });
+
+  it("isolates multiple hero fields across home and custom pages", () => {
+    const original = baseConfig();
+    original.content.hero.headline = "HOME";
+    original.content.hero.cta = "HOME CTA";
+    const project = {
+      pages: [
+        {
+          id: "home",
+          frames: [
+            {
+              component: {
+                components: [
+                  {
+                    tagName: "h1",
+                    attributes: {
+                      "data-content-path": "content.hero.headline",
+                    },
+                    components: [{ type: "textnode", content: "HOME" }],
+                  },
+                  {
+                    tagName: "a",
+                    attributes: { "data-content-path": "content.hero.cta" },
+                    components: [{ type: "textnode", content: "HOME CTA" }],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: "landing",
+          frames: [
+            {
+              component: {
+                components: [
+                  {
+                    tagName: "h1",
+                    attributes: {
+                      "data-content-path": "content.hero.headline",
+                    },
+                    components: [{ type: "textnode", content: "LANDING" }],
+                  },
+                  {
+                    tagName: "a",
+                    attributes: { "data-content-path": "content.hero.cta" },
+                    components: [
+                      { type: "textnode", content: "LANDING CTA" },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const restored = applyVisualProjectToWebsiteConfig(original, project);
+    expect(restored.content.hero.headline).toBe("HOME");
+    expect(restored.content.hero.cta).toBe("HOME CTA");
+  });
+
+  it("ignores section visibility/settings from custom pages", () => {
+    const original = baseConfig();
+    const project = {
+      pages: [
+        {
+          id: "home",
+          frames: [
+            {
+              component: {
+                components: [
+                  {
+                    tagName: "section",
+                    attributes: {
+                      "data-section-id": "hero-1",
+                      "data-visible": "true",
+                      "data-section-settings": JSON.stringify({ from: "home" }),
+                    },
+                  },
+                  {
+                    tagName: "section",
+                    attributes: {
+                      "data-section-id": "about-1",
+                      "data-visible": "true",
+                    },
+                  },
+                  {
+                    tagName: "section",
+                    attributes: {
+                      "data-section-id": "footer-1",
+                      "data-visible": "true",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          id: "landing",
+          frames: [
+            {
+              component: {
+                components: [
+                  {
+                    tagName: "section",
+                    attributes: {
+                      "data-section-id": "hero-1",
+                      "data-visible": "false",
+                      "data-section-settings": JSON.stringify({
+                        from: "landing",
+                      }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const byPage = extractPageSectionMeta(project);
+    expect(byPage.landing[0]?.visible).toBe(false);
+    expect(extractSectionMeta(project)[0]?.settings).toEqual({ from: "home" });
+
+    const restored = applyVisualProjectToWebsiteConfig(original, project);
+    expect(restored.sections.find((s) => s.id === "hero-1")?.visible).toBe(
+      true,
+    );
+    expect(restored.sections.find((s) => s.id === "hero-1")?.settings).toEqual({
+      from: "home",
+    });
+  });
+
+  it("reorders products by stable item id without swapping fields", () => {
+    const original = baseConfig();
+    original.content.products = {
+      title: "Products",
+      items: [product("pa", "A"), product("pb", "B"), product("pc", "C")],
+    };
+    original.sections.push({
+      id: "products-1",
+      type: "products",
+      visible: true,
+    });
+
+    const projected = buildProjectFromWebsiteConfig(original);
+    const page = (projected.pages as { component: string }[])[0];
+    // Simulate visual reorder C, A, B by rewriting product card order via ids
+    const cards = [
+      ...page.component.matchAll(
+        /<div[^>]*data-product-id="([^"]+)"[\s\S]*?<\/div>\s*<\/div>/g,
+      ),
+    ];
+    expect(cards.map((m) => m[1])).toEqual(["pa", "pb", "pc"]);
+    const byId = Object.fromEntries(cards.map((m) => [m[1], m[0]]));
+    page.component = page.component.replace(
+      cards.map((m) => m[0]).join(""),
+      [byId.pc, byId.pa, byId.pb].join(""),
+    );
+
+    const restored = applyVisualProjectToWebsiteConfig(original, projected);
+    expect(restored.content.products?.items?.map((p) => p.id)).toEqual([
+      "pc",
+      "pa",
+      "pb",
+    ]);
+    expect(restored.content.products?.items?.map((p) => p.name)).toEqual([
+      "C",
+      "A",
+      "B",
+    ]);
+  });
+
+  it("edits a product field after reorder without corrupting siblings", () => {
+    const original = baseConfig();
+    original.content.products = {
+      title: "Products",
+      items: [product("pa", "A"), product("pb", "B"), product("pc", "C")],
+    };
+    original.sections.push({
+      id: "products-1",
+      type: "products",
+      visible: true,
+    });
+    const projected = buildProjectFromWebsiteConfig(original);
+    const page = (projected.pages as { component: string }[])[0];
+    const cards = [
+      ...page.component.matchAll(
+        /<div[^>]*data-product-id="([^"]+)"[\s\S]*?<\/div>\s*<\/div>/g,
+      ),
+    ];
+    const byId = Object.fromEntries(cards.map((m) => [m[1], m[0]]));
+    let reordered = [byId.pc, byId.pa, byId.pb].join("");
+    reordered = reordered.replace(
+      /data-item-id="pa"[^>]*>A</,
+      'data-item-id="pa" data-content-path="content.products.items.name">A updated<',
+    );
+    // More reliably: replace the name text for pa only
+    reordered = reordered.replace(
+      /(data-item-id="pa"[^>]*data-content-path="content\.products\.items\.name"[^>]*>)A</,
+      "$1A updated<",
+    );
+    page.component = page.component.replace(
+      cards.map((m) => m[0]).join(""),
+      reordered,
+    );
+
+    const restored = applyVisualProjectToWebsiteConfig(original, projected);
+    expect(restored.content.products?.items?.map((p) => p.name)).toEqual([
+      "C",
+      "A updated",
+      "B",
+    ]);
+  });
+
+  it("reorders faq and testimonials by stable item id", () => {
+    const original = baseConfig();
+    original.content.faq = {
+      title: "FAQ",
+      items: [
+        { id: "f1", question: "Q1", answer: "A1" },
+        { id: "f2", question: "Q2", answer: "A2" },
+      ],
+    };
+    original.content.testimonials = {
+      title: "T",
+      items: [
+        { id: "t1", quote: "QA", author: "AA" },
+        { id: "t2", quote: "QB", author: "AB" },
+      ],
+    };
+    const project = {
+      pages: [
+        {
+          id: "home",
+          frames: [
+            {
+              component: {
+                components: [
+                  {
+                    tagName: "details",
+                    attributes: {
+                      "data-collection": "faq",
+                      "data-item-id": "f2",
+                      "data-faq-id": "f2",
+                    },
+                  },
+                  {
+                    tagName: "details",
+                    attributes: {
+                      "data-collection": "faq",
+                      "data-item-id": "f1",
+                      "data-faq-id": "f1",
+                    },
+                  },
+                  {
+                    tagName: "blockquote",
+                    attributes: {
+                      "data-collection": "testimonials",
+                      "data-item-id": "t2",
+                      "data-testimonial-id": "t2",
+                    },
+                  },
+                  {
+                    tagName: "blockquote",
+                    attributes: {
+                      "data-collection": "testimonials",
+                      "data-item-id": "t1",
+                      "data-testimonial-id": "t1",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const restored = applyVisualProjectToWebsiteConfig(original, project);
+    expect(restored.content.faq?.items?.map((i) => i.id)).toEqual(["f2", "f1"]);
+    expect(restored.content.faq?.items?.map((i) => i.question)).toEqual([
+      "Q2",
+      "Q1",
+    ]);
+    expect(restored.content.testimonials?.items?.map((i) => i.id)).toEqual([
+      "t2",
+      "t1",
+    ]);
+    expect(restored.content.testimonials?.items?.map((i) => i.quote)).toEqual([
+      "QB",
+      "QA",
+    ]);
+  });
+
+  it("assigns deterministic ids for legacy arrays without ids", () => {
+    const original = baseConfig();
+    original.content.products = {
+      title: "Products",
+      items: [
+        {
+          name: "A",
+          description: "da",
+          category: "general",
+          price: null,
+          currency: null,
+          imageIds: [],
+          confidence: 1,
+        },
+        {
+          name: "B",
+          description: "db",
+          category: "general",
+          price: null,
+          currency: null,
+          imageIds: [],
+          confidence: 1,
+        },
+      ],
+    };
+    original.sections.push({
+      id: "products-1",
+      type: "products",
+      visible: true,
+    });
+    const projected = buildProjectFromWebsiteConfig(original);
+    const html = String(
+      (projected.pages as { component: string }[])[0]?.component ?? "",
+    );
+    const id0 = stableCollectionItemId("products", undefined, 0);
+    const id1 = stableCollectionItemId("products", undefined, 1);
+    expect(html).toContain(`data-item-id="${id0}"`);
+    expect(html).toContain(`data-item-id="${id1}"`);
+
+    const restored = applyVisualProjectToWebsiteConfig(original, projected);
+    expect(restored.content.products?.items?.[0]?.id).toBe(id0);
+    expect(restored.content.products?.items?.[1]?.id).toBe(id1);
+    expect(restored.content.products?.items?.[0]?.name).toBe("A");
+    expect(restored.content.products?.items?.[1]?.name).toBe("B");
+  });
+
+  it("keeps collection and component identities stable across reopen", () => {
+    const config = baseConfig();
+    config.content.products = {
+      title: "Products",
+      items: [product("pa", "A"), product("pb", "B")],
+    };
+    config.sections.push({
+      id: "products-1",
+      type: "products",
+      visible: true,
+    });
+    const a = buildProjectFromWebsiteConfig(config);
+    const b = buildProjectFromWebsiteConfig(config);
+    const htmlA = String(
+      (a.pages as { component: string }[])[0]?.component ?? "",
+    );
+    const htmlB = String(
+      (b.pages as { component: string }[])[0]?.component ?? "",
+    );
+    const itemIdsA = [...htmlA.matchAll(/data-item-id="([^"]+)"/g)].map(
+      (m) => m[1],
+    );
+    const itemIdsB = [...htmlB.matchAll(/data-item-id="([^"]+)"/g)].map(
+      (m) => m[1],
+    );
+    expect(itemIdsA).toEqual(itemIdsB);
+    expect(itemIdsA).toContain("pa");
+    expect(itemIdsA).toContain("pb");
   });
 });

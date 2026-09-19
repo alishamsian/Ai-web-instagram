@@ -78,6 +78,9 @@ If Classic edits those fields after a Visual save, the next Visual open rebuilds
 | `lib/visual-editor/sync-from-project.ts` | GrapesJS → WebsiteConfig |
 | `lib/visual-editor/adapter.ts` | Public resolve / apply API |
 
-## Out of scope (later)
+## Phase 2.1 — Page isolation + collection identity
 
-Templates marketplace, ecommerce depth, AI redesign, Puck (removed permanently).
+- Canonical content sync reads **reserved pages only** (`home` / `about`).
+- Custom GrapesJS pages keep their project HTML but cannot overwrite `WebsiteConfig` content paths or section metadata.
+- Products / FAQ / testimonials use `data-item-id` + `data-collection` so reorder keeps fields attached to the correct record.
+- Legacy arrays without ids get deterministic `collection__idx_N` ids on first visual sync (persisted).

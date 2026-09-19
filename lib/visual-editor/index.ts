@@ -17,14 +17,21 @@ export {
 export {
   syncWebsiteConfigFromVisualProject,
   extractContentPathValues,
+  extractPageContentPathValues,
+  extractCanonicalContentPathValues,
   extractSectionMeta,
+  extractPageSectionMeta,
   extractGalleryImageIds,
+  extractGalleryImageIdsFromPage,
+  extractCollectionOrder,
+  collectPagesWithRoots,
   visualProjectFingerprint,
 } from "@/lib/visual-editor/sync-from-project";
 export { websiteConfigSourceFingerprint } from "@/lib/visual-editor/content-fingerprint";
 export { mergeProjectedWithSavedProject } from "@/lib/visual-editor/merge-project";
 export {
   visualComponentId,
+  stableCollectionItemId,
   VISUAL_PAGE_HOME,
   VISUAL_PAGE_ABOUT,
   isReservedVisualPageId,

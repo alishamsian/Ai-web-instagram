@@ -13,6 +13,7 @@ import {
   visualComponentId,
   VISUAL_PAGE_ABOUT,
   VISUAL_PAGE_HOME,
+  stableCollectionItemId,
 } from "@/lib/visual-editor/ids";
 
 function escapeHtml(value: string): string {
@@ -180,15 +181,19 @@ function renderProducts(config: WebsiteConfig, section: SectionConfig): string {
     .map((item, index) => {
       const imageId = item.imageIds?.[0];
       const url = mediaUrl(config, imageId);
-      const productId = item.id || `product-${index}`;
-      return `<div${componentAttrs(section.id, `product-${index}`, {
+      const productId = stableCollectionItemId("products", item, index);
+      return `<div${componentAttrs(section.id, `product-${productId}`, {
+        "data-collection": "products",
+        "data-item-id": productId,
         "data-product-id": productId,
         "data-product-index": String(index),
       })} style="border:1px solid #eee;border-radius:12px;overflow:hidden;background:#fff;">
         ${
           url
-            ? `<img${componentAttrs(section.id, `product-${index}-image`, {
-                "data-content-path": `content.products.items.${index}.imageIds.0`,
+            ? `<img${componentAttrs(section.id, `product-${productId}-image`, {
+                "data-collection": "products",
+                "data-item-id": productId,
+                "data-content-path": "content.products.items.imageIds.0",
                 "data-media-id": imageId,
                 src: url,
                 alt: item.name,
@@ -196,11 +201,15 @@ function renderProducts(config: WebsiteConfig, section: SectionConfig): string {
             : `<div style="height:120px;background:#f3f3f3;"></div>`
         }
         <div style="padding:14px;">
-          <h3${componentAttrs(section.id, `product-${index}-name`, {
-            "data-content-path": `content.products.items.${index}.name`,
+          <h3${componentAttrs(section.id, `product-${productId}-name`, {
+            "data-collection": "products",
+            "data-item-id": productId,
+            "data-content-path": "content.products.items.name",
           })} style="margin:0 0 6px;font-size:1rem;">${escapeHtml(item.name)}</h3>
-          <p${componentAttrs(section.id, `product-${index}-desc`, {
-            "data-content-path": `content.products.items.${index}.description`,
+          <p${componentAttrs(section.id, `product-${productId}-desc`, {
+            "data-collection": "products",
+            "data-item-id": productId,
+            "data-content-path": "content.products.items.description",
           })} style="margin:0;color:#666;font-size:0.9rem;">${escapeHtml(
             item.description || "",
           )}</p>
@@ -262,15 +271,21 @@ function renderTestimonials(
   const block = config.content.testimonials;
   const items = (block?.items ?? [])
     .map((item, index) => {
-      const tid = item.id || `t-${index}`;
-      return `<blockquote${componentAttrs(section.id, `testimonial-${index}`, {
+      const tid = stableCollectionItemId("testimonials", item, index);
+      return `<blockquote${componentAttrs(section.id, `testimonial-${tid}`, {
+        "data-collection": "testimonials",
+        "data-item-id": tid,
         "data-testimonial-id": tid,
       })} style="margin:0;padding:20px;border:1px solid #eee;border-radius:12px;">
-      <p${componentAttrs(section.id, `testimonial-${index}-quote`, {
-        "data-content-path": `content.testimonials.items.${index}.quote`,
+      <p${componentAttrs(section.id, `testimonial-${tid}-quote`, {
+        "data-collection": "testimonials",
+        "data-item-id": tid,
+        "data-content-path": "content.testimonials.items.quote",
       })} style="margin:0 0 10px;line-height:1.6;">${escapeHtml(item.quote)}</p>
-      <footer${componentAttrs(section.id, `testimonial-${index}-author`, {
-        "data-content-path": `content.testimonials.items.${index}.author`,
+      <footer${componentAttrs(section.id, `testimonial-${tid}-author`, {
+        "data-collection": "testimonials",
+        "data-item-id": tid,
+        "data-content-path": "content.testimonials.items.author",
       })} style="color:#666;font-size:0.9rem;">— ${escapeHtml(
         item.author,
       )}</footer>
@@ -294,17 +309,23 @@ function renderFaq(config: WebsiteConfig, section: SectionConfig): string {
   const faq = config.content.faq;
   const items = (faq?.items ?? [])
     .map((item, index) => {
-      const fid = item.id || `faq-${index}`;
-      return `<details${componentAttrs(section.id, `faq-${index}`, {
+      const fid = stableCollectionItemId("faq", item, index);
+      return `<details${componentAttrs(section.id, `faq-${fid}`, {
+        "data-collection": "faq",
+        "data-item-id": fid,
         "data-faq-id": fid,
       })} style="border:1px solid #eee;border-radius:10px;padding:12px 14px;">
-      <summary${componentAttrs(section.id, `faq-${index}-q`, {
-        "data-content-path": `content.faq.items.${index}.question`,
+      <summary${componentAttrs(section.id, `faq-${fid}-q`, {
+        "data-collection": "faq",
+        "data-item-id": fid,
+        "data-content-path": "content.faq.items.question",
       })} style="font-weight:550;cursor:pointer;">${escapeHtml(
         item.question,
       )}</summary>
-      <p${componentAttrs(section.id, `faq-${index}-a`, {
-        "data-content-path": `content.faq.items.${index}.answer`,
+      <p${componentAttrs(section.id, `faq-${fid}-a`, {
+        "data-collection": "faq",
+        "data-item-id": fid,
+        "data-content-path": "content.faq.items.answer",
       })} style="margin:10px 0 0;color:#555;line-height:1.6;">${escapeHtml(
         item.answer,
       )}</p>

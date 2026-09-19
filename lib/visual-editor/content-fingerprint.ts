@@ -24,6 +24,10 @@ function stableStringify(value: unknown): string {
  * Hash-like fingerprint of content + sections + media URLs/alts.
  * Brand/seo/settings changes that don't affect canvas projection are excluded
  * so Visual layout isn't needlessly rebuilt.
+ *
+ * Note: serializes a relatively large structure via stableStringify.
+ * Correctness > micro-optimization; a future pass may hash this payload
+ * without changing the comparison contract.
  */
 export function websiteConfigSourceFingerprint(config: WebsiteConfig): string {
   const payload = {
