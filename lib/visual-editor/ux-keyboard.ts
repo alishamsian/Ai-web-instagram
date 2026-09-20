@@ -11,7 +11,10 @@ export type BuilderShortcutAction =
   | "escape"
   | "select-parent"
   | "hide"
-  | "lock";
+  | "lock"
+  | "toggle-left"
+  | "toggle-right"
+  | "toggle-focus";
 
 export type ShortcutContext = {
   /** True when focus is inside an editable field / contenteditable. */
@@ -95,6 +98,10 @@ export function resolveBuilderShortcut(
     return "lock";
   }
 
+  if (!mod && !ctx.altKey && key === "[") return "toggle-left";
+  if (!mod && !ctx.altKey && key === "]") return "toggle-right";
+  if (!mod && !ctx.altKey && key === "\\") return "toggle-focus";
+
   return null;
 }
 
@@ -107,6 +114,9 @@ export function canApplyShortcutAction(
     case "undo":
     case "redo":
     case "escape":
+    case "toggle-left":
+    case "toggle-right":
+    case "toggle-focus":
       return true;
     case "select-parent":
     case "lock":

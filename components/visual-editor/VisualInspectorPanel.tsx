@@ -118,72 +118,150 @@ export function VisualInspectorPanel({
         ) : null}
       </div>
 
-      <div className="ve-library__tabs" role="tablist">
-        {groups.map((g) => (
-          <button
-            key={g}
-            type="button"
-            role="tab"
-            className="ve-tab"
-            data-active={group === g}
-            aria-selected={group === g}
-            onClick={() => setGroup(g)}
-          >
-            {isFa ? GROUP_LABELS[g].fa : GROUP_LABELS[g].en}
-          </button>
-        ))}
-      </div>
+      <QuickControls
+        component={selected}
+        apply={apply}
+        isFa={isFa}
+        key={`quick-${tick}`}
+      />
 
-      <div className="ve-inspector-panel__body" key={`${group}-${tick}`}>
-        {group === "content" ? (
-          <ContentFields
-            component={selected}
-            isFa={isFa}
-            onChange={onChange}
-            refresh={() => setTick((t) => t + 1)}
-          />
-        ) : null}
-        {group === "layout" ? (
-          <LayoutFields
-            component={selected}
-            apply={apply}
-            isFa={isFa}
-          />
-        ) : null}
-        {group === "spacing" ? (
-          <SpacingFields component={selected} apply={apply} isFa={isFa} />
-        ) : null}
-        {group === "typography" ? (
-          <TypographyFields component={selected} apply={apply} isFa={isFa} />
-        ) : null}
-        {group === "style" ? (
-          <StyleFields component={selected} apply={apply} isFa={isFa} />
-        ) : null}
-        {group === "background" ? (
-          <BackgroundFields component={selected} apply={apply} isFa={isFa} />
-        ) : null}
-        {group === "border" ? (
-          <BorderFields component={selected} apply={apply} isFa={isFa} />
-        ) : null}
-        {group === "responsive" ? (
-          <ResponsiveFields
-            editor={editor}
-            component={selected}
-            device={device}
-            isFa={isFa}
-            onChange={onChange}
-            refresh={() => setTick((t) => t + 1)}
-          />
-        ) : null}
-        {group === "advanced" ? (
-          <AdvancedFields
-            editor={editor}
-            component={selected}
-            isFa={isFa}
-            onChange={onChange}
-          />
-        ) : null}
+      <div className="ve-inspector-accordion">
+        {groups.map((g) => {
+          const open = group === g;
+          return (
+            <details
+              key={g}
+              className="ve-inspector-acc"
+              open={open}
+            >
+              <summary
+                className="ve-inspector-acc__summary"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setGroup(g);
+                }}
+              >
+                {isFa ? GROUP_LABELS[g].fa : GROUP_LABELS[g].en}
+              </summary>
+              {open ? (
+              <div className="ve-inspector-panel__body" key={`${g}-${tick}`}>
+                {g === "content" ? (
+                  <ContentFields
+                    component={selected}
+                    isFa={isFa}
+                    onChange={onChange}
+                    refresh={() => setTick((t) => t + 1)}
+                  />
+                ) : null}
+                {g === "layout" ? (
+                  <LayoutFields
+                    component={selected}
+                    apply={apply}
+                    isFa={isFa}
+                  />
+                ) : null}
+                {g === "spacing" ? (
+                  <SpacingFields
+                    component={selected}
+                    apply={apply}
+                    isFa={isFa}
+                  />
+                ) : null}
+                {g === "typography" ? (
+                  <TypographyFields
+                    component={selected}
+                    apply={apply}
+                    isFa={isFa}
+                  />
+                ) : null}
+                {g === "style" ? (
+                  <StyleFields
+                    component={selected}
+                    apply={apply}
+                    isFa={isFa}
+                  />
+                ) : null}
+                {g === "background" ? (
+                  <BackgroundFields
+                    component={selected}
+                    apply={apply}
+                    isFa={isFa}
+                  />
+                ) : null}
+                {g === "border" ? (
+                  <BorderFields
+                    component={selected}
+                    apply={apply}
+                    isFa={isFa}
+                  />
+                ) : null}
+                {g === "responsive" ? (
+                  <ResponsiveFields
+                    editor={editor}
+                    component={selected}
+                    device={device}
+                    isFa={isFa}
+                    onChange={onChange}
+                    refresh={() => setTick((t) => t + 1)}
+                  />
+                ) : null}
+                {g === "advanced" ? (
+                  <AdvancedFields
+                    editor={editor}
+                    component={selected}
+                    isFa={isFa}
+                    onChange={onChange}
+                  />
+                ) : null}
+              </div>
+              ) : null}
+            </details>
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+function QuickControls({
+  component,
+  apply,
+  isFa,
+}: {
+  component: Component;
+  apply: (prop: string, value: string) => void;
+  isFa: boolean;
+}) {
+  const g = (p: string) => getComponentStyle(component, p);
+  return (
+    <div className="ve-inspector-quick" aria-label={isFa ? "کنترل سریع" : "Quick controls"}>
+      <label className="ve-inspector-quick__field">
+        <span>{isFa ? "فونت" : "Size"}</span>
+        <input
+          className="ve-pages__input"
+          defaultValue={g("font-size")}
+          placeholder="16px"
+          onBlur={(e) => apply("font-size", e.target.value)}
+        />
+      </label>
+      <label className="ve-inspector-quick__field">
+        <span>{isFa ? "رنگ" : "Color"}</span>
+        <input
+          className="ve-pages__input ve-inspector-quick__color"
+          type="color"
+          defaultValue={normalizeColor(g("color"))}
+          onChange={(e) => apply("color", e.target.value)}
+        />
+      </label>
+      <label className="ve-inspector-quick__field">
+        <span>{isFa ? "پدینگ" : "Pad"}</span>
+        <input
+          className="ve-pages__input"
+          defaultValue={g("padding")}
+          placeholder="24px"
+          onBlur={(e) => apply("padding", e.target.value)}
+        />
+      </label>
     </div>
   );
 }
@@ -836,11 +914,11 @@ function ResponsiveFields({
           <Field
             label={`${isFa ? "اندازه فونت" : "Font size"}${
               fontResolved.inherited
-                ? ` (${isFa ? "ارثی از" : "from"} ${fontResolved.source})`
-                : ""
+                ? ` · ${isFa ? "ارثی از" : "inherits"} ${fontResolved.source}`
+                : ` · ${isFa ? "اورراید" : "override"}`
             }`}
           >
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="ve-inherit-row">
               <input
                 className="ve-pages__input"
                 key={`fs-${device}-${fontResolved.value}`}
@@ -862,7 +940,13 @@ function ResponsiveFields({
               {device !== "desktop" ? (
                 <button
                   type="button"
-                  className="ve-btn"
+                  className="ve-btn ve-btn--inherit"
+                  disabled={fontResolved.inherited}
+                  title={
+                    isFa
+                      ? "بازنشانی به ارث از والد دستگاه"
+                      : "Reset to inherit from parent device"
+                  }
                   onClick={() => {
                     if (!editor) return;
                     clearStyleOverride(editor, component, "font-size", device);
@@ -870,7 +954,7 @@ function ResponsiveFields({
                     refresh();
                   }}
                 >
-                  {isFa ? "بازنشانی" : "Reset"}
+                  {isFa ? "ارث‌بری" : "Inherit"}
                 </button>
               ) : null}
             </div>
@@ -878,11 +962,11 @@ function ResponsiveFields({
           <Field
             label={`${isFa ? "پدینگ" : "Padding"}${
               padResolved.inherited
-                ? ` (${isFa ? "ارثی از" : "from"} ${padResolved.source})`
-                : ""
+                ? ` · ${isFa ? "ارثی از" : "inherits"} ${padResolved.source}`
+                : ` · ${isFa ? "اورراید" : "override"}`
             }`}
           >
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="ve-inherit-row">
               <input
                 className="ve-pages__input"
                 key={`pad-${device}-${padResolved.value}`}
@@ -904,7 +988,13 @@ function ResponsiveFields({
               {device !== "desktop" ? (
                 <button
                   type="button"
-                  className="ve-btn"
+                  className="ve-btn ve-btn--inherit"
+                  disabled={padResolved.inherited}
+                  title={
+                    isFa
+                      ? "بازنشانی به ارث از والد دستگاه"
+                      : "Reset to inherit from parent device"
+                  }
                   onClick={() => {
                     if (!editor) return;
                     clearStyleOverride(editor, component, "padding", device);
@@ -912,7 +1002,7 @@ function ResponsiveFields({
                     refresh();
                   }}
                 >
-                  {isFa ? "بازنشانی" : "Reset"}
+                  {isFa ? "ارث‌بری" : "Inherit"}
                 </button>
               ) : null}
             </div>

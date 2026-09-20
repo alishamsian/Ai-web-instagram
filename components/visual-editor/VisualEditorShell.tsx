@@ -94,11 +94,19 @@ import {
   ArrowLeft,
   ArrowUp,
   Bold,
+  Check,
   Copy,
   EyeOff,
   ImageIcon,
   Italic,
   Link2,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Redo2,
   Save,
   Trash2,
@@ -107,8 +115,14 @@ import {
 
 type LeftTab = "pages" | "library" | "assets" | "navigator";
 type RightTab = "inspector" | "style";
+type MobilePanel = "none" | "left" | "right";
 
 const AUTOSAVE_MS = 1200;
+const EMPTY_STARTERS = [
+  { id: "section-hero", fa: "هیرو", en: "Hero" },
+  { id: "layout-container", fa: "کانتینر", en: "Container" },
+  { id: "section-about", fa: "درباره", en: "About" },
+] as const;
 
 export function VisualEditorShell({
   website,
@@ -186,6 +200,12 @@ export function VisualEditorShell({
     label: string;
   } | null>(null);
   const [canvasEmpty, setCanvasEmpty] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("none");
+  const [topMoreOpen, setTopMoreOpen] = useState(false);
+  const prevHasSelectionRef = useRef(false);
   const siteName = website.config.brand.name || website.slug || "Website";
 
   const mediaList = useMemo(
@@ -592,6 +612,23 @@ export function VisualEditorShell({
       const ed = editorRef.current;
       if (!ed) return;
 
+      if (action === "toggle-left") {
+        event.preventDefault();
+        setFocusMode(false);
+        setLeftCollapsed((v) => !v);
+        return;
+      }
+      if (action === "toggle-right") {
+        event.preventDefault();
+        setFocusMode(false);
+        setRightCollapsed((v) => !v);
+        return;
+      }
+      if (action === "toggle-focus") {
+        event.preventDefault();
+        setFocusMode((v) => !v);
+        return;
+      }
       if (action === "undo") {
         event.preventDefault();
         visualUndo(ed);
@@ -606,6 +643,14 @@ export function VisualEditorShell({
       }
       if (action === "escape") {
         event.preventDefault();
+        if (focusMode) {
+          setFocusMode(false);
+          return;
+        }
+        if (mobilePanel !== "none") {
+          setMobilePanel("none");
+          return;
+        }
         ed.select(undefined as never);
         setHoverBadge(null);
         return;
@@ -648,7 +693,20 @@ export function VisualEditorShell({
     hasSelection,
     selectionLocked,
     refreshDirtyFromEditor,
+    focusMode,
+    mobilePanel,
   ]);
+
+  // Smart left tab: selection → Layers, deselection → Library
+  useEffect(() => {
+    if (prevHasSelectionRef.current === hasSelection) return;
+    prevHasSelectionRef.current = hasSelection;
+    if (hasSelection) {
+      setLeftTab("navigator");
+    } else {
+      setLeftTab((tab) => (tab === "navigator" ? "library" : tab));
+    }
+  }, [hasSelection]);
 
   // Track empty canvas for empty-state UX (sections only under wrapper)
   useEffect(() => {
@@ -979,6 +1037,10 @@ export function VisualEditorShell({
       className="ve-shell"
       dir={isFa ? "rtl" : "ltr"}
       lang={locale}
+      data-focus={focusMode || undefined}
+      data-left-collapsed={leftCollapsed || undefined}
+      data-right-collapsed={rightCollapsed || undefined}
+      data-mobile-panel={mobilePanel}
     >
       {!ready ? (
         <div
@@ -1044,7 +1106,11 @@ export function VisualEditorShell({
           <span className="ve-topbar__title">{siteName}</span>
         </div>
 
-        <div className="ve-topbar__group" role="group" aria-label="Viewport">
+        <div
+          className="ve-topbar__group ve-topbar__priority"
+          role="group"
+          aria-label={isFa ? "دستگاه" : "Viewport"}
+        >
           {VISUAL_DEVICES.map((d) => (
             <button
               key={d.id}
@@ -1059,13 +1125,13 @@ export function VisualEditorShell({
           ))}
         </div>
 
-        <div className="ve-topbar__group">
+        <div className="ve-topbar__group ve-topbar__priority">
           <button
             type="button"
             className="ve-btn"
             disabled={!canUndo}
-            aria-label="Undo"
-            title="Undo"
+            aria-label={isFa ? "بازگردانی" : "Undo"}
+            title={isFa ? "بازگردانی" : "Undo"}
             onClick={() => {
               const ed = editorRef.current;
               if (!ed) return;
@@ -1074,13 +1140,16 @@ export function VisualEditorShell({
             }}
           >
             <Undo2 size={15} />
+            <span className="ve-topbar__btn-label">
+              {isFa ? "بازگردانی" : "Undo"}
+            </span>
           </button>
           <button
             type="button"
             className="ve-btn"
             disabled={!canRedo}
-            aria-label="Redo"
-            title="Redo"
+            aria-label={isFa ? "بازانجام" : "Redo"}
+            title={isFa ? "بازانجام" : "Redo"}
             onClick={() => {
               const ed = editorRef.current;
               if (!ed) return;
@@ -1092,11 +1161,11 @@ export function VisualEditorShell({
           </button>
         </div>
 
-        <div className="ve-topbar__group" role="group" aria-label="Zoom">
+        <div className="ve-topbar__group ve-topbar__secondary" role="group" aria-label="Zoom">
           <select
             className="ve-btn"
             value={String(zoom)}
-            aria-label="Zoom"
+            aria-label={isFa ? "بزرگ‌نمایی" : "Zoom"}
             onChange={(e) => {
               const v = e.target.value;
               setZoom(v === "fit" ? "fit" : (Number(v) as VisualZoomMode));
@@ -1104,39 +1173,105 @@ export function VisualEditorShell({
           >
             {VISUAL_ZOOM_OPTIONS.map((z) => (
               <option key={String(z)} value={String(z)}>
-                {z === "fit" ? "Fit" : `${z}%`}
+                {z === "fit" ? (isFa ? "جاشو" : "Fit") : `${z}%`}
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            className="ve-btn"
+            data-active={focusMode}
+            aria-pressed={focusMode}
+            aria-label={isFa ? "حالت تمرکز" : "Focus mode"}
+            title={
+              isFa
+                ? "حالت تمرکز (\\)"
+                : "Focus mode (\\)"
+            }
+            onClick={() => setFocusMode((v) => !v)}
+          >
+            {focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+          <button
+            type="button"
+            className="ve-btn ve-topbar__desktop-only"
+            aria-label={isFa ? "پنل چپ" : "Toggle left panel"}
+            title={isFa ? "پنل چپ ([)" : "Left panel ([)"}
+            onClick={() => {
+              setFocusMode(false);
+              setLeftCollapsed((v) => !v);
+            }}
+          >
+            {leftCollapsed ? (
+              <PanelLeftOpen size={15} />
+            ) : (
+              <PanelLeftClose size={15} />
+            )}
+          </button>
+          <button
+            type="button"
+            className="ve-btn ve-topbar__desktop-only"
+            aria-label={isFa ? "پنل راست" : "Toggle right panel"}
+            title={isFa ? "پنل راست (])" : "Right panel (])"}
+            onClick={() => {
+              setFocusMode(false);
+              setRightCollapsed((v) => !v);
+            }}
+          >
+            {rightCollapsed ? (
+              <PanelRightOpen size={15} />
+            ) : (
+              <PanelRightClose size={15} />
+            )}
+          </button>
         </div>
 
         <div className="ve-topbar__group ve-topbar__actions">
-          <span className="ve-status" data-state={saveState}>
+          <span className="ve-status ve-status--pill" data-state={saveState}>
+            {saveState === "saved" || saveState === "clean" ? (
+              <Check size={12} aria-hidden />
+            ) : null}
             {statusLabel}
           </span>
-          <Link
-            href={`/${locale}/preview/${website.id}${
-              activePageId && activePageId !== VISUAL_PAGE_HOME
-                ? `?page=${encodeURIComponent(activePageId)}`
-                : ""
-            }`}
-            target="_blank"
-            className="ve-btn"
-            style={{ textDecoration: "none" }}
-          >
-            {isFa ? "پیش‌نمایش" : "Preview"}
-          </Link>
-          <Link
-            href={`/${locale}/editor/${website.id}`}
-            className="ve-btn"
-            style={{ textDecoration: "none" }}
-            title={isFa ? "ویرایشگر کلاسیک" : "Classic Editor"}
-          >
-            Classic
-          </Link>
+          <div className="ve-topbar__more">
+            <button
+              type="button"
+              className="ve-btn ve-topbar__mobile-only"
+              aria-expanded={topMoreOpen}
+              aria-label={isFa ? "بیشتر" : "More"}
+              onClick={() => setTopMoreOpen((v) => !v)}
+            >
+              <MoreHorizontal size={15} />
+            </button>
+            <div
+              className="ve-topbar__overflow"
+              data-open={topMoreOpen || undefined}
+            >
+              <Link
+                href={`/${locale}/preview/${website.id}${
+                  activePageId && activePageId !== VISUAL_PAGE_HOME
+                    ? `?page=${encodeURIComponent(activePageId)}`
+                    : ""
+                }`}
+                target="_blank"
+                className="ve-btn"
+                style={{ textDecoration: "none" }}
+              >
+                {isFa ? "پیش‌نمایش" : "Preview"}
+              </Link>
+              <Link
+                href={`/${locale}/editor/${website.id}`}
+                className="ve-btn"
+                style={{ textDecoration: "none" }}
+                title={isFa ? "ویرایشگر کلاسیک" : "Classic Editor"}
+              >
+                {isFa ? "کلاسیک" : "Classic"}
+              </Link>
+            </div>
+          </div>
           <button
             type="button"
-            className="ve-btn ve-btn--primary"
+            className="ve-btn ve-btn--primary ve-topbar__priority"
             onClick={() => void persist()}
             disabled={saveState === "saving"}
           >
@@ -1146,8 +1281,39 @@ export function VisualEditorShell({
         </div>
       </header>
 
+      <div className="ve-mobile-bar" role="toolbar" aria-label={isFa ? "پنل‌ها" : "Panels"}>
+        <button
+          type="button"
+          className="ve-btn"
+          data-active={mobilePanel === "left"}
+          onClick={() =>
+            setMobilePanel((p) => (p === "left" ? "none" : "left"))
+          }
+        >
+          {isFa ? "کتابخانه" : "Library"}
+        </button>
+        <button
+          type="button"
+          className="ve-btn"
+          data-active={mobilePanel === "none"}
+          onClick={() => setMobilePanel("none")}
+        >
+          {isFa ? "بوم" : "Canvas"}
+        </button>
+        <button
+          type="button"
+          className="ve-btn"
+          data-active={mobilePanel === "right"}
+          onClick={() =>
+            setMobilePanel((p) => (p === "right" ? "none" : "right"))
+          }
+        >
+          {isFa ? "بازرس" : "Inspector"}
+        </button>
+      </div>
+
       <div className="ve-body">
-        <aside className="ve-sidebar" aria-label="Library">
+        <aside className="ve-sidebar" aria-label={isFa ? "کتابخانه" : "Library"}>
           <div className="ve-tabs" role="tablist">
             {(
               [
@@ -1375,19 +1541,26 @@ export function VisualEditorShell({
               </p>
               <p className="ve-canvas-empty__hint">
                 {isFa
-                  ? "یک کامپوننت را بکشید یا از کتابخانه اضافه کنید."
-                  : "Drag a component here or add one from the library."}
+                  ? "یک نقطهٔ شروع انتخاب کنید یا از کتابخانه بکشید."
+                  : "Pick a starter or drag from the library."}
               </p>
-              <button
-                type="button"
-                className="ve-btn ve-btn--primary"
-                onClick={() => {
-                  setLeftTab("library");
-                  handleInsertBlock("layout-container");
-                }}
-              >
-                {isFa ? "+ افزودن کامپوننت" : "+ Add component"}
-              </button>
+              <div className="ve-canvas-empty__starters">
+                {EMPTY_STARTERS.map((starter) => (
+                  <button
+                    key={starter.id}
+                    type="button"
+                    className="ve-btn ve-btn--primary"
+                    onClick={() => {
+                      setLeftTab("library");
+                      setLeftCollapsed(false);
+                      setMobilePanel("none");
+                      handleInsertBlock(starter.id);
+                    }}
+                  >
+                    + {isFa ? starter.fa : starter.en}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
           {selectionCrumbs.length > 0 ? (
@@ -1501,8 +1674,8 @@ export function VisualEditorShell({
               type="button"
               className="ve-btn"
               disabled={!hasSelection || selectionLocked}
-              aria-label="Duplicate"
-              title="Duplicate"
+              aria-label={isFa ? "کپی" : "Duplicate"}
+              title={isFa ? "کپی" : "Duplicate"}
               onClick={() => {
                 const ed = editorRef.current;
                 if (!ed) return;
@@ -1516,8 +1689,24 @@ export function VisualEditorShell({
               type="button"
               className="ve-btn"
               disabled={!hasSelection}
-              aria-label={selectionLocked ? "Unlock" : "Lock"}
-              title={selectionLocked ? "Unlock" : "Lock"}
+              aria-label={
+                selectionLocked
+                  ? isFa
+                    ? "باز کردن قفل"
+                    : "Unlock"
+                  : isFa
+                    ? "قفل"
+                    : "Lock"
+              }
+              title={
+                selectionLocked
+                  ? isFa
+                    ? "باز کردن قفل"
+                    : "Unlock"
+                  : isFa
+                    ? "قفل"
+                    : "Lock"
+              }
               aria-pressed={selectionLocked}
               onClick={() => {
                 const ed = editorRef.current;
@@ -1527,14 +1716,20 @@ export function VisualEditorShell({
                 refreshDirtyFromEditor();
               }}
             >
-              {selectionLocked ? "Unlock" : "Lock"}
+              {selectionLocked
+                ? isFa
+                  ? "بازقفل"
+                  : "Unlock"
+                : isFa
+                  ? "قفل"
+                  : "Lock"}
             </button>
             <button
               type="button"
               className="ve-btn"
               disabled={!hasSelection || selectionLocked}
-              aria-label="Hide"
-              title="Hide"
+              aria-label={isFa ? "مخفی" : "Hide"}
+              title={isFa ? "مخفی" : "Hide"}
               onClick={() => {
                 const ed = editorRef.current;
                 if (!ed) return;
@@ -1548,8 +1743,8 @@ export function VisualEditorShell({
               type="button"
               className="ve-btn"
               disabled={!hasSelection || selectionLocked}
-              aria-label="Delete"
-              title="Delete"
+              aria-label={isFa ? "حذف" : "Delete"}
+              title={isFa ? "حذف" : "Delete"}
               onClick={() => {
                 const ed = editorRef.current;
                 if (!ed) return;
@@ -1707,7 +1902,7 @@ export function VisualEditorShell({
           <div ref={canvasRef} className="ve-canvas-host" />
         </main>
 
-        <aside className="ve-inspector" aria-label="Inspector">
+        <aside className="ve-inspector" aria-label={isFa ? "بازرس" : "Inspector"}>
           <div className="ve-tabs" role="tablist">
             <button
               type="button"

@@ -368,96 +368,130 @@ function NavItem({
             </span>
           ) : null}
         </button>
-        <button
-          type="button"
-          className="ve-pages__icon-btn"
-          aria-label={isFa ? "بالا" : "Move up"}
-          title={isFa ? "بالا" : "Move up"}
-          disabled={locked}
-          onClick={() => {
-            const result = moveComponentRelative(node.component, "up");
-            if (result.ok) {
+        <div className="ve-navigator__actions">
+          <button
+            type="button"
+            className="ve-pages__icon-btn"
+            aria-label={isFa ? "بالا" : "Move up"}
+            title={isFa ? "بالا" : "Move up"}
+            disabled={locked}
+            onClick={() => {
+              const result = moveComponentRelative(node.component, "up");
+              if (result.ok) {
+                onChange();
+                refresh();
+              }
+            }}
+          >
+            <ArrowUp size={12} />
+          </button>
+          <button
+            type="button"
+            className="ve-pages__icon-btn"
+            aria-label={isFa ? "پایین" : "Move down"}
+            title={isFa ? "پایین" : "Move down"}
+            disabled={locked}
+            onClick={() => {
+              const result = moveComponentRelative(node.component, "down");
+              if (result.ok) {
+                onChange();
+                refresh();
+              }
+            }}
+          >
+            <ArrowDown size={12} />
+          </button>
+          <button
+            type="button"
+            className="ve-pages__icon-btn"
+            aria-label={
+              locked
+                ? isFa
+                  ? "باز کردن قفل"
+                  : "Unlock"
+                : isFa
+                  ? "قفل"
+                  : "Lock"
+            }
+            title={
+              locked
+                ? isFa
+                  ? "باز کردن قفل"
+                  : "Unlock"
+                : isFa
+                  ? "قفل"
+                  : "Lock"
+            }
+            aria-pressed={locked}
+            onClick={() => {
+              toggleComponentLocked(node.component);
               onChange();
               refresh();
+            }}
+          >
+            {locked ? <Unlock size={12} /> : <Lock size={12} />}
+          </button>
+          <button
+            type="button"
+            className="ve-pages__icon-btn"
+            aria-label={
+              visible
+                ? isFa
+                  ? "مخفی"
+                  : "Hide"
+                : isFa
+                  ? "نمایش"
+                  : "Show"
             }
-          }}
-        >
-          <ArrowUp size={12} />
-        </button>
-        <button
-          type="button"
-          className="ve-pages__icon-btn"
-          aria-label={isFa ? "پایین" : "Move down"}
-          title={isFa ? "پایین" : "Move down"}
-          disabled={locked}
-          onClick={() => {
-            const result = moveComponentRelative(node.component, "down");
-            if (result.ok) {
+            title={
+              visible
+                ? isFa
+                  ? "مخفی"
+                  : "Hide"
+                : isFa
+                  ? "نمایش"
+                  : "Show"
+            }
+            disabled={locked}
+            onClick={() => {
+              node.component.addStyle({
+                display: visible ? "none" : "",
+              });
               onChange();
               refresh();
-            }
-          }}
-        >
-          <ArrowDown size={12} />
-        </button>
-        <button
-          type="button"
-          className="ve-pages__icon-btn"
-          aria-label={locked ? "Unlock" : "Lock"}
-          title={locked ? "Unlock" : "Lock"}
-          aria-pressed={locked}
-          onClick={() => {
-            toggleComponentLocked(node.component);
-            onChange();
-            refresh();
-          }}
-        >
-          {locked ? <Unlock size={12} /> : <Lock size={12} />}
-        </button>
-        <button
-          type="button"
-          className="ve-pages__icon-btn"
-          aria-label={visible ? "Hide" : "Show"}
-          title={visible ? "Hide" : "Show"}
-          disabled={locked}
-          onClick={() => {
-            node.component.addStyle({
-              display: visible ? "none" : "",
-            });
-            onChange();
-            refresh();
-          }}
-        >
-          {visible ? <Eye size={12} /> : <EyeOff size={12} />}
-        </button>
-        <button
-          type="button"
-          className="ve-pages__icon-btn"
-          aria-label="Duplicate"
-          title="Duplicate"
-          disabled={locked}
-          onClick={() => {
-            duplicateComponentSafe(editor, node.component);
-            onChange();
-            refresh();
-          }}
-        >
-          <Copy size={12} />
-        </button>
-        <button
-          type="button"
-          className="ve-pages__icon-btn"
-          aria-label="Delete"
-          title="Delete"
-          disabled={locked}
-          onClick={() => {
-            node.component.remove();
-            onChange();
-            refresh();
-          }}
-        >
-          <Trash2 size={12} />
-        </button>
+            }}
+          >
+            {visible ? <Eye size={12} /> : <EyeOff size={12} />}
+          </button>
+          <button
+            type="button"
+            className="ve-pages__icon-btn"
+            aria-label={isFa ? "کپی" : "Duplicate"}
+            title={isFa ? "کپی" : "Duplicate"}
+            disabled={locked}
+            onClick={() => {
+              duplicateComponentSafe(editor, node.component);
+              onChange();
+              refresh();
+            }}
+          >
+            <Copy size={12} />
+          </button>
+          <button
+            type="button"
+            className="ve-pages__icon-btn"
+            aria-label={isFa ? "حذف" : "Delete"}
+            title={isFa ? "حذف" : "Delete"}
+            disabled={locked}
+            onClick={() => {
+              node.component.remove();
+              onChange();
+              refresh();
+            }}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
       </div>
       {hasKids && isOpen ? (
         <ul className="ve-navigator__list" role="group">

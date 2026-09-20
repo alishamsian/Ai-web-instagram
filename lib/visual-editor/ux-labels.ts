@@ -15,6 +15,40 @@ const FALLBACK: Record<string, { fa: string; en: string }> = {
   unknown: { fa: "عنصر", en: "Element" },
 };
 
+/** Friendly HTML tag labels (avoid raw H1 / DIV in Layers). */
+const TAG_LABELS: Record<string, { fa: string; en: string }> = {
+  h1: { fa: "عنوان ۱", en: "Heading 1" },
+  h2: { fa: "عنوان ۲", en: "Heading 2" },
+  h3: { fa: "عنوان ۳", en: "Heading 3" },
+  h4: { fa: "عنوان ۴", en: "Heading 4" },
+  h5: { fa: "عنوان ۵", en: "Heading 5" },
+  h6: { fa: "عنوان ۶", en: "Heading 6" },
+  p: { fa: "پاراگراف", en: "Paragraph" },
+  span: { fa: "متن", en: "Text" },
+  div: { fa: "باکس", en: "Box" },
+  section: { fa: "سکشن", en: "Section" },
+  article: { fa: "مقاله", en: "Article" },
+  header: { fa: "هدر", en: "Header" },
+  footer: { fa: "فوتر", en: "Footer" },
+  nav: { fa: "ناوبری", en: "Nav" },
+  main: { fa: "اصلی", en: "Main" },
+  aside: { fa: "کناری", en: "Aside" },
+  img: { fa: "تصویر", en: "Image" },
+  picture: { fa: "تصویر", en: "Picture" },
+  video: { fa: "ویدیو", en: "Video" },
+  a: { fa: "لینک", en: "Link" },
+  button: { fa: "دکمه", en: "Button" },
+  ul: { fa: "فهرست", en: "List" },
+  ol: { fa: "فهرست شماره‌دار", en: "Ordered list" },
+  li: { fa: "آیتم", en: "List item" },
+  form: { fa: "فرم", en: "Form" },
+  input: { fa: "ورودی", en: "Input" },
+  textarea: { fa: "متن بلند", en: "Textarea" },
+  label: { fa: "برچسب", en: "Label" },
+  figure: { fa: "فیگور", en: "Figure" },
+  figcaption: { fa: "زیرنویس", en: "Caption" },
+};
+
 /** Human-readable label for a block / section type id. */
 export function formatBlockTypeLabel(
   rawType: string | undefined | null,
@@ -71,6 +105,14 @@ export function formatComponentLabel(
   const tag = (options?.tagName || "").toLowerCase();
   if (tag === "body" || tag === "wrapper") {
     return locale === "fa" ? FALLBACK.wrapper.fa : FALLBACK.wrapper.en;
+  }
+  if (tag && TAG_LABELS[tag]) {
+    const base = locale === "fa" ? TAG_LABELS[tag].fa : TAG_LABELS[tag].en;
+    const preview = options?.textPreview?.trim();
+    if (preview && preview.length > 0 && preview.length <= 24) {
+      return `${base}: ${preview}`;
+    }
+    return base;
   }
   if (tag) return tag.toUpperCase();
   return locale === "fa" ? FALLBACK.unknown.fa : FALLBACK.unknown.en;

@@ -101,6 +101,15 @@ describe("Phase 3.3 labels", () => {
     ).toBe("Button");
   });
 
+  it("uses friendly tag labels when type missing", () => {
+    expect(
+      formatComponentLabel({}, { locale: "en", tagName: "h1" }),
+    ).toBe("Heading 1");
+    expect(
+      formatComponentLabel({}, { locale: "fa", tagName: "div" }),
+    ).toBe("باکس");
+  });
+
   it("appends short text preview", () => {
     expect(
       formatComponentLabel(
@@ -175,6 +184,45 @@ describe("Phase 3.3 keyboard shortcuts", () => {
         key: "l",
       }),
     ).toBe("lock");
+  });
+
+  it("maps panel and focus chrome shortcuts", () => {
+    expect(
+      resolveBuilderShortcut({
+        typingTarget: false,
+        hasSelection: false,
+        locked: false,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        key: "[",
+      }),
+    ).toBe("toggle-left");
+    expect(
+      resolveBuilderShortcut({
+        typingTarget: false,
+        hasSelection: false,
+        locked: false,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        key: "]",
+      }),
+    ).toBe("toggle-right");
+    expect(
+      resolveBuilderShortcut({
+        typingTarget: false,
+        hasSelection: false,
+        locked: false,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        key: "\\",
+      }),
+    ).toBe("toggle-focus");
   });
 
   it("ctrl+y redo on non-mac", () => {

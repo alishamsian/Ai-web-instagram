@@ -19,6 +19,22 @@ const TABS: Array<{ id: VisualLibraryTab; fa: string; en: string }> = [
   { id: "navigation", fa: "ناوبری", en: "Navigation" },
 ];
 
+function previewKind(block: VisualBlockDefinition): string {
+  const id = block.id;
+  if (id.startsWith("section-")) return "section";
+  if (id.startsWith("layout-")) return "layout";
+  if (id.includes("heading") || id.includes("text") || id.includes("paragraph"))
+    return "text";
+  if (id.includes("image") || id.includes("gallery") || id.includes("media"))
+    return "media";
+  if (id.includes("button") || id.includes("cta") || id.includes("link"))
+    return "action";
+  if (id.includes("form") || id.includes("input")) return "form";
+  if (id.includes("nav") || id.includes("menu") || id.includes("header"))
+    return "nav";
+  return block.libraryTab || "other";
+}
+
 export function VisualBlockLibrary({
   isFa,
   onInsert,
@@ -31,6 +47,7 @@ export function VisualBlockLibrary({
   const deferredQuery = useDeferredValue(query);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const hasQuery = Boolean(deferredQuery.trim());
 
   // Registry is client-populated; defer list render until after mount to avoid
   // SSR/client block-count hydration mismatches.
@@ -58,22 +75,37 @@ export function VisualBlockLibrary({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={
-            isFa ? "جستجوی کامپوننت…" : "Search components…"
+            isFa
+              ? "جستجو در همه تب‌ها…"
+              : "Search all components…"
           }
           aria-label={isFa ? "جستجوی کامپوننت" : "Search components"}
           autoComplete="off"
         />
       </label>
+      {hasQuery ? (
+        <p className="ve-library__search-hint" role="status">
+          {isFa
+            ? `جستجوی سراسری · ${total} نتیجه`
+            : `Searching all tabs · ${total} results`}
+        </p>
+      ) : null}
 
-      <div className="ve-library__tabs" role="tablist" aria-label="Library">
+      <div
+        className="ve-library__tabs"
+        role="tablist"
+        aria-label={isFa ? "کتابخانه" : "Library"}
+        data-dimmed={hasQuery || undefined}
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             role="tab"
             className="ve-tab"
-            data-active={tab === t.id}
-            aria-selected={tab === t.id}
+            data-active={!hasQuery && tab === t.id}
+            aria-selected={!hasQuery && tab === t.id}
+            disabled={hasQuery}
             onClick={() => {
               setTab(t.id);
               setExpanded(null);
@@ -135,9 +167,10 @@ function BlockCard({
   const label = isFa ? block.label.fa : block.label.en;
   const desc = isFa ? block.description?.fa : block.description?.en;
   const variants = block.variants ?? [];
+  const kind = previewKind(block);
 
   return (
-    <div className="ve-library__card" role="listitem">
+    <div className="ve-library__card" role="listitem" data-preview={kind}>
       <button
         type="button"
         className="ve-library__card-main"
@@ -164,12 +197,15 @@ function BlockCard({
         aria-label={isFa ? `افزودن ${label}` : `Insert ${label}`}
         title={desc || label}
       >
-        <span className="ve-library__card-title">{label}</span>
-        {variants.length > 0 ? (
-          <span className="ve-library__card-meta">
-            {variants.length} {isFa ? "واریانت" : "variants"}
-          </span>
-        ) : null}
+        <span className="ve-library__card-thumb" aria-hidden />
+        <span className="ve-library__card-copy">
+          <span className="ve-library__card-title">{label}</span>
+          {variants.length > 0 ? (
+            <span className="ve-library__card-meta">
+              {variants.length} {isFa ? "واریانت" : "variants"}
+            </span>
+          ) : null}
+        </span>
       </button>
       {expanded && variants.length > 0 ? (
         <div className="ve-library__variants" role="group">
