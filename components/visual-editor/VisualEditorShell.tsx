@@ -66,6 +66,7 @@ import {
 } from "@/lib/visual-editor";
 import {
   moveComponentRelative,
+  placeRelativeByIds,
   resolveCanvasDropHint,
   type CanvasDropHint,
 } from "@/lib/visual-editor/dnd/reorder";
@@ -1276,32 +1277,60 @@ export function VisualEditorShell({
         <main
           className="ve-canvas-wrap"
           onDragOver={(e) => {
-            if (!e.dataTransfer.types.includes("text/ve-block-id")) return;
+            const isLibrary = e.dataTransfer.types.includes("text/ve-block-id");
+            const isNav = e.dataTransfer.types.includes("text/ve-nav-id");
+            if (!isLibrary && !isNav) return;
             e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
+            e.dataTransfer.dropEffect = isLibrary ? "copy" : "move";
             const ed = editorRef.current;
             const blockId =
               e.dataTransfer.getData("text/ve-block-id") ||
               getActiveLibraryDrag() ||
               "section-hero";
             if (!ed) return;
+            // For navigator→canvas, resolve against a generic nestable child type.
+            const hintChild = isNav ? "content-heading" : blockId;
             const hint = resolveCanvasDropHint(
               ed,
               e.clientX,
               e.clientY,
-              blockId,
+              hintChild,
             );
             setDropHint(hint);
           }}
           onDragLeave={() => setDropHint(null)}
           onDrop={(e) => {
             const blockId = e.dataTransfer.getData("text/ve-block-id");
-            if (!blockId) return;
+            const navId = e.dataTransfer.getData("text/ve-nav-id");
+            if (!blockId && !navId) return;
             e.preventDefault();
             const ed = editorRef.current;
-            const hint = ed
-              ? resolveCanvasDropHint(ed, e.clientX, e.clientY, blockId)
-              : null;
+            if (!ed) {
+              setDropHint(null);
+              return;
+            }
+            if (navId) {
+              const hint = resolveCanvasDropHint(
+                ed,
+                e.clientX,
+                e.clientY,
+                "content-heading",
+              );
+              setDropHint(null);
+              if (!hint?.accepted || !hint.targetId) return;
+              const result = placeRelativeByIds(
+                ed,
+                navId,
+                hint.targetId,
+                hint.position,
+              );
+              if (result.ok) {
+                refreshDirtyFromEditor();
+                syncHistoryFlags();
+              }
+              return;
+            }
+            const hint = resolveCanvasDropHint(ed, e.clientX, e.clientY, blockId);
             setDropHint(null);
             handleInsertBlock(blockId, undefined, {
               targetComponentId: hint?.targetId,

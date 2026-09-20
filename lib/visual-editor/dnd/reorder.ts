@@ -163,8 +163,33 @@ export type CanvasDropHint = {
   indicatorTop?: number;
 };
 
+function collectDropCandidates(root: Component): Component[] {
+  const out: Component[] = [];
+  const walk = (cmp: Component, depth: number) => {
+    if (!cmp || typeof cmp.getId !== "function") return;
+    if (!cmp.is?.("wrapper")) out.push(cmp);
+    const kids = cmp.components?.();
+    const list = Array.isArray(kids)
+      ? kids
+      : ((kids as { models?: Component[] } | undefined)?.models ?? []);
+    for (const child of list) walk(child, depth + 1);
+  };
+  walk(root, 0);
+  return out;
+}
+
+function parentBlockIdOf(cmp: Component): string {
+  const parent = cmp.parent?.();
+  if (!parent || parent.is?.("wrapper")) return "wrapper";
+  return (
+    normalizeBlockId(blockIdFromAttrs(attrsOf(parent))) ||
+    String(parent.get?.("tagName") || "wrapper")
+  );
+}
+
 /**
  * Find the best drop target under pointer using component view rectangles.
+ * Walks the full nested tree (not only top-level sections).
  * Safe no-op when canvas frame is unavailable (SSR / unit tests).
  */
 export function resolveCanvasDropHint(
@@ -176,16 +201,11 @@ export function resolveCanvasDropHint(
   const wrapper = editor.getWrapper();
   if (!wrapper) return null;
 
-  const kids = wrapper.components();
-  const models = Array.isArray(kids)
-    ? kids
-    : ((kids as { models?: Component[] }).models ?? []);
-
+  const candidates = collectDropCandidates(wrapper);
   let best: CanvasDropHint | null = null;
-  let bestDist = Infinity;
+  let bestScore = -Infinity;
 
-  for (const cmp of models) {
-    if (!cmp || typeof cmp.getId !== "function") continue;
+  for (const cmp of candidates) {
     const el = cmp.getEl?.() || cmp.view?.el;
     if (!el || typeof el.getBoundingClientRect !== "function") continue;
     const rect = el.getBoundingClientRect();
@@ -201,7 +221,11 @@ export function resolveCanvasDropHint(
     const parentDecision =
       position === "inside"
         ? nest
-        : canNestBlocks("wrapper", childBlockId);
+        : canNestBlocks(parentBlockIdOf(cmp), childBlockId);
+
+    // Prefer deepest (smallest area) hits, then closest vertical center.
+    const area = Math.max(rect.width * rect.height, 1);
+    const score = 1_000_000 / area - dist;
 
     const hint: CanvasDropHint = {
       targetId: cmp.getId(),
@@ -215,13 +239,13 @@ export function resolveCanvasDropHint(
             ? rect.bottom
             : mid,
     };
-    if (dist < bestDist) {
-      bestDist = dist;
+    if (score > bestScore) {
+      bestScore = score;
       best = hint;
     }
   }
 
-  if (!best && models.length === 0) {
+  if (!best && candidates.length === 0) {
     return {
       targetId: wrapper.getId(),
       position: "inside",
@@ -230,16 +254,40 @@ export function resolveCanvasDropHint(
     };
   }
 
-  // Empty space below last section → append
-  if (!best && models.length > 0) {
-    const last = models[models.length - 1];
-    return {
-      targetId: last.getId(),
-      position: "after",
-      accepted: canNestBlocks("wrapper", childBlockId).accepted,
-      label: normalizeBlockId(blockIdFromAttrs(attrsOf(last))),
-    };
+  // Empty space below last top-level section → append
+  if (!best) {
+    const kids = wrapper.components();
+    const models = Array.isArray(kids)
+      ? kids
+      : ((kids as { models?: Component[] }).models ?? []);
+    if (models.length > 0) {
+      const last = models[models.length - 1];
+      return {
+        targetId: last.getId(),
+        position: "after",
+        accepted: canNestBlocks("wrapper", childBlockId).accepted,
+        label: normalizeBlockId(blockIdFromAttrs(attrsOf(last))),
+      };
+    }
   }
 
   return best;
+}
+
+/**
+ * Apply a product-owned relative place using GrapesJS component ids.
+ * Used by canvas drop + tests; validates locking / nesting / self-drops.
+ */
+export function placeRelativeByIds(
+  editor: Editor,
+  sourceId: string,
+  targetId: string,
+  position: DropPosition,
+): MoveResult {
+  const source = editor.Components?.getById?.(sourceId) ?? null;
+  const target = editor.Components?.getById?.(targetId) ?? null;
+  if (!source || !target) {
+    return { ok: false, error: "Component not found" };
+  }
+  return placeRelativeTo(source, target, position);
 }

@@ -3,7 +3,7 @@
  * Keep the Editor instance out of React state.
  */
 
-import type { Editor, EditorConfig, ProjectData } from "grapesjs";
+import type { Component, Editor, EditorConfig, ProjectData } from "grapesjs";
 import {
   createBlockHtml,
   registryAsGrapesBlocks,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/visual-editor/design-tokens";
 import { duplicateComponentSafe } from "@/lib/visual-editor/duplicate";
 import { isInLockedSubtree, toggleComponentLocked } from "@/lib/visual-editor/lock";
+import { canMoveInto } from "@/lib/visual-editor/dnd/reorder";
 import type { WebsiteConfig } from "@/types/website";
 
 export type VisualEditorPanels = {
@@ -269,6 +270,26 @@ export async function createVisualEditor(
   editor.on("page:select", emitUpdate);
   editor.on("component:selected", () => options.onSelection?.());
   editor.on("component:deselected", () => options.onSelection?.());
+
+  // Product nesting / lock authority for in-canvas GrapesJS pointer moves.
+  // Invalid native drops are reverted so WebsiteConfig never absorbs them.
+  editor.on("component:drag:end", (payload: unknown) => {
+    const data = payload as {
+      target?: Component;
+      parent?: Component;
+    };
+    const source = data?.target;
+    const parent = data?.parent ?? source?.parent?.();
+    if (!source || !parent) return;
+    const check = canMoveInto(source, parent);
+    if (!check.ok) {
+      try {
+        editor.UndoManager?.undo?.();
+      } catch {
+        // ignore undo failures
+      }
+    }
+  });
 
   if (options.onHover) {
     editor.on("component:hover", (component: unknown) => {

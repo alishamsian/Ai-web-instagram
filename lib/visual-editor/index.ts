@@ -159,6 +159,7 @@ export {
   moveComponentRelative,
   moveComponentTo,
   placeRelativeTo,
+  placeRelativeByIds,
   canMoveInto,
   resolvePositionFromRatio,
   resolveCanvasDropHint,
