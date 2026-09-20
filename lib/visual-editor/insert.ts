@@ -2,12 +2,18 @@
  * Single product-owned insertion path into the active GrapesJS page.
  */
 
-import type { Editor } from "grapesjs";
+import type { Component, Editor } from "grapesjs";
 import type { WebsiteConfig, WebsiteSectionType } from "@/types/website";
 import {
   createBlockHtml,
   getVisualBlock,
 } from "@/lib/visual-editor/registry";
+import {
+  canNestBlocks,
+  normalizeBlockId,
+  type DropPosition,
+} from "@/lib/visual-editor/dnd/nesting";
+import { switchSectionVariant } from "@/lib/visual-editor/variants/switch";
 
 export type InsertVisualBlockOptions = {
   blockId: string;
@@ -16,6 +22,9 @@ export type InsertVisualBlockOptions = {
   /** Existing WebsiteConfig section ids (for deterministic next id). */
   existingSectionIds?: string[];
   colors?: WebsiteConfig["brand"]["colors"];
+  /** Precise drop target (GrapesJS component id). */
+  targetComponentId?: string;
+  position?: DropPosition;
 };
 
 export type InsertVisualBlockResult = {
@@ -35,7 +44,10 @@ function collectExistingSectionIds(editor: Editor): string[] {
   const ids: string[] = [];
   try {
     const wrapper = editor.getWrapper();
-    const walk = (cmp: { getAttributes?: () => Record<string, string>; components?: () => { models?: unknown[] } | unknown[] }) => {
+    const walk = (cmp: {
+      getAttributes?: () => Record<string, string>;
+      components?: () => { models?: unknown[] } | unknown[];
+    }) => {
       const attrs = cmp.getAttributes?.() ?? {};
       if (attrs["data-section-id"]) ids.push(attrs["data-section-id"]);
       const kids = cmp.components?.();
@@ -53,9 +65,50 @@ function collectExistingSectionIds(editor: Editor): string[] {
   return ids;
 }
 
+function findById(editor: Editor, id: string): Component | null {
+  try {
+    const all = editor.getWrapper()?.find?.(`*`) ?? [];
+    // GrapesJS Components collection — prefer Components.get
+    const byGet = editor.Components?.getById?.(id);
+    if (byGet) return byGet;
+    void all;
+  } catch {
+    // fall through
+  }
+  const wrapper = editor.getWrapper();
+  if (!wrapper) return null;
+  let found: Component | null = null;
+  const walk = (cmp: Component) => {
+    if (found) return;
+    if (cmp.getId?.() === id) {
+      found = cmp;
+      return;
+    }
+    const kids = cmp.components?.();
+    const list = Array.isArray(kids)
+      ? kids
+      : ((kids as { models?: Component[] } | undefined)?.models ?? []);
+    for (const child of list) walk(child);
+  };
+  walk(wrapper);
+  return found;
+}
+
+function appendAt(
+  parent: Component,
+  html: string,
+  at?: number,
+): void {
+  if (typeof at === "number") {
+    parent.append(html, { at });
+  } else {
+    parent.append(html);
+  }
+}
+
 /**
  * Insert a registry block into the currently selected GrapesJS page.
- * Returns metadata so the shell can register SectionConfig when on home.
+ * Supports precise before/after/inside placement when targetComponentId is set.
  */
 export function insertVisualBlock(
   editor: Editor,
@@ -78,18 +131,60 @@ export function insertVisualBlock(
       existingSectionIds: existing,
       colors: options.colors,
     });
-    const selected = editor.getSelected();
     const wrapper = editor.getWrapper();
     if (!wrapper) {
       return { ok: false, error: "No insert target" };
     }
-    if (selected && !selected.is("wrapper")) {
-      const parent = selected.parent() || wrapper;
-      const idx = selected.index();
-      parent.append(html, { at: idx + 1 });
+
+    const position = options.position ?? "after";
+    const target = options.targetComponentId
+      ? findById(editor, options.targetComponentId)
+      : null;
+
+    if (target && !target.is("wrapper")) {
+      const targetAttrs = target.getAttributes?.() ?? {};
+      const targetBlockId = normalizeBlockId(
+        targetAttrs["data-component-type"] ||
+          (targetAttrs["data-section-type"]
+            ? `section-${targetAttrs["data-section-type"]}`
+            : undefined),
+      );
+      const parent = target.parent() || wrapper;
+      const parentAttrs = parent.getAttributes?.() ?? {};
+      const parentBlockId = parent.is("wrapper")
+        ? "wrapper"
+        : normalizeBlockId(
+            parentAttrs["data-component-type"] ||
+              (parentAttrs["data-section-type"]
+                ? `section-${parentAttrs["data-section-type"]}`
+                : undefined),
+          );
+
+      if (position === "inside") {
+        const nest = canNestBlocks(targetBlockId, options.blockId);
+        if (!nest.accepted) {
+          return { ok: false, error: nest.reason || "Invalid drop target" };
+        }
+        appendAt(target, html);
+      } else {
+        const nest = canNestBlocks(parentBlockId ?? "wrapper", options.blockId);
+        if (!nest.accepted) {
+          return { ok: false, error: nest.reason || "Invalid drop target" };
+        }
+        const idx = target.index();
+        appendAt(parent, html, position === "before" ? idx : idx + 1);
+      }
     } else {
-      wrapper.append(html);
+      const selected = editor.getSelected();
+      if (selected && !selected.is("wrapper")) {
+        const parent = selected.parent() || wrapper;
+        const idx = selected.index();
+        appendAt(parent, html, idx + 1);
+      } else {
+        appendAt(wrapper, html);
+      }
     }
+
     const variant =
       options.variantId ||
       block.variants?.find((v) => v.default)?.id ||
@@ -111,22 +206,20 @@ export function insertVisualBlock(
   }
 }
 
-/** Apply a variant by regenerating section markup attributes (preserves content paths). */
+/**
+ * Apply a variant by rebuilding section structure (preserves ids + compatible content).
+ * @deprecated Prefer switchSectionVariant — kept as stable alias.
+ */
 export function applySectionVariant(
   editor: Editor,
   variantId: string,
+  options?: {
+    locale?: "fa" | "en";
+    colors?: WebsiteConfig["brand"]["colors"];
+  },
 ): boolean {
-  const selected = editor.getSelected();
-  if (!selected) return false;
-  let target = selected;
-  while (target && !target.getAttributes()?.["data-section-id"]) {
-    const parent = target.parent?.();
-    if (!parent || parent.is("wrapper")) break;
-    target = parent;
-  }
-  const attrs = target.getAttributes?.() ?? {};
-  if (!attrs["data-section-id"]) return false;
-  target.addAttributes({ "data-section-variant": variantId });
-  target.addAttributes({ "data-component-variant": variantId });
-  return true;
+  const result = switchSectionVariant(editor, variantId, options);
+  return result.ok;
 }
+
+export { switchSectionVariant };

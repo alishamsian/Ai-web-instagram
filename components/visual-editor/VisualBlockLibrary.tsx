@@ -11,6 +11,7 @@ import {
   type VisualBlockDefinition,
   type VisualLibraryTab,
 } from "@/lib/visual-editor/registry";
+import { setActiveLibraryDrag } from "@/lib/visual-editor/dnd/drag-state";
 
 const TABS: Array<{ id: VisualLibraryTab; fa: string; en: string }> = [
   { id: "sections", fa: "سکشن‌ها", en: "Sections" },
@@ -117,6 +118,10 @@ function BlockCard({
         onDragStart={(e) => {
           e.dataTransfer.setData("text/ve-block-id", block.id);
           e.dataTransfer.effectAllowed = "copy";
+          setActiveLibraryDrag(block.id);
+        }}
+        onDragEnd={() => {
+          setActiveLibraryDrag(null);
         }}
         onClick={() => {
           if (variants.length > 1) onToggle();

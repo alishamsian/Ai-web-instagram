@@ -54,6 +54,8 @@ import {
   visualRedo,
   visualUndo,
   websiteConfigToVisualProject,
+  getVisualBlock,
+  applySectionVariant,
   type VisualDeviceId,
   type VisualSaveState,
   type VisualZoomMode,
@@ -61,6 +63,12 @@ import {
   VISUAL_PAGE_HOME,
   VISUAL_ZOOM_OPTIONS,
 } from "@/lib/visual-editor";
+import {
+  moveComponentRelative,
+  resolveCanvasDropHint,
+  type CanvasDropHint,
+} from "@/lib/visual-editor/dnd/reorder";
+import { getActiveLibraryDrag } from "@/lib/visual-editor/dnd/drag-state";
 import { VisualEditorLoading } from "@/components/visual-editor/VisualEditorLoading";
 import { VisualPagesPanel } from "@/components/visual-editor/VisualPagesPanel";
 import { VisualBlockLibrary } from "@/components/visual-editor/VisualBlockLibrary";
@@ -69,7 +77,10 @@ import { VisualNavigator } from "@/components/visual-editor/VisualNavigator";
 import "@/app/visual-editor.css";
 import "grapesjs/dist/css/grapes.min.css";
 import {
+  AlignCenter,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   Bold,
   Copy,
   EyeOff,
@@ -146,6 +157,13 @@ export function VisualEditorShell({
   const [selectedIsImage, setSelectedIsImage] = useState(false);
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
   const [mediaMap, setMediaMap] = useState(website.config.media);
+  const [dropHint, setDropHint] = useState<CanvasDropHint | null>(null);
+  const [selectionLabel, setSelectionLabel] = useState<string | null>(null);
+  const [selectedIsSection, setSelectedIsSection] = useState(false);
+  const [sectionVariants, setSectionVariants] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
   const siteName = website.config.brand.name || website.slug || "Website";
 
   const mediaList = useMemo(
@@ -436,7 +454,11 @@ export function VisualEditorShell({
   );
 
   const handleInsertBlock = useCallback(
-    (blockId: string, variantId?: string) => {
+    (
+      blockId: string,
+      variantId?: string,
+      placement?: { targetComponentId?: string; position?: "before" | "after" | "inside" },
+    ) => {
       const ed = editorRef.current;
       if (!ed) return;
       const result = insertVisualBlock(ed, {
@@ -445,13 +467,14 @@ export function VisualEditorShell({
         variantId,
         existingSectionIds: (configRef.current.sections ?? []).map((s) => s.id),
         colors: configRef.current.brand.colors,
+        targetComponentId: placement?.targetComponentId,
+        position: placement?.position,
       });
       if (!result.ok) {
         setPageError(result.error);
         return;
       }
       setPageError(null);
-      // Canonical home sections are registered on sync via data-section-* metadata.
       refreshDirtyFromEditor();
       syncHistoryFlags();
     },
@@ -594,6 +617,50 @@ export function VisualEditorShell({
                     )),
               ),
             );
+            if (!selected || selected.is("wrapper")) {
+              setSelectionLabel(null);
+              setSelectedIsSection(false);
+              setSectionVariants([]);
+              setActiveVariantId(null);
+              return;
+            }
+            const crumbs: string[] = [];
+            let walk = selected;
+            for (let i = 0; i < 6; i++) {
+              const a = walk.getAttributes?.() ?? {};
+              const label =
+                a["data-section-type"] ||
+                a["data-component-type"] ||
+                String(walk.get("tagName") || "");
+              if (label) crumbs.unshift(String(label));
+              const parent = walk.parent?.();
+              if (!parent || parent.is("wrapper")) break;
+              walk = parent;
+            }
+            setSelectionLabel(crumbs.join(" / "));
+
+            let section = selected;
+            while (section && !section.getAttributes?.()?.["data-section-id"]) {
+              const parent = section.parent?.();
+              if (!parent || parent.is("wrapper")) break;
+              section = parent;
+            }
+            const sattrs = section?.getAttributes?.() ?? {};
+            const isSec = Boolean(sattrs["data-section-id"]);
+            setSelectedIsSection(isSec);
+            if (isSec && sattrs["data-section-type"]) {
+              const block = getVisualBlock(`section-${sattrs["data-section-type"]}`);
+              setSectionVariants(
+                (block?.variants ?? []).map((v) => ({
+                  id: v.id,
+                  label: locale === "fa" ? v.label.fa : v.label.en,
+                })),
+              );
+              setActiveVariantId(sattrs["data-section-variant"] || null);
+            } else {
+              setSectionVariants([]);
+              setActiveVariantId(null);
+            }
           },
           websiteConfig: configRef.current,
         });
@@ -1023,19 +1090,101 @@ export function VisualEditorShell({
         <main
           className="ve-canvas-wrap"
           onDragOver={(e) => {
-            if (e.dataTransfer.types.includes("text/ve-block-id")) {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "copy";
-            }
+            if (!e.dataTransfer.types.includes("text/ve-block-id")) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            const ed = editorRef.current;
+            const blockId =
+              e.dataTransfer.getData("text/ve-block-id") ||
+              getActiveLibraryDrag() ||
+              "section-hero";
+            if (!ed) return;
+            const hint = resolveCanvasDropHint(
+              ed,
+              e.clientX,
+              e.clientY,
+              blockId,
+            );
+            setDropHint(hint);
           }}
+          onDragLeave={() => setDropHint(null)}
           onDrop={(e) => {
             const blockId = e.dataTransfer.getData("text/ve-block-id");
             if (!blockId) return;
             e.preventDefault();
-            handleInsertBlock(blockId);
+            const ed = editorRef.current;
+            const hint = ed
+              ? resolveCanvasDropHint(ed, e.clientX, e.clientY, blockId)
+              : null;
+            setDropHint(null);
+            handleInsertBlock(blockId, undefined, {
+              targetComponentId: hint?.targetId,
+              position: hint?.position,
+            });
           }}
         >
+          {dropHint ? (
+            <div
+              className="ve-drop-indicator"
+              data-accepted={dropHint.accepted}
+              data-position={dropHint.position}
+              aria-hidden
+            >
+              <span className="ve-drop-indicator__line" />
+              <span className="ve-drop-indicator__label">
+                {dropHint.accepted
+                  ? isFa
+                    ? "اینجا رها کنید"
+                    : "Drop here"
+                  : isFa
+                    ? "محل نامعتبر"
+                    : "Invalid target"}
+              </span>
+              <span className="ve-drop-indicator__line" />
+            </div>
+          ) : null}
+          {selectionLabel ? (
+            <div className="ve-selection-crumb" aria-live="polite">
+              {selectionLabel}
+            </div>
+          ) : null}
+          <div className="ve-device-edit-hint" aria-live="polite">
+            {isFa ? "در حال ویرایش:" : "Editing"}{" "}
+            <strong>{device}</strong>
+          </div>
           <div className="ve-canvas-toolbar" aria-label="Contextual toolbar">
+            <button
+              type="button"
+              className="ve-btn"
+              disabled={!hasSelection}
+              aria-label={isFa ? "بالا" : "Move up"}
+              title={isFa ? "بالا" : "Move up"}
+              onClick={() => {
+                const ed = editorRef.current;
+                const sel = ed?.getSelected();
+                if (!sel) return;
+                moveComponentRelative(sel, "up");
+                refreshDirtyFromEditor();
+              }}
+            >
+              <ArrowUp size={14} />
+            </button>
+            <button
+              type="button"
+              className="ve-btn"
+              disabled={!hasSelection}
+              aria-label={isFa ? "پایین" : "Move down"}
+              title={isFa ? "پایین" : "Move down"}
+              onClick={() => {
+                const ed = editorRef.current;
+                const sel = ed?.getSelected();
+                if (!sel) return;
+                moveComponentRelative(sel, "down");
+                refreshDirtyFromEditor();
+              }}
+            >
+              <ArrowDown size={14} />
+            </button>
             <button
               type="button"
               className="ve-btn"
@@ -1081,6 +1230,30 @@ export function VisualEditorShell({
             >
               <Trash2 size={14} />
             </button>
+            {selectedIsSection && sectionVariants.length > 0 ? (
+              <select
+                className="ve-pages__input"
+                style={{ width: "auto", minWidth: 110, height: 32 }}
+                aria-label={isFa ? "واریانت" : "Variant"}
+                value={activeVariantId || sectionVariants[0]?.id || ""}
+                onChange={(e) => {
+                  const ed = editorRef.current;
+                  if (!ed) return;
+                  applySectionVariant(ed, e.target.value, {
+                    locale,
+                    colors: configRef.current.brand.colors,
+                  });
+                  setActiveVariantId(e.target.value);
+                  refreshDirtyFromEditor();
+                }}
+              >
+                {sectionVariants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             {selectedIsText ? (
               <>
                 <button
@@ -1125,6 +1298,25 @@ export function VisualEditorShell({
                   type="button"
                   className="ve-btn"
                   disabled={!hasSelection}
+                  aria-label="Align"
+                  title="Align"
+                  onClick={() => {
+                    const ed = editorRef.current;
+                    const sel = ed?.getSelected();
+                    if (!sel) return;
+                    const cur = String(sel.getStyle()?.["text-align"] || "start");
+                    const cycle = ["start", "center", "end"] as const;
+                    const next = cycle[(cycle.indexOf(cur as typeof cycle[number]) + 1) % cycle.length];
+                    sel.addStyle({ "text-align": next });
+                    refreshDirtyFromEditor();
+                  }}
+                >
+                  <AlignCenter size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="ve-btn"
+                  disabled={!hasSelection}
                   aria-label="Link"
                   title="Link"
                   onClick={() => {
@@ -1160,6 +1352,28 @@ export function VisualEditorShell({
             >
               <ImageIcon size={14} />
             </button>
+            {selectedIsImage ? (
+              <button
+                type="button"
+                className="ve-btn"
+                aria-label="Alt"
+                title="Alt text"
+                onClick={() => {
+                  const ed = editorRef.current;
+                  const sel = ed?.getSelected();
+                  if (!sel) return;
+                  const next = window.prompt(
+                    isFa ? "متن جایگزین" : "Alt text",
+                    sel.getAttributes()?.alt || "",
+                  );
+                  if (next == null) return;
+                  sel.addAttributes({ alt: next });
+                  refreshDirtyFromEditor();
+                }}
+              >
+                Alt
+              </button>
+            ) : null}
           </div>
           <div ref={canvasRef} className="ve-canvas-host" />
         </main>

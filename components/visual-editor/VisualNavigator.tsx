@@ -2,6 +2,7 @@
 
 /**
  * Product navigator — reflects GrapesJS component tree (not a second layer model).
+ * Supports drag reorder + keyboard move up/down.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -12,14 +13,32 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  GripVertical,
   Trash2,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+import {
+  canMoveInto,
+  moveComponentRelative,
+  placeRelativeTo,
+} from "@/lib/visual-editor/dnd/reorder";
+import {
+  blockIdFromAttrs,
+  canNestBlocks,
+  normalizeBlockId,
+} from "@/lib/visual-editor/dnd/nesting";
+import { duplicateComponentSafe } from "@/lib/visual-editor/duplicate";
 
 type NavNode = {
   id: string;
   label: string;
   component: Component;
   children: NavNode[];
+};
+
+type DragPayload = {
+  sourceId: string;
 };
 
 function labelFor(cmp: Component): string {
@@ -53,6 +72,15 @@ function buildTree(cmp: Component, depth = 0): NavNode[] {
   return out;
 }
 
+function findNode(nodes: NavNode[], id: string): NavNode | null {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const child = findNode(n.children, id);
+    if (child) return child;
+  }
+  return null;
+}
+
 export function VisualNavigator({
   editor,
   isFa,
@@ -65,6 +93,10 @@ export function VisualNavigator({
   const [tree, setTree] = useState<NavNode[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [dropOverId, setDropOverId] = useState<string | null>(null);
+  const [dropPos, setDropPos] = useState<"before" | "after" | "inside" | null>(
+    null,
+  );
 
   const refresh = useCallback(() => {
     if (!editor) {
@@ -123,8 +155,14 @@ export function VisualNavigator({
               open={open}
               setOpen={setOpen}
               editor={editor}
+              tree={tree}
               onChange={onChange}
               refresh={refresh}
+              dropOverId={dropOverId}
+              dropPos={dropPos}
+              setDropOverId={setDropOverId}
+              setDropPos={setDropPos}
+              isFa={isFa}
             />
           ))}
         </ul>
@@ -140,8 +178,14 @@ function NavItem({
   open,
   setOpen,
   editor,
+  tree,
   onChange,
   refresh,
+  dropOverId,
+  dropPos,
+  setDropOverId,
+  setDropPos,
+  isFa,
 }: {
   node: NavNode;
   depth: number;
@@ -149,21 +193,106 @@ function NavItem({
   open: Record<string, boolean>;
   setOpen: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   editor: Editor;
+  tree: NavNode[];
   onChange: () => void;
   refresh: () => void;
+  dropOverId: string | null;
+  dropPos: "before" | "after" | "inside" | null;
+  setDropOverId: (id: string | null) => void;
+  setDropPos: (p: "before" | "after" | "inside" | null) => void;
+  isFa: boolean;
 }) {
   const hasKids = node.children.length > 0;
   const isOpen = open[node.id] ?? depth < 2;
   const active = selectedId === node.id;
   const visible = node.component.getStyle()?.display !== "none";
+  const isDropTarget = dropOverId === node.id;
 
   return (
     <li>
       <div
         className="ve-navigator__row"
         data-active={active}
+        data-drop={isDropTarget ? dropPos : undefined}
         style={{ paddingInlineStart: 8 + depth * 12 }}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("text/ve-nav-id")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const ratio = (e.clientY - rect.top) / Math.max(rect.height, 1);
+          const attrs = node.component.getAttributes?.() ?? {};
+          const targetBlock = normalizeBlockId(
+            blockIdFromAttrs(attrs as Record<string, string>),
+          );
+          const sourceId = e.dataTransfer.getData("text/ve-nav-id");
+          const sourceNode = sourceId ? findNode(tree, sourceId) : null;
+          const sourceBlock = sourceNode
+            ? normalizeBlockId(
+                blockIdFromAttrs(
+                  (sourceNode.component.getAttributes?.() ?? {}) as Record<
+                    string,
+                    string
+                  >,
+                ),
+              ) || "div"
+            : "div";
+          const nest = canNestBlocks(targetBlock, sourceBlock);
+          let pos: "before" | "after" | "inside" =
+            ratio < 0.28 ? "before" : ratio > 0.72 ? "after" : "inside";
+          if (pos === "inside" && !nest.accepted) {
+            pos = ratio < 0.5 ? "before" : "after";
+          }
+          setDropOverId(node.id);
+          setDropPos(pos);
+          e.dataTransfer.dropEffect = "move";
+        }}
+        onDragLeave={() => {
+          if (dropOverId === node.id) {
+            setDropOverId(null);
+            setDropPos(null);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const sourceId = e.dataTransfer.getData("text/ve-nav-id");
+          setDropOverId(null);
+          setDropPos(null);
+          if (!sourceId || sourceId === node.id || !dropPos) return;
+          const sourceNode = findNode(tree, sourceId);
+          if (!sourceNode) return;
+          if (dropPos === "inside") {
+            const check = canMoveInto(sourceNode.component, node.component);
+            if (!check.ok) return;
+          }
+          const result = placeRelativeTo(
+            sourceNode.component,
+            node.component,
+            dropPos,
+          );
+          if (result.ok) {
+            onChange();
+            refresh();
+          }
+        }}
       >
+        <button
+          type="button"
+          className="ve-pages__icon-btn ve-navigator__grip"
+          aria-label={isFa ? "جابه‌جایی" : "Drag to reorder"}
+          title={isFa ? "بکشید" : "Drag"}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/ve-nav-id", node.id);
+            e.dataTransfer.effectAllowed = "move";
+            const payload: DragPayload = { sourceId: node.id };
+            e.dataTransfer.setData("application/json", JSON.stringify(payload));
+          }}
+          onClick={(e) => e.preventDefault()}
+        >
+          <GripVertical size={12} />
+        </button>
         <button
           type="button"
           className="ve-pages__icon-btn"
@@ -193,6 +322,36 @@ function NavItem({
         <button
           type="button"
           className="ve-pages__icon-btn"
+          aria-label={isFa ? "بالا" : "Move up"}
+          title={isFa ? "بالا" : "Move up"}
+          onClick={() => {
+            const result = moveComponentRelative(node.component, "up");
+            if (result.ok) {
+              onChange();
+              refresh();
+            }
+          }}
+        >
+          <ArrowUp size={12} />
+        </button>
+        <button
+          type="button"
+          className="ve-pages__icon-btn"
+          aria-label={isFa ? "پایین" : "Move down"}
+          title={isFa ? "پایین" : "Move down"}
+          onClick={() => {
+            const result = moveComponentRelative(node.component, "down");
+            if (result.ok) {
+              onChange();
+              refresh();
+            }
+          }}
+        >
+          <ArrowDown size={12} />
+        </button>
+        <button
+          type="button"
+          className="ve-pages__icon-btn"
           aria-label={visible ? "Hide" : "Show"}
           title={visible ? "Hide" : "Show"}
           onClick={() => {
@@ -211,11 +370,7 @@ function NavItem({
           aria-label="Duplicate"
           title="Duplicate"
           onClick={() => {
-            const parent = node.component.parent();
-            if (!parent) return;
-            const idx = node.component.index();
-            const clone = node.component.clone();
-            parent.append(clone, { at: idx + 1 });
+            duplicateComponentSafe(editor, node.component);
             onChange();
             refresh();
           }}
@@ -247,8 +402,14 @@ function NavItem({
               open={open}
               setOpen={setOpen}
               editor={editor}
+              tree={tree}
               onChange={onChange}
               refresh={refresh}
+              dropOverId={dropOverId}
+              dropPos={dropPos}
+              setDropOverId={setDropOverId}
+              setDropPos={setDropPos}
+              isFa={isFa}
             />
           ))}
         </ul>

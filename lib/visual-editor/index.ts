@@ -118,8 +118,61 @@ export {
 export {
   insertVisualBlock,
   applySectionVariant,
+  switchSectionVariant,
   type InsertVisualBlockResult,
 } from "@/lib/visual-editor/insert";
+export {
+  canNestBlocks,
+  blockCanNest,
+  isLeafBlock,
+  isSectionBlock,
+  canDropOnTarget,
+  normalizeBlockId,
+  blockIdFromAttrs,
+  type DropPosition,
+  type NestDecision,
+} from "@/lib/visual-editor/dnd/nesting";
+export {
+  moveComponentRelative,
+  moveComponentTo,
+  placeRelativeTo,
+  canMoveInto,
+  resolvePositionFromRatio,
+  resolveCanvasDropHint,
+  type MoveResult,
+  type CanvasDropHint,
+} from "@/lib/visual-editor/dnd/reorder";
+export {
+  duplicateComponentSafe,
+  remintIdentities,
+  remintAttributeTree,
+  type DuplicateResult,
+} from "@/lib/visual-editor/duplicate";
+export {
+  switchSectionVariant as switchVariant,
+  extractPreservedFields,
+  mergePreservedIntoHtml,
+  filterCompatibleFields,
+  compatibleRolesForSectionType,
+  VARIANT_COMPATIBLE_ROLES,
+  type PreservedField,
+  type VariantSwitchResult,
+} from "@/lib/visual-editor/variants/switch";
+export {
+  listReusableComponents,
+  getReusableComponent,
+  registerReusableComponent,
+  removeReusableComponent,
+  resetReusableComponentStore,
+  REUSABLE_SCHEMA_VERSION,
+  type ReusableVisualComponent,
+} from "@/lib/visual-editor/reusable";
+export {
+  getDeviceVisibility,
+  setDeviceVisibility,
+  readVisibilityMap,
+  type DeviceVisibility,
+} from "@/lib/visual-editor/responsive-visibility";
 export {
   resolveVisualDesignTokens,
   visualDesignTokenCssVars,
@@ -131,6 +184,8 @@ export {
   setComponentStyle,
   setComponentStyles,
   relevantInspectorGroups,
+  parseCssLength,
+  formatCssLength,
   type InspectorGroup,
 } from "@/lib/visual-editor/inspector-model";
 

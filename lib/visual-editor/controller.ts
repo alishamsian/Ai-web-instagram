@@ -10,6 +10,7 @@ import {
   resolveVisualDesignTokens,
   visualDesignTokenStyleTag,
 } from "@/lib/visual-editor/design-tokens";
+import { duplicateComponentSafe } from "@/lib/visual-editor/duplicate";
 import type { WebsiteConfig } from "@/types/website";
 
 export type VisualEditorPanels = {
@@ -421,14 +422,7 @@ export function canVisualRedo(editor: Editor): boolean {
 }
 
 export function duplicateSelected(editor: Editor) {
-  const selected = editor.getSelected();
-  if (!selected || selected.is("wrapper")) return;
-  const parent = selected.parent();
-  if (!parent) return;
-  const clone = selected.clone();
-  const index = selected.index();
-  parent.append(clone, { at: index + 1 });
-  editor.select(clone);
+  duplicateComponentSafe(editor);
 }
 
 export function deleteSelected(editor: Editor) {

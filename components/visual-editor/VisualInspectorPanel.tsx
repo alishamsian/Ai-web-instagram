@@ -15,6 +15,10 @@ import {
   type InspectorGroup,
 } from "@/lib/visual-editor/inspector-model";
 import { applySectionVariant, getVisualBlock } from "@/lib/visual-editor";
+import {
+  readVisibilityMap,
+  setDeviceVisibility,
+} from "@/lib/visual-editor/responsive-visibility";
 import type { VisualDeviceId } from "@/lib/visual-editor/devices";
 
 const GROUP_LABELS: Record<
@@ -25,6 +29,8 @@ const GROUP_LABELS: Record<
   layout: { fa: "چیدمان", en: "Layout" },
   spacing: { fa: "فاصله", en: "Spacing" },
   typography: { fa: "تایپوگرافی", en: "Typography" },
+  background: { fa: "پس‌زمینه", en: "Background" },
+  border: { fa: "حاشیه", en: "Border" },
   style: { fa: "استایل", en: "Style" },
   responsive: { fa: "ریسپانسیو", en: "Responsive" },
   advanced: { fa: "پیشرفته", en: "Advanced" },
@@ -148,8 +154,21 @@ export function VisualInspectorPanel({
         {group === "style" ? (
           <StyleFields component={selected} apply={apply} isFa={isFa} />
         ) : null}
+        {group === "background" ? (
+          <BackgroundFields component={selected} apply={apply} isFa={isFa} />
+        ) : null}
+        {group === "border" ? (
+          <BorderFields component={selected} apply={apply} isFa={isFa} />
+        ) : null}
         {group === "responsive" ? (
-          <ResponsiveHint device={device} isFa={isFa} />
+          <ResponsiveFields
+            editor={editor}
+            component={selected}
+            device={device}
+            isFa={isFa}
+            onChange={onChange}
+            refresh={() => setTick((t) => t + 1)}
+          />
         ) : null}
         {group === "advanced" ? (
           <AdvancedFields
@@ -408,6 +427,14 @@ function LayoutFields({
           placeholder="16px"
         />
       </Field>
+      <Field label="Grid columns">
+        <input
+          className="ve-pages__input"
+          defaultValue={g("grid-template-columns")}
+          onBlur={(e) => apply("grid-template-columns", e.target.value)}
+          placeholder="1fr 1fr"
+        />
+      </Field>
       <Field label="Position">
         <select
           className="ve-pages__input"
@@ -421,12 +448,11 @@ function LayoutFields({
           ))}
         </select>
       </Field>
-      <Field label="Grid columns">
+      <Field label="z-index">
         <input
           className="ve-pages__input"
-          defaultValue={g("grid-template-columns")}
-          onBlur={(e) => apply("grid-template-columns", e.target.value)}
-          placeholder="1fr 1fr"
+          defaultValue={g("z-index")}
+          onBlur={(e) => apply("z-index", e.target.value)}
         />
       </Field>
     </div>
@@ -602,14 +628,195 @@ function ResponsiveHint({
   return (
     <div className="ve-assets-hint" style={{ display: "grid", gap: 8 }}>
       <p style={{ margin: 0 }}>
-        {isFa ? "دستگاه فعال:" : "Active device:"}{" "}
-        <strong>{device}</strong>
+        {isFa ? "در حال ویرایش:" : "Editing"}{" "}
+        <strong className="ve-device-badge">{device}</strong>
       </p>
       <p style={{ margin: 0 }}>
         {isFa
           ? "تغییرات استایل روی دستگاه فعال اعمال می‌شوند. دسکتاپ / تبلت / موبایل مستقل می‌مانند."
           : "Style edits apply to the active device. Desktop / Tablet / Mobile stay independent via GrapesJS media rules."}
       </p>
+    </div>
+  );
+}
+
+function ResponsiveFields({
+  editor,
+  component,
+  device,
+  isFa,
+  onChange,
+  refresh,
+}: {
+  editor: Editor | null;
+  component: Component;
+  device: VisualDeviceId;
+  isFa: boolean;
+  onChange: () => void;
+  refresh: () => void;
+}) {
+  const map = readVisibilityMap(component);
+  const devices: VisualDeviceId[] = ["desktop", "tablet", "mobile"];
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <ResponsiveHint device={device} isFa={isFa} />
+      <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
+        <legend style={{ fontSize: 12, marginBottom: 8 }}>
+          {isFa ? "نمایش در دستگاه" : "Visibility per device"}
+        </legend>
+        <div style={{ display: "grid", gap: 8 }}>
+          {devices.map((d) => (
+            <label
+              key={d}
+              className="ve-pages__label"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span>
+                {d}
+                {d === device ? (
+                  <span className="ve-device-badge" style={{ marginInlineStart: 6 }}>
+                    {isFa ? "فعال" : "active"}
+                  </span>
+                ) : null}
+              </span>
+              <select
+                className="ve-pages__input"
+                style={{ width: 120 }}
+                value={map[d] ? "visible" : "hidden"}
+                onChange={(e) => {
+                  if (!editor) return;
+                  setDeviceVisibility(
+                    editor,
+                    component,
+                    d,
+                    e.target.value === "visible",
+                  );
+                  onChange();
+                  refresh();
+                }}
+              >
+                <option value="visible">
+                  {isFa ? "نمایش" : "Visible"}
+                </option>
+                <option value="hidden">
+                  {isFa ? "مخفی" : "Hidden"}
+                </option>
+              </select>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </div>
+  );
+}
+
+function BackgroundFields({
+  component,
+  apply,
+  isFa,
+}: {
+  component: Component;
+  apply: (prop: string, value: string) => void;
+  isFa: boolean;
+}) {
+  const g = (p: string) => getComponentStyle(component, p);
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <Field label={isFa ? "رنگ پس‌زمینه" : "Background color"}>
+        <input
+          className="ve-pages__input"
+          type="color"
+          defaultValue={normalizeColor(g("background-color") || "#ffffff")}
+          onChange={(e) => apply("background-color", e.target.value)}
+        />
+      </Field>
+      <Field label={isFa ? "تصویر پس‌زمینه" : "Background image"}>
+        <input
+          className="ve-pages__input"
+          defaultValue={g("background-image")}
+          onBlur={(e) => apply("background-image", e.target.value)}
+          placeholder='url("…")'
+        />
+      </Field>
+      <Field label={isFa ? "اندازه" : "Size"}>
+        <select
+          className="ve-pages__input"
+          defaultValue={g("background-size") || ""}
+          onChange={(e) => apply("background-size", e.target.value)}
+        >
+          <option value="">—</option>
+          {["cover", "contain", "auto", "100% 100%"].map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label={isFa ? "موقعیت" : "Position"}>
+        <input
+          className="ve-pages__input"
+          defaultValue={g("background-position")}
+          onBlur={(e) => apply("background-position", e.target.value)}
+          placeholder="center"
+        />
+      </Field>
+    </div>
+  );
+}
+
+function BorderFields({
+  component,
+  apply,
+  isFa,
+}: {
+  component: Component;
+  apply: (prop: string, value: string) => void;
+  isFa: boolean;
+}) {
+  const g = (p: string) => getComponentStyle(component, p);
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <Field label={isFa ? "ضخامت" : "Width"}>
+        <input
+          className="ve-pages__input"
+          defaultValue={g("border-width")}
+          onBlur={(e) => apply("border-width", e.target.value)}
+          placeholder="1px"
+        />
+      </Field>
+      <Field label={isFa ? "استایل" : "Style"}>
+        <select
+          className="ve-pages__input"
+          defaultValue={g("border-style") || "none"}
+          onChange={(e) => apply("border-style", e.target.value)}
+        >
+          {["none", "solid", "dashed", "dotted"].map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label={isFa ? "رنگ" : "Color"}>
+        <input
+          className="ve-pages__input"
+          type="color"
+          defaultValue={normalizeColor(g("border-color") || "#e5e5e5")}
+          onChange={(e) => apply("border-color", e.target.value)}
+        />
+      </Field>
+      <Field label={isFa ? "گردی گوشه" : "Radius"}>
+        <input
+          className="ve-pages__input"
+          defaultValue={g("border-radius")}
+          onBlur={(e) => apply("border-radius", e.target.value)}
+        />
+      </Field>
     </div>
   );
 }
