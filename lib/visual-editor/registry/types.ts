@@ -16,7 +16,12 @@ export type VisualBlockCategory =
   | "utility"
   | "sections";
 
-export type VisualLibraryTab = "sections" | "components" | "layout" | "media";
+export type VisualLibraryTab =
+  | "sections"
+  | "components"
+  | "layout"
+  | "media"
+  | "forms";
 
 export type VisualBlockVariant = {
   id: string;
@@ -43,6 +48,21 @@ export type VisualBlockCreateContext = {
   };
 };
 
+/**
+ * Nesting / interaction metadata for the production visual builder.
+ * Prefer these over hardcoded leaf lists in DnD code.
+ */
+export type VisualBlockNesting = {
+  /** Explicit allow-list of parent block ids. Empty = use defaults. */
+  allowedParents?: string[];
+  /** Explicit allow-list of child block ids. Empty = any nestable child. */
+  allowedChildren?: string[];
+  /** Deny-list of child block ids (wins over allowedChildren when both set). */
+  deniedChildren?: string[];
+  /** Max nesting depth under this block (undefined = unlimited within safety cap). */
+  maxDepth?: number;
+};
+
 export type VisualBlockDefinition = {
   id: string;
   label: { fa: string; en: string };
@@ -57,7 +77,15 @@ export type VisualBlockDefinition = {
   sectionType?: WebsiteSectionType;
   /** When true, insert also registers SectionConfig on home sync. */
   canonical?: boolean;
+  /** Whether this block may contain children (layout containers). */
   canNest?: boolean;
+  nesting?: VisualBlockNesting;
+  /** Defaults true. */
+  draggable?: boolean;
+  /** Defaults true. */
+  duplicatable?: boolean;
+  /** Defaults false — leaf content is not free-form resizable. */
+  resizable?: boolean;
   variants?: VisualBlockVariant[];
   /** Build HTML markup with stable metadata attributes. */
   create: (ctx: VisualBlockCreateContext) => string;

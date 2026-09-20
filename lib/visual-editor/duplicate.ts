@@ -102,20 +102,33 @@ export function remintIdentities(
       const parentSection =
         newSectionId ||
         findAncestorSectionId(cmp) ||
-        `cmp-${Date.now().toString(36)}`;
+        `cmp-${existing.length + sectionCounter + 1}`;
       const parts = String(attrs["data-component-id"]).split("__");
       const role =
         parts.length > 1
           ? parts.slice(1).join("__")
           : attrs["data-component-type"] || "node";
-      const next =
-        visualComponentId(parentSection, `${role}_copy_${Math.random().toString(36).slice(2, 7)}`);
+      const next = visualComponentId(
+        parentSection,
+        `${role}_copy_${existing.length + sectionCounter + 1}`,
+      );
       updates["data-component-id"] = next;
       if (!newComponentId) newComponentId = next;
       if (options.pageId) updates["data-page-id"] = options.pageId;
       // Standalone component duplicates should not share content paths
       if (attrs["data-content-path"]) {
         removes.push("data-content-path");
+      }
+    }
+
+    if (attrs["data-item-id"]) {
+      updates["data-item-id"] =
+        `${attrs["data-item-id"]}_dup_${existing.length + sectionCounter}`;
+    }
+    if (attrs["data-product-id"] && updates["data-section-id"] == null) {
+      const pid = attrs["data-product-id"];
+      if (!pid.includes("_dup_")) {
+        updates["data-product-id"] = `${pid}_dup_${existing.length}`;
       }
     }
 
@@ -144,7 +157,7 @@ export function remintIdentities(
           : attrs["data-component-type"] || "node";
       const next = visualComponentId(
         sectionId,
-        `${role}_${Math.random().toString(36).slice(2, 6)}`,
+        `${role}_dup_${existing.length}`,
       );
       cmp.addAttributes({ "data-component-id": next });
       if (options.stripCanonicalContentPaths && attrs["data-content-path"]) {

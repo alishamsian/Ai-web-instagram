@@ -76,6 +76,7 @@ export {
   duplicateSelected,
   deleteSelected,
   toggleSelectedVisibility,
+  toggleSelectedLock,
   applyMediaToSelectedImage,
   openAssetManager,
 } from "@/lib/visual-editor/controller";
@@ -127,15 +128,33 @@ export {
 } from "@/lib/visual-editor/insert";
 export {
   canNestBlocks,
+  canDropComponent,
   blockCanNest,
   isLeafBlock,
   isSectionBlock,
   canDropOnTarget,
   normalizeBlockId,
   blockIdFromAttrs,
+  getAllowedChildren,
+  getAllowedParents,
   type DropPosition,
   type NestDecision,
 } from "@/lib/visual-editor/dnd/nesting";
+export {
+  isComponentLocked,
+  isInLockedSubtree,
+  setComponentLocked,
+  toggleComponentLocked,
+  LOCK_ATTR,
+} from "@/lib/visual-editor/lock";
+export {
+  resolveStyleProp,
+  setStyleOverride,
+  clearStyleOverride,
+  getStyleOverride,
+  RESPONSIVE_STYLE_PROPS,
+  type ResolvedStyleProp,
+} from "@/lib/visual-editor/responsive-style";
 export {
   moveComponentRelative,
   moveComponentTo,

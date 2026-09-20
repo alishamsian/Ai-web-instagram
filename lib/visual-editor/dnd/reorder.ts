@@ -9,6 +9,7 @@ import {
   normalizeBlockId,
   type DropPosition,
 } from "@/lib/visual-editor/dnd/nesting";
+import { isComponentLocked, isInLockedSubtree } from "@/lib/visual-editor/lock";
 
 export type MoveResult =
   | { ok: true }
@@ -25,6 +26,9 @@ export function moveComponentRelative(
   if (component.is("wrapper")) {
     return { ok: false, error: "Cannot move wrapper" };
   }
+  if (isInLockedSubtree(component)) {
+    return { ok: false, error: "Component is locked" };
+  }
   const parent = component.parent();
   if (!parent) return { ok: false, error: "No parent" };
   const index = component.index();
@@ -38,7 +42,6 @@ export function moveComponentRelative(
     component.move(parent, { at: next });
     return { ok: true };
   } catch {
-    // Fallback for older GrapesJS move semantics
     const clone = component.clone();
     component.remove();
     parent.append(clone, { at: next });
@@ -52,6 +55,9 @@ export function canMoveInto(
 ): MoveResult {
   if (source.is("wrapper") || targetParent === source) {
     return { ok: false, error: "Invalid target" };
+  }
+  if (isInLockedSubtree(source) || isComponentLocked(targetParent)) {
+    return { ok: false, error: "Component is locked" };
   }
   // Prevent moving into own descendant
   let walk: Component | undefined = targetParent;

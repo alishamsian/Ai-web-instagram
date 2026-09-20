@@ -47,6 +47,7 @@ import {
   setVisualDevice,
   setVisualZoom,
   toggleSelectedVisibility,
+  toggleSelectedLock,
   uniqueCopyName,
   uniqueCopySlug,
   validateNewPageInput,
@@ -158,7 +159,10 @@ export function VisualEditorShell({
   const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
   const [mediaMap, setMediaMap] = useState(website.config.media);
   const [dropHint, setDropHint] = useState<CanvasDropHint | null>(null);
-  const [selectionLabel, setSelectionLabel] = useState<string | null>(null);
+  const [selectionCrumbs, setSelectionCrumbs] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
+  const [selectionLocked, setSelectionLocked] = useState(false);
   const [selectedIsSection, setSelectedIsSection] = useState(false);
   const [sectionVariants, setSectionVariants] = useState<
     Array<{ id: string; label: string }>
@@ -618,26 +622,34 @@ export function VisualEditorShell({
               ),
             );
             if (!selected || selected.is("wrapper")) {
-              setSelectionLabel(null);
+              setSelectionCrumbs([]);
+              setSelectionLocked(false);
               setSelectedIsSection(false);
               setSectionVariants([]);
               setActiveVariantId(null);
               return;
             }
-            const crumbs: string[] = [];
+            const crumbs: Array<{ id: string; label: string }> = [];
             let walk = selected;
-            for (let i = 0; i < 6; i++) {
+            for (let i = 0; i < 8; i++) {
               const a = walk.getAttributes?.() ?? {};
               const label =
+                a["data-label"] ||
                 a["data-section-type"] ||
                 a["data-component-type"] ||
                 String(walk.get("tagName") || "");
-              if (label) crumbs.unshift(String(label));
+              if (label) {
+                crumbs.unshift({ id: walk.getId(), label: String(label) });
+              }
               const parent = walk.parent?.();
               if (!parent || parent.is("wrapper")) break;
               walk = parent;
             }
-            setSelectionLabel(crumbs.join(" / "));
+            setSelectionCrumbs(crumbs);
+            setSelectionLocked(
+              String(selected.getAttributes?.()?.["data-locked"] ?? "") ===
+                "true",
+            );
 
             let section = selected;
             while (section && !section.getAttributes?.()?.["data-section-id"]) {
@@ -1143,10 +1155,55 @@ export function VisualEditorShell({
               <span className="ve-drop-indicator__line" />
             </div>
           ) : null}
-          {selectionLabel ? (
-            <div className="ve-selection-crumb" aria-live="polite">
-              {selectionLabel}
-            </div>
+          {selectionCrumbs.length > 0 ? (
+            <nav
+              className="ve-selection-crumb"
+              aria-label={isFa ? "مسیر انتخاب" : "Selection breadcrumb"}
+            >
+              {selectionCrumbs.map((crumb, index) => (
+                <span key={`${crumb.id}-${index}`}>
+                  {index > 0 ? (
+                    <span className="ve-selection-crumb__sep" aria-hidden>
+                      {" / "}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="ve-selection-crumb__btn"
+                    onClick={() => {
+                      const ed = editorRef.current;
+                      if (!ed) return;
+                      const wrapper = ed.getWrapper();
+                      if (!wrapper) return;
+                      const findById = (
+                        cmp: { getId: () => string; components?: () => unknown },
+                      ): typeof wrapper | null => {
+                        if (cmp.getId() === crumb.id) return cmp as typeof wrapper;
+                        const kids = cmp.components?.();
+                        const list = Array.isArray(kids)
+                          ? kids
+                          : ((kids as { models?: Array<typeof wrapper> } | undefined)
+                              ?.models ?? []);
+                        for (const child of list) {
+                          const hit = findById(
+                            child as {
+                              getId: () => string;
+                              components?: () => unknown;
+                            },
+                          );
+                          if (hit) return hit;
+                        }
+                        return null;
+                      };
+                      const target = findById(wrapper);
+                      if (target) ed.select(target);
+                    }}
+                  >
+                    {crumb.label}
+                  </button>
+                </span>
+              ))}
+            </nav>
           ) : null}
           <div className="ve-device-edit-hint" aria-live="polite">
             {isFa ? "در حال ویرایش:" : "Editing"}{" "}
@@ -1204,6 +1261,23 @@ export function VisualEditorShell({
               type="button"
               className="ve-btn"
               disabled={!hasSelection}
+              aria-label={selectionLocked ? "Unlock" : "Lock"}
+              title={selectionLocked ? "Unlock" : "Lock"}
+              aria-pressed={selectionLocked}
+              onClick={() => {
+                const ed = editorRef.current;
+                if (!ed) return;
+                const next = toggleSelectedLock(ed);
+                if (next != null) setSelectionLocked(next);
+                refreshDirtyFromEditor();
+              }}
+            >
+              {selectionLocked ? "Unlock" : "Lock"}
+            </button>
+            <button
+              type="button"
+              className="ve-btn"
+              disabled={!hasSelection || selectionLocked}
               aria-label="Hide"
               title="Hide"
               onClick={() => {
@@ -1218,7 +1292,7 @@ export function VisualEditorShell({
             <button
               type="button"
               className="ve-btn"
-              disabled={!hasSelection}
+              disabled={!hasSelection || selectionLocked}
               aria-label="Delete"
               title="Delete"
               onClick={() => {

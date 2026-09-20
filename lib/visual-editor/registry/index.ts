@@ -158,9 +158,13 @@ export function registryAsGrapesBlocks(locale: "fa" | "en"): Array<{
               ? locale === "fa"
                 ? "رسانه"
                 : "Media"
-              : locale === "fa"
-                ? "کامپوننت"
-                : "Components",
+              : block.libraryTab === "forms"
+                ? locale === "fa"
+                  ? "فرم‌ها"
+                  : "Forms"
+                : locale === "fa"
+                  ? "کامپوننت"
+                  : "Components",
       content: html,
     };
   });

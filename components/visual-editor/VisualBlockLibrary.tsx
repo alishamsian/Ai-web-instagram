@@ -15,9 +15,10 @@ import { setActiveLibraryDrag } from "@/lib/visual-editor/dnd/drag-state";
 
 const TABS: Array<{ id: VisualLibraryTab; fa: string; en: string }> = [
   { id: "sections", fa: "سکشن‌ها", en: "Sections" },
-  { id: "components", fa: "کامپوننت", en: "Components" },
   { id: "layout", fa: "چیدمان", en: "Layout" },
+  { id: "components", fa: "پایه", en: "Basic" },
   { id: "media", fa: "رسانه", en: "Media" },
+  { id: "forms", fa: "فرم‌ها", en: "Forms" },
 ];
 
 export function VisualBlockLibrary({

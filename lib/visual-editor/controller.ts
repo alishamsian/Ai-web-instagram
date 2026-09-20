@@ -11,6 +11,7 @@ import {
   visualDesignTokenStyleTag,
 } from "@/lib/visual-editor/design-tokens";
 import { duplicateComponentSafe } from "@/lib/visual-editor/duplicate";
+import { isInLockedSubtree, toggleComponentLocked } from "@/lib/visual-editor/lock";
 import type { WebsiteConfig } from "@/types/website";
 
 export type VisualEditorPanels = {
@@ -422,21 +423,31 @@ export function canVisualRedo(editor: Editor): boolean {
 }
 
 export function duplicateSelected(editor: Editor) {
+  const selected = editor.getSelected();
+  if (isInLockedSubtree(selected)) return;
   duplicateComponentSafe(editor);
 }
 
 export function deleteSelected(editor: Editor) {
   const selected = editor.getSelected();
   if (!selected || selected.is("wrapper")) return;
+  if (isInLockedSubtree(selected)) return;
   selected.remove();
 }
 
 export function toggleSelectedVisibility(editor: Editor) {
   const selected = editor.getSelected();
   if (!selected || selected.is("wrapper")) return;
+  if (isInLockedSubtree(selected)) return;
   const style = selected.getStyle();
   const hidden = style.display === "none";
   selected.addStyle({ display: hidden ? "" : "none" });
+}
+
+export function toggleSelectedLock(editor: Editor): boolean | null {
+  const selected = editor.getSelected();
+  if (!selected || selected.is("wrapper")) return null;
+  return toggleComponentLocked(selected);
 }
 
 /** Editor-only zoom via GrapesJS Canvas API (never serialized). */

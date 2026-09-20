@@ -19,6 +19,11 @@ import {
   readVisibilityMap,
   setDeviceVisibility,
 } from "@/lib/visual-editor/responsive-visibility";
+import {
+  clearStyleOverride,
+  resolveStyleProp,
+  setStyleOverride,
+} from "@/lib/visual-editor/responsive-style";
 import type { VisualDeviceId } from "@/lib/visual-editor/devices";
 
 const GROUP_LABELS: Record<
@@ -590,6 +595,21 @@ function StyleFields({
           onChange={(e) => apply("color", e.target.value)}
         />
       </Field>
+      <Field label={isFa ? "توکن رنگ متن" : "Text color token"}>
+        <select
+          className="ve-pages__input"
+          defaultValue=""
+          onChange={(e) => {
+            if (e.target.value) apply("color", e.target.value);
+          }}
+        >
+          <option value="">{isFa ? "سفارشی / توکن…" : "Custom / token…"}</option>
+          <option value="var(--ve-color-foreground)">foreground</option>
+          <option value="var(--ve-color-primary)">primary</option>
+          <option value="var(--ve-color-accent)">accent</option>
+          <option value="var(--ve-color-muted)">muted</option>
+        </select>
+      </Field>
       <Field label={isFa ? "پس‌زمینه" : "Background"}>
         <input
           className="ve-pages__input"
@@ -598,13 +618,32 @@ function StyleFields({
           onChange={(e) => apply("background-color", e.target.value)}
         />
       </Field>
-      <Field label={isFa ? "گردی گوشه" : "Radius"}>
-        <input
+      <Field label={isFa ? "توکن پس‌زمینه" : "Background token"}>
+        <select
           className="ve-pages__input"
-          defaultValue={g("border-radius")}
-          onBlur={(e) => apply("border-radius", e.target.value)}
-          placeholder="var(--ve-radius-md)"
-        />
+          defaultValue=""
+          onChange={(e) => {
+            if (e.target.value) apply("background-color", e.target.value);
+          }}
+        >
+          <option value="">{isFa ? "سفارشی / توکن…" : "Custom / token…"}</option>
+          <option value="var(--ve-color-background)">background</option>
+          <option value="var(--ve-color-muted)">muted</option>
+          <option value="var(--ve-color-primary)">primary</option>
+        </select>
+      </Field>
+      <Field label={isFa ? "گردی گوشه" : "Radius"}>
+        <select
+          className="ve-pages__input"
+          defaultValue={g("border-radius") || ""}
+          onChange={(e) => apply("border-radius", e.target.value)}
+        >
+          <option value="">{isFa ? "سفارشی" : "Custom"}</option>
+          <option value="var(--ve-radius-sm)">radius.sm</option>
+          <option value="var(--ve-radius-md)">radius.md</option>
+          <option value="var(--ve-radius-lg)">radius.lg</option>
+          <option value="var(--ve-radius-full)">radius.full</option>
+        </select>
       </Field>
       <Field label="Opacity">
         <input
@@ -633,8 +672,8 @@ function ResponsiveHint({
       </p>
       <p style={{ margin: 0 }}>
         {isFa
-          ? "تغییرات استایل روی دستگاه فعال اعمال می‌شوند. دسکتاپ / تبلت / موبایل مستقل می‌مانند."
-          : "Style edits apply to the active device. Desktop / Tablet / Mobile stay independent via GrapesJS media rules."}
+          ? "موبایل از تبلت، تبلت از دسکتاپ ارث می‌برد مگر اینکه override شود."
+          : "Mobile inherits tablet, tablet inherits desktop, unless overridden."}
       </p>
     </div>
   );
@@ -657,6 +696,8 @@ function ResponsiveFields({
 }) {
   const map = readVisibilityMap(component);
   const devices: VisualDeviceId[] = ["desktop", "tablet", "mobile"];
+  const fontResolved = resolveStyleProp(component, "font-size", device);
+  const padResolved = resolveStyleProp(component, "padding", device);
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <ResponsiveHint device={device} isFa={isFa} />
@@ -679,7 +720,10 @@ function ResponsiveFields({
               <span>
                 {d}
                 {d === device ? (
-                  <span className="ve-device-badge" style={{ marginInlineStart: 6 }}>
+                  <span
+                    className="ve-device-badge"
+                    style={{ marginInlineStart: 6 }}
+                  >
                     {isFa ? "فعال" : "active"}
                   </span>
                 ) : null}
@@ -703,12 +747,102 @@ function ResponsiveFields({
                 <option value="visible">
                   {isFa ? "نمایش" : "Visible"}
                 </option>
-                <option value="hidden">
-                  {isFa ? "مخفی" : "Hidden"}
-                </option>
+                <option value="hidden">{isFa ? "مخفی" : "Hidden"}</option>
               </select>
             </label>
           ))}
+        </div>
+      </fieldset>
+
+      <fieldset style={{ border: "none", margin: 0, padding: 0 }}>
+        <legend style={{ fontSize: 12, marginBottom: 8 }}>
+          {isFa ? "استایل ریسپانسیو" : "Responsive style"}
+        </legend>
+        <div style={{ display: "grid", gap: 10 }}>
+          <Field
+            label={`${isFa ? "اندازه فونت" : "Font size"}${
+              fontResolved.inherited
+                ? ` (${isFa ? "ارثی از" : "from"} ${fontResolved.source})`
+                : ""
+            }`}
+          >
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                className="ve-pages__input"
+                key={`fs-${device}-${fontResolved.value}`}
+                defaultValue={fontResolved.value}
+                placeholder={fontResolved.value || "16px"}
+                onBlur={(e) => {
+                  if (!editor) return;
+                  setStyleOverride(
+                    editor,
+                    component,
+                    "font-size",
+                    device,
+                    e.target.value,
+                  );
+                  onChange();
+                  refresh();
+                }}
+              />
+              {device !== "desktop" ? (
+                <button
+                  type="button"
+                  className="ve-btn"
+                  onClick={() => {
+                    if (!editor) return;
+                    clearStyleOverride(editor, component, "font-size", device);
+                    onChange();
+                    refresh();
+                  }}
+                >
+                  {isFa ? "بازنشانی" : "Reset"}
+                </button>
+              ) : null}
+            </div>
+          </Field>
+          <Field
+            label={`${isFa ? "پدینگ" : "Padding"}${
+              padResolved.inherited
+                ? ` (${isFa ? "ارثی از" : "from"} ${padResolved.source})`
+                : ""
+            }`}
+          >
+            <div style={{ display: "flex", gap: 6 }}>
+              <input
+                className="ve-pages__input"
+                key={`pad-${device}-${padResolved.value}`}
+                defaultValue={padResolved.value}
+                placeholder="24px"
+                onBlur={(e) => {
+                  if (!editor) return;
+                  setStyleOverride(
+                    editor,
+                    component,
+                    "padding",
+                    device,
+                    e.target.value,
+                  );
+                  onChange();
+                  refresh();
+                }}
+              />
+              {device !== "desktop" ? (
+                <button
+                  type="button"
+                  className="ve-btn"
+                  onClick={() => {
+                    if (!editor) return;
+                    clearStyleOverride(editor, component, "padding", device);
+                    onChange();
+                    refresh();
+                  }}
+                >
+                  {isFa ? "بازنشانی" : "Reset"}
+                </button>
+              ) : null}
+            </div>
+          </Field>
         </div>
       </fieldset>
     </div>

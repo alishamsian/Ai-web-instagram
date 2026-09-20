@@ -17,6 +17,8 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import {
   canMoveInto,
@@ -29,6 +31,10 @@ import {
   normalizeBlockId,
 } from "@/lib/visual-editor/dnd/nesting";
 import { duplicateComponentSafe } from "@/lib/visual-editor/duplicate";
+import {
+  isComponentLocked,
+  toggleComponentLocked,
+} from "@/lib/visual-editor/lock";
 
 type NavNode = {
   id: string;
@@ -206,6 +212,7 @@ function NavItem({
   const isOpen = open[node.id] ?? depth < 2;
   const active = selectedId === node.id;
   const visible = node.component.getStyle()?.display !== "none";
+  const locked = isComponentLocked(node.component);
   const isDropTarget = dropOverId === node.id;
 
   return (
@@ -282,14 +289,19 @@ function NavItem({
           className="ve-pages__icon-btn ve-navigator__grip"
           aria-label={isFa ? "جابه‌جایی" : "Drag to reorder"}
           title={isFa ? "بکشید" : "Drag"}
-          draggable
+          draggable={!locked}
           onDragStart={(e) => {
+            if (locked) {
+              e.preventDefault();
+              return;
+            }
             e.dataTransfer.setData("text/ve-nav-id", node.id);
             e.dataTransfer.effectAllowed = "move";
             const payload: DragPayload = { sourceId: node.id };
             e.dataTransfer.setData("application/json", JSON.stringify(payload));
           }}
           onClick={(e) => e.preventDefault()}
+          disabled={locked}
         >
           <GripVertical size={12} />
         </button>
@@ -352,8 +364,23 @@ function NavItem({
         <button
           type="button"
           className="ve-pages__icon-btn"
+          aria-label={locked ? "Unlock" : "Lock"}
+          title={locked ? "Unlock" : "Lock"}
+          aria-pressed={locked}
+          onClick={() => {
+            toggleComponentLocked(node.component);
+            onChange();
+            refresh();
+          }}
+        >
+          {locked ? <Unlock size={12} /> : <Lock size={12} />}
+        </button>
+        <button
+          type="button"
+          className="ve-pages__icon-btn"
           aria-label={visible ? "Hide" : "Show"}
           title={visible ? "Hide" : "Show"}
+          disabled={locked}
           onClick={() => {
             node.component.addStyle({
               display: visible ? "none" : "",
@@ -369,6 +396,7 @@ function NavItem({
           className="ve-pages__icon-btn"
           aria-label="Duplicate"
           title="Duplicate"
+          disabled={locked}
           onClick={() => {
             duplicateComponentSafe(editor, node.component);
             onChange();
@@ -382,6 +410,7 @@ function NavItem({
           className="ve-pages__icon-btn"
           aria-label="Delete"
           title="Delete"
+          disabled={locked}
           onClick={() => {
             node.component.remove();
             onChange();

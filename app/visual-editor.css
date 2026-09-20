@@ -782,11 +782,33 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   padding: 4px 8px;
-  max-width: min(60%, 360px);
+  max-width: min(70%, 480px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.ve-selection-crumb__btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ve-selection-crumb__btn:hover,
+.ve-selection-crumb__btn:focus-visible {
+  color: #fff;
+  outline: none;
+}
+
+.ve-selection-crumb__sep {
+  opacity: 0.55;
 }
 
 .ve-device-edit-hint {
