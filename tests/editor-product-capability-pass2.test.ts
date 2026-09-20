@@ -209,6 +209,24 @@ describe("pass 2.1 — normalize identity + legacy hero", () => {
     expect(next.content.products?.items[0]?.id).toBe("p1");
   });
 
+  it("tolerates collection shells with missing items arrays", () => {
+    const raw = baseConfig();
+    raw.content.services = { title: "Services" } as typeof raw.content.services;
+    raw.content.faq = { title: "FAQ" } as typeof raw.content.faq;
+    raw.content.testimonials = {
+      title: "T",
+    } as typeof raw.content.testimonials;
+    raw.content.products = {
+      title: "P",
+    } as typeof raw.content.products;
+
+    const next = normalizeCollectionIdentities(raw);
+    expect(next.content.services?.items).toEqual([]);
+    expect(next.content.faq?.items).toEqual([]);
+    expect(next.content.testimonials?.items).toEqual([]);
+    expect(next.content.products?.items).toEqual([]);
+  });
+
   it("legacy identity normalization is deterministic and idempotent", () => {
     const raw = baseConfig();
     raw.content.products!.items = [

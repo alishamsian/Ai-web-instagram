@@ -20,8 +20,13 @@ export function normalizeCollectionIdentities(
   const content = { ...config.content };
 
   if (content.products) {
+    const source = content.products.items ?? [];
+    if (!content.products.items) {
+      content.products = { ...content.products, items: source };
+      changed = true;
+    }
     let productsTouched = false;
-    const items = content.products.items.map((item, index) => {
+    const items = source.map((item, index) => {
       if (item.id || item.slug) return item;
       productsTouched = true;
       const id = createLegacyEntityId(
@@ -44,8 +49,13 @@ export function normalizeCollectionIdentities(
   }
 
   if (content.services) {
+    const source = content.services.items ?? [];
+    if (!content.services.items) {
+      content.services = { ...content.services, items: source };
+      changed = true;
+    }
     let touched = false;
-    const items = content.services.items.map((item, index) => {
+    const items = source.map((item, index) => {
       if (item.id) return item;
       touched = true;
       return {
@@ -69,8 +79,13 @@ export function normalizeCollectionIdentities(
   }
 
   if (content.faq) {
+    const source = content.faq.items ?? [];
+    if (!content.faq.items) {
+      content.faq = { ...content.faq, items: source };
+      changed = true;
+    }
     let touched = false;
-    const items = content.faq.items.map((item, index) => {
+    const items = source.map((item, index) => {
       if (item.id) return item;
       touched = true;
       return {
@@ -94,8 +109,13 @@ export function normalizeCollectionIdentities(
   }
 
   if (content.testimonials) {
+    const source = content.testimonials.items ?? [];
+    if (!content.testimonials.items) {
+      content.testimonials = { ...content.testimonials, items: source };
+      changed = true;
+    }
     let touched = false;
-    const items = content.testimonials.items.map((item, index) => {
+    const items = source.map((item, index) => {
       if (item.id) return item;
       touched = true;
       return {
