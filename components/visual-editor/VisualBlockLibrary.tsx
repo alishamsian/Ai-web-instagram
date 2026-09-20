@@ -1,17 +1,14 @@
 "use client";
 
 /**
- * Product-owned block library — search, tabs, click-to-insert.
- * GrapesJS BlockManager remains available for drag via registered blocks.
+ * Product-owned block library — search, tabs, grouped insert, drag-to-canvas.
  */
 
-import { useMemo, useState } from "react";
-import {
-  listVisualBlocks,
-  type VisualBlockDefinition,
-  type VisualLibraryTab,
-} from "@/lib/visual-editor/registry";
+import { useDeferredValue, useMemo, useState } from "react";
+import type { VisualLibraryTab } from "@/lib/visual-editor/registry";
 import { setActiveLibraryDrag } from "@/lib/visual-editor/dnd/drag-state";
+import { groupLibraryBlocks } from "@/lib/visual-editor/ux-library";
+import type { VisualBlockDefinition } from "@/lib/visual-editor/registry/types";
 
 const TABS: Array<{ id: VisualLibraryTab; fa: string; en: string }> = [
   { id: "sections", fa: "سکشن‌ها", en: "Sections" },
@@ -19,6 +16,7 @@ const TABS: Array<{ id: VisualLibraryTab; fa: string; en: string }> = [
   { id: "components", fa: "پایه", en: "Basic" },
   { id: "media", fa: "رسانه", en: "Media" },
   { id: "forms", fa: "فرم‌ها", en: "Forms" },
+  { id: "navigation", fa: "ناوبری", en: "Navigation" },
 ];
 
 export function VisualBlockLibrary({
@@ -30,24 +28,32 @@ export function VisualBlockLibrary({
 }) {
   const [tab, setTab] = useState<VisualLibraryTab>("sections");
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const blocks = useMemo(
-    () => listVisualBlocks({ tab, query }),
-    [tab, query],
+  const groups = useMemo(
+    () => groupLibraryBlocks({ tab, query: deferredQuery }),
+    [tab, deferredQuery],
   );
+
+  const total = groups.reduce((n, g) => n + g.blocks.length, 0);
 
   return (
     <div className="ve-library">
       <label className="ve-library__search">
-        <span className="sr-only">{isFa ? "جستجوی بلوک" : "Search blocks"}</span>
+        <span className="sr-only">
+          {isFa ? "جستجوی کامپوننت" : "Search components"}
+        </span>
         <input
           type="search"
           className="ve-pages__input"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={isFa ? "جستجوی بلوک…" : "Search blocks…"}
-          aria-label={isFa ? "جستجوی بلوک" : "Search blocks"}
+          placeholder={
+            isFa ? "جستجوی کامپوننت…" : "Search components…"
+          }
+          aria-label={isFa ? "جستجوی کامپوننت" : "Search components"}
+          autoComplete="off"
         />
       </label>
 
@@ -71,21 +77,28 @@ export function VisualBlockLibrary({
       </div>
 
       <div className="ve-library__grid" role="list">
-        {blocks.map((block) => (
-          <BlockCard
-            key={block.id}
-            block={block}
-            isFa={isFa}
-            expanded={expanded === block.id}
-            onToggle={() =>
-              setExpanded((cur) => (cur === block.id ? null : block.id))
-            }
-            onInsert={onInsert}
-          />
+        {groups.map((group) => (
+          <div key={group.id} className="ve-library__group" role="group">
+            <h4 className="ve-library__group-title">
+              {isFa ? group.label.fa : group.label.en}
+            </h4>
+            {group.blocks.map((block) => (
+              <BlockCard
+                key={block.id}
+                block={block}
+                isFa={isFa}
+                expanded={expanded === block.id}
+                onToggle={() =>
+                  setExpanded((cur) => (cur === block.id ? null : block.id))
+                }
+                onInsert={onInsert}
+              />
+            ))}
+          </div>
         ))}
-        {blocks.length === 0 ? (
+        {total === 0 ? (
           <p className="ve-assets-hint" role="status">
-            {isFa ? "بلوکی پیدا نشد." : "No blocks match your search."}
+            {isFa ? "کامپوننتی پیدا نشد." : "No components match your search."}
           </p>
         ) : null}
       </div>
@@ -127,6 +140,13 @@ function BlockCard({
         onClick={() => {
           if (variants.length > 1) onToggle();
           else onInsert(block.id);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (variants.length > 1) onToggle();
+            else onInsert(block.id);
+          }
         }}
         aria-label={isFa ? `افزودن ${label}` : `Insert ${label}`}
         title={desc || label}

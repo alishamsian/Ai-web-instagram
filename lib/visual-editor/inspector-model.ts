@@ -53,6 +53,7 @@ const SAFE_PROPS = new Set([
   "object-fit",
   "object-position",
   "z-index",
+  "box-shadow",
   "grid-gap",
   "row-gap",
   "column-gap",

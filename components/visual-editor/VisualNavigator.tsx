@@ -35,6 +35,7 @@ import {
   isComponentLocked,
   toggleComponentLocked,
 } from "@/lib/visual-editor/lock";
+import { formatComponentLabel } from "@/lib/visual-editor/ux-labels";
 
 type NavNode = {
   id: string;
@@ -47,17 +48,23 @@ type DragPayload = {
   sourceId: string;
 };
 
-function labelFor(cmp: Component): string {
-  const attrs = cmp.getAttributes?.() ?? {};
-  if (attrs["data-section-type"]) return String(attrs["data-section-type"]);
-  if (attrs["data-component-type"]) return String(attrs["data-component-type"]);
-  const tag = String(cmp.get("tagName") || cmp.get("type") || "node");
-  const text = String(cmp.get("content") || "").trim();
-  if (text && text.length < 28) return `${tag}: ${text}`;
-  return tag;
+function labelFor(cmp: Component, isFa: boolean): string {
+  const attrs = (cmp.getAttributes?.() ?? {}) as Record<string, string>;
+  let textPreview = "";
+  try {
+    const raw = String(cmp.get("content") || "").trim();
+    if (raw && raw.length < 28) textPreview = raw;
+  } catch {
+    // ignore
+  }
+  return formatComponentLabel(attrs, {
+    locale: isFa ? "fa" : "en",
+    tagName: String(cmp.get("tagName") || ""),
+    textPreview,
+  });
 }
 
-function buildTree(cmp: Component, depth = 0): NavNode[] {
+function buildTree(cmp: Component, isFa: boolean, depth = 0): NavNode[] {
   if (depth > 12) return [];
   const kids = cmp.components?.();
   const models = Array.isArray(kids)
@@ -70,9 +77,9 @@ function buildTree(cmp: Component, depth = 0): NavNode[] {
     if (type === "textnode") continue;
     out.push({
       id: child.getId(),
-      label: labelFor(child),
+      label: labelFor(child, isFa),
       component: child,
-      children: buildTree(child, depth + 1),
+      children: buildTree(child, isFa, depth + 1),
     });
   }
   return out;
@@ -110,10 +117,23 @@ export function VisualNavigator({
       return;
     }
     const wrapper = editor.getWrapper();
-    setTree(wrapper ? buildTree(wrapper) : []);
+    setTree(wrapper ? buildTree(wrapper, isFa) : []);
     const sel = editor.getSelected();
-    setSelectedId(sel && !sel.is("wrapper") ? sel.getId() : null);
-  }, [editor]);
+    const sid = sel && !sel.is("wrapper") ? sel.getId() : null;
+    setSelectedId(sid);
+    if (sid) {
+      // Auto-expand ancestors of the selection
+      setOpen((prev) => {
+        const next = { ...prev };
+        let walk: Component | undefined = sel ?? undefined;
+        while (walk && !walk.is("wrapper")) {
+          next[walk.getId()] = true;
+          walk = walk.parent?.() ?? undefined;
+        }
+        return next;
+      });
+    }
+  }, [editor, isFa]);
 
   useEffect(() => {
     if (!editor) return;
@@ -151,7 +171,7 @@ export function VisualNavigator({
           {isFa ? "هنوز لایه‌ای نیست." : "No layers yet."}
         </p>
       ) : (
-        <ul className="ve-navigator__list">
+        <ul className="ve-navigator__list" role="tree" aria-label={isFa ? "لایه‌ها" : "Layers"}>
           {tree.map((node) => (
             <NavItem
               key={node.id}
@@ -216,10 +236,11 @@ function NavItem({
   const isDropTarget = dropOverId === node.id;
 
   return (
-    <li>
+    <li role="treeitem" aria-selected={active} aria-expanded={hasKids ? isOpen : undefined}>
       <div
         className="ve-navigator__row"
         data-active={active}
+        data-locked={locked || undefined}
         data-drop={isDropTarget ? dropPos : undefined}
         style={{ paddingInlineStart: 8 + depth * 12 }}
         onDragOver={(e) => {
@@ -328,14 +349,31 @@ function NavItem({
           type="button"
           className="ve-navigator__label"
           onClick={() => editor.select(node.component)}
+          aria-current={active ? "true" : undefined}
         >
           {node.label}
+          {isDropTarget && dropPos ? (
+            <span className="ve-navigator__drop-hint" aria-hidden>
+              {dropPos === "before"
+                ? isFa
+                  ? "قبل"
+                  : "before"
+                : dropPos === "after"
+                  ? isFa
+                    ? "بعد"
+                    : "after"
+                  : isFa
+                    ? "داخل"
+                    : "inside"}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"
           className="ve-pages__icon-btn"
           aria-label={isFa ? "بالا" : "Move up"}
           title={isFa ? "بالا" : "Move up"}
+          disabled={locked}
           onClick={() => {
             const result = moveComponentRelative(node.component, "up");
             if (result.ok) {
@@ -351,6 +389,7 @@ function NavItem({
           className="ve-pages__icon-btn"
           aria-label={isFa ? "پایین" : "Move down"}
           title={isFa ? "پایین" : "Move down"}
+          disabled={locked}
           onClick={() => {
             const result = moveComponentRelative(node.component, "down");
             if (result.ok) {
@@ -421,7 +460,7 @@ function NavItem({
         </button>
       </div>
       {hasKids && isOpen ? (
-        <ul className="ve-navigator__list">
+        <ul className="ve-navigator__list" role="group">
           {node.children.map((child) => (
             <NavItem
               key={child.id}

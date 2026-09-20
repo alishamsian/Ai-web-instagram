@@ -70,6 +70,16 @@ import {
   type CanvasDropHint,
 } from "@/lib/visual-editor/dnd/reorder";
 import { getActiveLibraryDrag } from "@/lib/visual-editor/dnd/drag-state";
+import {
+  dropPositionLabel,
+  formatComponentLabel,
+  withPageBreadcrumbRoot,
+} from "@/lib/visual-editor/ux-labels";
+import {
+  canApplyShortcutAction,
+  isTypingTarget,
+  resolveBuilderShortcut,
+} from "@/lib/visual-editor/ux-keyboard";
 import { VisualEditorLoading } from "@/components/visual-editor/VisualEditorLoading";
 import { VisualPagesPanel } from "@/components/visual-editor/VisualPagesPanel";
 import { VisualBlockLibrary } from "@/components/visual-editor/VisualBlockLibrary";
@@ -168,6 +178,11 @@ export function VisualEditorShell({
     Array<{ id: string; label: string }>
   >([]);
   const [activeVariantId, setActiveVariantId] = useState<string | null>(null);
+  const [hoverBadge, setHoverBadge] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [canvasEmpty, setCanvasEmpty] = useState(false);
   const siteName = website.config.brand.name || website.slug || "Website";
 
   const mediaList = useMemo(
@@ -556,6 +571,114 @@ export function VisualEditorShell({
   }, [saveState]);
 
   useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const action = resolveBuilderShortcut({
+        typingTarget: isTypingTarget(event.target),
+        hasSelection,
+        locked: selectionLocked,
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        shiftKey: event.shiftKey,
+        key: event.key,
+      });
+      if (!action) return;
+      if (!canApplyShortcutAction(action, { hasSelection, locked: selectionLocked })) {
+        return;
+      }
+      const ed = editorRef.current;
+      if (!ed) return;
+
+      if (action === "undo") {
+        event.preventDefault();
+        visualUndo(ed);
+        refreshDirtyFromEditor();
+        return;
+      }
+      if (action === "redo") {
+        event.preventDefault();
+        visualRedo(ed);
+        refreshDirtyFromEditor();
+        return;
+      }
+      if (action === "escape") {
+        event.preventDefault();
+        ed.select(undefined as never);
+        setHoverBadge(null);
+        return;
+      }
+      if (action === "select-parent") {
+        event.preventDefault();
+        const sel = ed.getSelected();
+        const parent = sel?.parent?.();
+        if (parent && !parent.is("wrapper")) ed.select(parent);
+        return;
+      }
+      if (action === "duplicate") {
+        event.preventDefault();
+        duplicateSelected(ed);
+        refreshDirtyFromEditor();
+        return;
+      }
+      if (action === "delete") {
+        event.preventDefault();
+        deleteSelected(ed);
+        refreshDirtyFromEditor();
+        return;
+      }
+      if (action === "hide") {
+        event.preventDefault();
+        toggleSelectedVisibility(ed);
+        refreshDirtyFromEditor();
+        return;
+      }
+      if (action === "lock") {
+        event.preventDefault();
+        const next = toggleSelectedLock(ed);
+        if (next != null) setSelectionLocked(next);
+        refreshDirtyFromEditor();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    hasSelection,
+    selectionLocked,
+    refreshDirtyFromEditor,
+  ]);
+
+  // Track empty canvas for empty-state UX (sections only under wrapper)
+  useEffect(() => {
+    if (!editorInstance) {
+      setCanvasEmpty(false);
+      return;
+    }
+    const check = () => {
+      const wrapper = editorInstance.getWrapper();
+      if (!wrapper) {
+        setCanvasEmpty(true);
+        return;
+      }
+      const kids = wrapper.components?.();
+      const models = Array.isArray(kids)
+        ? kids
+        : ((kids as { models?: unknown[] } | undefined)?.models ?? []);
+      setCanvasEmpty(models.length === 0);
+    };
+    check();
+    editorInstance.on("component:add", check);
+    editorInstance.on("component:remove", check);
+    editorInstance.on("load", check);
+    editorInstance.on("page:select", check);
+    return () => {
+      editorInstance.off("component:add", check);
+      editorInstance.off("component:remove", check);
+      editorInstance.off("load", check);
+      editorInstance.off("page:select", check);
+    };
+  }, [editorInstance]);
+
+  useEffect(() => {
     const mountId = ++editorMountIdRef.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -632,20 +755,22 @@ export function VisualEditorShell({
             const crumbs: Array<{ id: string; label: string }> = [];
             let walk = selected;
             for (let i = 0; i < 8; i++) {
-              const a = walk.getAttributes?.() ?? {};
-              const label =
-                a["data-label"] ||
-                a["data-section-type"] ||
-                a["data-component-type"] ||
-                String(walk.get("tagName") || "");
+              const a = (walk.getAttributes?.() ?? {}) as Record<
+                string,
+                string
+              >;
+              const label = formatComponentLabel(a, {
+                locale,
+                tagName: String(walk.get("tagName") || ""),
+              });
               if (label) {
-                crumbs.unshift({ id: walk.getId(), label: String(label) });
+                crumbs.unshift({ id: walk.getId(), label });
               }
               const parent = walk.parent?.();
               if (!parent || parent.is("wrapper")) break;
               walk = parent;
             }
-            setSelectionCrumbs(crumbs);
+            setSelectionCrumbs(withPageBreadcrumbRoot(crumbs, locale));
             setSelectionLocked(
               String(selected.getAttributes?.()?.["data-locked"] ?? "") ===
                 "true",
@@ -675,6 +800,23 @@ export function VisualEditorShell({
             }
           },
           websiteConfig: configRef.current,
+          onHover: (payload) => {
+            if (editorMountIdRef.current !== mountId) return;
+            if (!payload) {
+              setHoverBadge(null);
+              return;
+            }
+            setHoverBadge({
+              id: payload.id,
+              label: formatComponentLabel(
+                {
+                  "data-component-type": payload.label,
+                  "data-section-type": payload.label,
+                },
+                { locale },
+              ),
+            });
+          },
         });
 
         if (!editor || editorMountIdRef.current !== mountId) {
@@ -1140,19 +1282,51 @@ export function VisualEditorShell({
               className="ve-drop-indicator"
               data-accepted={dropHint.accepted}
               data-position={dropHint.position}
+              style={
+                dropHint.indicatorTop != null
+                  ? { top: Math.max(48, dropHint.indicatorTop - 40) }
+                  : undefined
+              }
               aria-hidden
             >
               <span className="ve-drop-indicator__line" />
               <span className="ve-drop-indicator__label">
                 {dropHint.accepted
-                  ? isFa
-                    ? "اینجا رها کنید"
-                    : "Drop here"
+                  ? dropPositionLabel(dropHint.position, locale)
                   : isFa
                     ? "محل نامعتبر"
                     : "Invalid target"}
               </span>
               <span className="ve-drop-indicator__line" />
+            </div>
+          ) : null}
+          {hoverBadge && !hasSelection ? (
+            <div className="ve-hover-badge" aria-hidden>
+              {hoverBadge.label}
+            </div>
+          ) : null}
+          {canvasEmpty && ready ? (
+            <div className="ve-canvas-empty" role="status">
+              <p>
+                {isFa
+                  ? "این صفحه خالی است"
+                  : "This page is empty"}
+              </p>
+              <p className="ve-canvas-empty__hint">
+                {isFa
+                  ? "یک کامپوننت را بکشید یا از کتابخانه اضافه کنید."
+                  : "Drag a component here or add one from the library."}
+              </p>
+              <button
+                type="button"
+                className="ve-btn ve-btn--primary"
+                onClick={() => {
+                  setLeftTab("library");
+                  handleInsertBlock("layout-container");
+                }}
+              >
+                {isFa ? "+ افزودن کامپوننت" : "+ Add component"}
+              </button>
             </div>
           ) : null}
           {selectionCrumbs.length > 0 ? (
@@ -1170,9 +1344,14 @@ export function VisualEditorShell({
                   <button
                     type="button"
                     className="ve-selection-crumb__btn"
+                    data-current={index === selectionCrumbs.length - 1}
                     onClick={() => {
                       const ed = editorRef.current;
                       if (!ed) return;
+                      if (crumb.id === "page") {
+                        ed.select(ed.getWrapper() as never);
+                        return;
+                      }
                       const wrapper = ed.getWrapper();
                       if (!wrapper) return;
                       const findById = (
@@ -1213,7 +1392,22 @@ export function VisualEditorShell({
             <button
               type="button"
               className="ve-btn"
-              disabled={!hasSelection}
+              disabled={!hasSelection || selectionCrumbs.length < 2}
+              aria-label={isFa ? "انتخاب والد" : "Select parent"}
+              title={isFa ? "انتخاب والد" : "Select parent"}
+              onClick={() => {
+                const ed = editorRef.current;
+                const sel = ed?.getSelected();
+                const parent = sel?.parent?.();
+                if (parent && !parent.is("wrapper")) ed?.select(parent);
+              }}
+            >
+              <ArrowUp size={14} style={{ transform: "rotate(-90deg)" }} />
+            </button>
+            <button
+              type="button"
+              className="ve-btn"
+              disabled={!hasSelection || selectionLocked}
               aria-label={isFa ? "بالا" : "Move up"}
               title={isFa ? "بالا" : "Move up"}
               onClick={() => {
@@ -1229,7 +1423,7 @@ export function VisualEditorShell({
             <button
               type="button"
               className="ve-btn"
-              disabled={!hasSelection}
+              disabled={!hasSelection || selectionLocked}
               aria-label={isFa ? "پایین" : "Move down"}
               title={isFa ? "پایین" : "Move down"}
               onClick={() => {
@@ -1245,7 +1439,7 @@ export function VisualEditorShell({
             <button
               type="button"
               className="ve-btn"
-              disabled={!hasSelection}
+              disabled={!hasSelection || selectionLocked}
               aria-label="Duplicate"
               title="Duplicate"
               onClick={() => {

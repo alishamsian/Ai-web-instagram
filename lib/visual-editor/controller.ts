@@ -40,6 +40,8 @@ export type CreateVisualEditorOptions = {
   isCurrent?: () => boolean;
   onUpdate?: () => void;
   onSelection?: () => void;
+  /** Hovered component (non-wrapper) — for product hover badge. */
+  onHover?: (payload: { id: string; label: string } | null) => void;
 };
 
 function registerBlocks(editor: Editor, locale: "fa" | "en") {
@@ -225,6 +227,32 @@ export async function createVisualEditor(
   editor.on("page:select", emitUpdate);
   editor.on("component:selected", () => options.onSelection?.());
   editor.on("component:deselected", () => options.onSelection?.());
+
+  if (options.onHover) {
+    editor.on("component:hover", (component: unknown) => {
+      const cmp = component as {
+        is?: (t: string) => boolean;
+        getId?: () => string;
+        getAttributes?: () => Record<string, string>;
+        get?: (k: string) => unknown;
+      } | null;
+      if (!cmp || cmp.is?.("wrapper")) {
+        options.onHover?.(null);
+        return;
+      }
+      const attrs = cmp.getAttributes?.() ?? {};
+      const label =
+        attrs["data-label"] ||
+        attrs["data-section-type"] ||
+        attrs["data-component-type"] ||
+        String(cmp.get?.("tagName") || "Element");
+      options.onHover?.({
+        id: cmp.getId?.() || "",
+        label: String(label),
+      });
+    });
+    editor.on("component:unhover", () => options.onHover?.(null));
+  }
 
   if (process.env.NODE_ENV !== "production") {
     (

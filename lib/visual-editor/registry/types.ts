@@ -21,7 +21,8 @@ export type VisualLibraryTab =
   | "components"
   | "layout"
   | "media"
-  | "forms";
+  | "forms"
+  | "navigation";
 
 export type VisualBlockVariant = {
   id: string;

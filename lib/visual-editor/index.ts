@@ -238,4 +238,24 @@ export {
   removeComponentById,
   componentTreeFingerprint,
 } from "@/lib/website/component-tree";
+export {
+  formatBlockTypeLabel,
+  formatComponentLabel,
+  withPageBreadcrumbRoot,
+  dropPositionLabel,
+  saveStateLabel,
+} from "@/lib/visual-editor/ux-labels";
+export {
+  isTypingTarget,
+  resolveBuilderShortcut,
+  canApplyShortcutAction,
+  type BuilderShortcutAction,
+} from "@/lib/visual-editor/ux-keyboard";
+export {
+  libraryGroupForBlock,
+  groupLibraryBlocks,
+  matchesLibraryQuery,
+  type LibraryGroupId,
+  type LibraryGroup,
+} from "@/lib/visual-editor/ux-library";
 

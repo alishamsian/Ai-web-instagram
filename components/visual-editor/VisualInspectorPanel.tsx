@@ -279,6 +279,22 @@ function ContentFields({
           />
         </Field>
       ) : null}
+      {tag === "a" || attrs["data-component-type"] === "content-button" ? (
+        <Field label={isFa ? "هدف" : "Target"}>
+          <select
+            className="ve-pages__input"
+            defaultValue={attrs.target || "_self"}
+            onChange={(e) => {
+              component.addAttributes({ target: e.target.value });
+              onChange();
+              refresh();
+            }}
+          >
+            <option value="_self">{isFa ? "همان صفحه" : "Same tab"}</option>
+            <option value="_blank">{isFa ? "تب جدید" : "New tab"}</option>
+          </select>
+        </Field>
+      ) : null}
       {["h1", "h2", "h3", "h4", "h5", "h6"].includes(tag) ? (
         <Field label={isFa ? "سطح عنوان" : "Heading level"}>
           <select
@@ -474,15 +490,36 @@ function SpacingFields({
   isFa: boolean;
 }) {
   const g = (p: string) => getComponentStyle(component, p);
+  const [linkedPadding, setLinkedPadding] = useState(true);
+  const [linkedMargin, setLinkedMargin] = useState(true);
+
+  const applyLinked = (
+    prefix: "margin" | "padding",
+    linked: boolean,
+    sideName: "top" | "right" | "bottom" | "left",
+    value: string,
+  ) => {
+    if (linked) {
+      apply(`${prefix}-top`, value);
+      apply(`${prefix}-right`, value);
+      apply(`${prefix}-bottom`, value);
+      apply(`${prefix}-left`, value);
+      apply(prefix, value);
+      return;
+    }
+    apply(`${prefix}-${sideName}`, value);
+  };
+
   const side = (
     prefix: "margin" | "padding",
     sideName: "top" | "right" | "bottom" | "left",
+    linked: boolean,
   ) => (
     <input
       className="ve-pages__input"
       style={{ width: "100%" }}
-      defaultValue={g(`${prefix}-${sideName}`)}
-      onBlur={(e) => apply(`${prefix}-${sideName}`, e.target.value)}
+      defaultValue={g(`${prefix}-${sideName}`) || g(prefix)}
+      onBlur={(e) => applyLinked(prefix, linked, sideName, e.target.value)}
       aria-label={`${prefix} ${sideName}`}
       placeholder="0"
     />
@@ -490,30 +527,54 @@ function SpacingFields({
 
   return (
     <div className="ve-box-model" aria-label="Box model">
+      <div className="ve-box-model__toolbar">
+        <label className="ve-pages__label" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={linkedMargin}
+            onChange={(e) => setLinkedMargin(e.target.checked)}
+          />
+          {isFa ? "مارجین یکسان" : "Link margins"}
+        </label>
+        <label className="ve-pages__label" style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={linkedPadding}
+            onChange={(e) => setLinkedPadding(e.target.checked)}
+          />
+          {isFa ? "پدینگ یکسان" : "Link paddings"}
+        </label>
+      </div>
       <div className="ve-box-model__margin">
         <span className="ve-box-model__label">
           {isFa ? "مارجین" : "Margin"}
         </span>
-        <div className="ve-box-model__row">{side("margin", "top")}</div>
+        <div className="ve-box-model__row">{side("margin", "top", linkedMargin)}</div>
         <div className="ve-box-model__mid">
-          {side("margin", "left")}
+          {side("margin", "left", linkedMargin)}
           <div className="ve-box-model__padding">
             <span className="ve-box-model__label">
               {isFa ? "پدینگ" : "Padding"}
             </span>
-            <div className="ve-box-model__row">{side("padding", "top")}</div>
+            <div className="ve-box-model__row">
+              {side("padding", "top", linkedPadding)}
+            </div>
             <div className="ve-box-model__mid">
-              {side("padding", "left")}
+              {side("padding", "left", linkedPadding)}
               <div className="ve-box-model__content">
                 {isFa ? "محتوا" : "Content"}
               </div>
-              {side("padding", "right")}
+              {side("padding", "right", linkedPadding)}
             </div>
-            <div className="ve-box-model__row">{side("padding", "bottom")}</div>
+            <div className="ve-box-model__row">
+              {side("padding", "bottom", linkedPadding)}
+            </div>
           </div>
-          {side("margin", "right")}
+          {side("margin", "right", linkedMargin)}
         </div>
-        <div className="ve-box-model__row">{side("margin", "bottom")}</div>
+        <div className="ve-box-model__row">
+          {side("margin", "bottom", linkedMargin)}
+        </div>
       </div>
     </div>
   );
@@ -652,6 +713,19 @@ function StyleFields({
           onBlur={(e) => apply("opacity", e.target.value)}
           placeholder="1"
         />
+      </Field>
+      <Field label={isFa ? "سایه" : "Shadow"}>
+        <select
+          className="ve-pages__input"
+          defaultValue={g("box-shadow") || ""}
+          onChange={(e) => apply("box-shadow", e.target.value)}
+        >
+          <option value="">{isFa ? "بدون سایه" : "None"}</option>
+          <option value="var(--ve-shadow-sm)">shadow.sm</option>
+          <option value="var(--ve-shadow-md)">shadow.md</option>
+          <option value="0 1px 2px rgba(0,0,0,.08)">subtle</option>
+          <option value="0 8px 24px rgba(0,0,0,.12)">elevated</option>
+        </select>
       </Field>
     </div>
   );
