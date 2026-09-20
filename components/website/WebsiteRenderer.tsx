@@ -102,7 +102,19 @@ function SectionList({
       {visibleSections.map((section) => {
         const Comp = sectionMap[section.type as keyof typeof sectionMap];
         const hasTree = Boolean(section.components?.length);
+        /**
+         * Phase 3 render contract (parity with GrapesJS projection):
+         * - Freeform-only (`columns` / `*__freeform` / no Comp): tree alone.
+         * - Specialized: Comp owns WebsiteContent; NestedComponentTree is
+         *   additive freeform only (never a second copy of specialized slots).
+         */
+        const freeformOnly =
+          Boolean(hasTree) &&
+          (!Comp ||
+            section.type === "columns" ||
+            section.id.endsWith("__freeform"));
         if (!Comp && !hasTree) return null;
+
         const body = (
           <div
             className={cn(
@@ -112,15 +124,31 @@ function SectionList({
             data-section-type={section.type}
             data-section-variant={section.variant || undefined}
             data-visible={section.visible !== false ? "true" : "false"}
+            data-render-mode={
+              freeformOnly
+                ? "freeform"
+                : hasTree
+                  ? "specialized+freeform"
+                  : "specialized"
+            }
           >
             <SectionRenderProvider section={section}>
-              {Comp ? <Comp config={view} /> : null}
-              {hasTree ? (
+              {freeformOnly ? (
                 <NestedComponentTree
                   nodes={section.components}
                   config={view}
                 />
-              ) : null}
+              ) : (
+                <>
+                  {Comp ? <Comp config={view} /> : null}
+                  {hasTree ? (
+                    <NestedComponentTree
+                      nodes={section.components}
+                      config={view}
+                    />
+                  ) : null}
+                </>
+              )}
             </SectionRenderProvider>
           </div>
         );

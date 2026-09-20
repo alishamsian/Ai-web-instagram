@@ -512,6 +512,53 @@ describe("Phase 3 closure — WebsiteRenderer without GrapesJS", () => {
     expect(html).not.toContain("grapesjs");
   });
 
+  it("freeform-only sections render tree alone (no specialized Comp)", () => {
+    const config = baseConfig();
+    config.sections = [
+      {
+        id: "home__freeform",
+        type: "columns",
+        visible: true,
+        components: [stackTree()],
+      },
+    ];
+    config.pages![0]!.sections = config.sections;
+    const html = renderToStaticMarkup(
+      React.createElement(WebsiteRenderer, {
+        config,
+        mode: "published",
+        pageId: "home",
+      }),
+    );
+    expect(html).toContain('data-render-mode="freeform"');
+    expect(html).toContain("Closure Heading");
+    // Specialized hero headline must not appear — freeform-only path
+    expect(html).not.toContain("Welcome");
+  });
+
+  it("specialized + freeform is additive (contract)", () => {
+    const config = baseConfig();
+    config.sections[0]!.components = [
+      createComponentNode({
+        id: "ff-1",
+        type: "content-heading",
+        content: { text: "Freeform Extra" },
+      }),
+    ];
+    config.pages![0]!.sections![0]!.components = config.sections[0]!.components;
+    const html = renderToStaticMarkup(
+      React.createElement(WebsiteRenderer, {
+        config,
+        mode: "published",
+        pageId: "home",
+      }),
+    );
+    expect(html).toContain('data-render-mode="specialized+freeform"');
+    expect(html).toContain("Freeform Extra");
+    // Specialized hero still present
+    expect(html).toContain("Welcome");
+  });
+
   it("NestedComponentTree renders grid cards", () => {
     const html = renderToStaticMarkup(
       React.createElement(NestedComponentTree, {

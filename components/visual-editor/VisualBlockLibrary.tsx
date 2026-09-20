@@ -4,7 +4,7 @@
  * Product-owned block library — search, tabs, grouped insert, drag-to-canvas.
  */
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { VisualLibraryTab } from "@/lib/visual-editor/registry";
 import { setActiveLibraryDrag } from "@/lib/visual-editor/dnd/drag-state";
 import { groupLibraryBlocks } from "@/lib/visual-editor/ux-library";
@@ -30,10 +30,18 @@ export function VisualBlockLibrary({
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Registry is client-populated; defer list render until after mount to avoid
+  // SSR/client block-count hydration mismatches.
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const groups = useMemo(
-    () => groupLibraryBlocks({ tab, query: deferredQuery }),
-    [tab, deferredQuery],
+    () =>
+      mounted ? groupLibraryBlocks({ tab, query: deferredQuery }) : [],
+    [tab, deferredQuery, mounted],
   );
 
   const total = groups.reduce((n, g) => n + g.blocks.length, 0);
@@ -77,6 +85,11 @@ export function VisualBlockLibrary({
       </div>
 
       <div className="ve-library__grid" role="list">
+        {!mounted ? (
+          <p className="ve-muted" style={{ padding: "8px 4px", margin: 0 }}>
+            {isFa ? "در حال بارگذاری…" : "Loading…"}
+          </p>
+        ) : null}
         {groups.map((group) => (
           <div key={group.id} className="ve-library__group" role="group">
             <h4 className="ve-library__group-title">
@@ -96,7 +109,7 @@ export function VisualBlockLibrary({
             ))}
           </div>
         ))}
-        {total === 0 ? (
+        {mounted && total === 0 ? (
           <p className="ve-assets-hint" role="status">
             {isFa ? "کامپوننتی پیدا نشد." : "No components match your search."}
           </p>

@@ -6,7 +6,6 @@ import { parseLocale } from "@/lib/i18n/paths";
 import { recordProductEvent } from "@/lib/admin/events";
 import { VisualEditorShell } from "@/components/visual-editor/VisualEditorShell";
 import { VisualEditorErrorBoundary } from "@/components/visual-editor/VisualEditorErrorBoundary";
-import { VisualEditorLoading } from "@/components/visual-editor/VisualEditorLoading";
 
 /**
  * Product Visual Editor — GrapesJS engine.
@@ -54,13 +53,23 @@ export default async function VisualEditorPage({
     <VisualEditorErrorBoundary locale={locale} websiteId={websiteId}>
       <Suspense
         fallback={
-          <VisualEditorLoading
-            label={
-              locale === "fa"
-                ? "در حال بارگذاری ویرایشگر…"
-                : "Loading website editor…"
-            }
-          />
+          <div
+            className="ve-loading"
+            aria-busy="true"
+            aria-live="polite"
+            style={{
+              minHeight: "100vh",
+              display: "grid",
+              placeItems: "center",
+              background: "#09090b",
+              color: "#8a8a93",
+              fontSize: 14,
+            }}
+          >
+            {locale === "fa"
+              ? "در حال بارگذاری ویرایشگر…"
+              : "Loading website editor…"}
+          </div>
         }
       >
         <VisualEditorShell
