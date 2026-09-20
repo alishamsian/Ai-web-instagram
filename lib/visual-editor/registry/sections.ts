@@ -524,4 +524,129 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
 </div>${sectionClose()}`;
     },
   },
+  {
+    id: "section-pricing",
+    label: { fa: "قیمت‌گذاری", en: "Pricing" },
+    category: "commerce",
+    libraryTab: "sections",
+    keywords: ["pricing", "plans", "قیمت"],
+    icon: "tag",
+    sectionType: "pricing",
+    canonical: true,
+    create: (ctx) => {
+      const open = sectionOpen({
+        sectionId: ctx.sectionId,
+        sectionType: "pricing",
+        variant: "cards",
+        pageId: ctx.pageId,
+        blockId: "section-pricing",
+      });
+      return `${open}<div style="max-width:1100px;margin:0 auto;text-align:center;">
+  <h2 data-content-path="content.pricing.title" style="font-size:2rem;margin:0 0 24px;">Pricing</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:start;">
+    <div data-collection="pricing" data-plan-id="plan-starter" style="border:1px solid #e5e5e5;border-radius:16px;padding:24px;"><strong>Starter</strong><p style="font-size:1.75rem;margin:8px 0;">$0</p></div>
+    <div data-collection="pricing" data-plan-id="plan-pro" style="border:1px solid #111;border-radius:16px;padding:24px;background:#111;color:#fff;"><strong>Pro</strong><p style="font-size:1.75rem;margin:8px 0;">$29</p></div>
+    <div data-collection="pricing" data-plan-id="plan-enterprise" style="border:1px solid #e5e5e5;border-radius:16px;padding:24px;"><strong>Enterprise</strong><p style="font-size:1.75rem;margin:8px 0;">Custom</p></div>
+  </div>
+</div>${sectionClose()}`;
+    },
+  },
+  {
+    id: "section-menu",
+    label: { fa: "منو", en: "Menu" },
+    category: "commerce",
+    libraryTab: "sections",
+    keywords: ["menu", "منو", "food"],
+    icon: "list",
+    sectionType: "menu",
+    canonical: true,
+    create: (ctx) => {
+      const open = sectionOpen({
+        sectionId: ctx.sectionId,
+        sectionType: "menu",
+        variant: "list",
+        pageId: ctx.pageId,
+        blockId: "section-menu",
+      });
+      return `${open}<div style="max-width:720px;margin:0 auto;">
+  <h2 data-content-path="content.menu.title" style="font-size:2rem;margin:0 0 24px;">Menu</h2>
+  <div data-collection="menu" data-menu-item-id="mi-1" style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eee;"><strong>Season salad</strong><span>18</span></div>
+</div>${sectionClose()}`;
+    },
+  },
+  {
+    id: "section-location",
+    label: { fa: "مکان", en: "Location" },
+    category: "content",
+    libraryTab: "sections",
+    keywords: ["location", "address", "مکان"],
+    icon: "map",
+    sectionType: "location",
+    canonical: true,
+    create: (ctx) => {
+      const open = sectionOpen({
+        sectionId: ctx.sectionId,
+        sectionType: "location",
+        variant: "simple",
+        pageId: ctx.pageId,
+        blockId: "section-location",
+      });
+      return `${open}<div style="max-width:720px;margin:0 auto;">
+  <h2 data-content-path="content.location.title" style="font-size:2rem;margin:0 0 12px;">Location</h2>
+  <p data-content-path="content.location.address" style="margin:0;">Address</p>
+</div>${sectionClose()}`;
+    },
+  },
+  {
+    id: "section-portfolio",
+    label: { fa: "پورتفولیو", en: "Portfolio" },
+    category: "content",
+    libraryTab: "sections",
+    keywords: ["portfolio", "work", "projects"],
+    icon: "grid",
+    sectionType: "portfolio",
+    canonical: true,
+    create: (ctx) => {
+      const open = sectionOpen({
+        sectionId: ctx.sectionId,
+        sectionType: "portfolio",
+        variant: "grid",
+        pageId: ctx.pageId,
+        blockId: "section-portfolio",
+      });
+      return `${open}<div style="max-width:1100px;margin:0 auto;">
+  <h2 data-content-path="content.portfolio.title" style="font-size:2rem;margin:0 0 24px;">Work</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+    <div data-collection="portfolio" data-portfolio-id="work-1" style="aspect-ratio:4/3;background:#eee;border-radius:12px;"></div>
+    <div data-collection="portfolio" data-portfolio-id="work-2" style="aspect-ratio:4/3;background:#eee;border-radius:12px;"></div>
+    <div data-collection="portfolio" data-portfolio-id="work-3" style="aspect-ratio:4/3;background:#eee;border-radius:12px;"></div>
+  </div>
+</div>${sectionClose()}`;
+    },
+  },
+  {
+    id: "section-properties",
+    label: { fa: "املاک", en: "Properties" },
+    category: "commerce",
+    libraryTab: "sections",
+    keywords: ["properties", "listings", "املاک"],
+    icon: "home",
+    sectionType: "properties",
+    canonical: true,
+    create: (ctx) => {
+      const open = sectionOpen({
+        sectionId: ctx.sectionId,
+        sectionType: "properties",
+        variant: "cards",
+        pageId: ctx.pageId,
+        blockId: "section-properties",
+      });
+      return `${open}<div style="max-width:1100px;margin:0 auto;">
+  <h2 data-content-path="content.properties.title" style="font-size:2rem;margin:0 0 24px;">Properties</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+    <div data-collection="properties" data-property-id="prop-1" style="border:1px solid #eee;border-radius:12px;overflow:hidden;"><div style="aspect-ratio:16/10;background:#eee;"></div><div style="padding:12px;"><strong>Harbor Loft</strong></div></div>
+  </div>
+</div>${sectionClose()}`;
+    },
+  },
 ];

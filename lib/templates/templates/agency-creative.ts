@@ -30,8 +30,7 @@ export const agencyCreativeTemplate = defineTemplate({
       sec("services", "section-services", {
         content: { title: "What we do" },
       }),
-      sec("gallery", "section-gallery", {
-        variant: "grid",
+      sec("portfolio", "section-portfolio", {
         content: { title: "Selected work" },
       }),
       sec("cta", "section-cta", {
@@ -61,7 +60,7 @@ export const agencyCreativeTemplate = defineTemplate({
           cta: "Inquire",
         },
       }),
-      sec("gallery", "section-gallery", { variant: "masonry" }),
+      sec("portfolio", "section-portfolio", { content: { title: "Work" } }),
       sec("footer", "section-footer"),
     ]),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [

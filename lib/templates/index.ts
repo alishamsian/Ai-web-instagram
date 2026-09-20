@@ -58,3 +58,7 @@ export {
 export { ALL_WEBSITE_TEMPLATES } from "@/lib/templates/templates";
 export { defineTemplate, page, sec } from "@/lib/templates/define";
 export { BRAND_LUXURY, BRAND_EDITORIAL, BRAND_MODERN } from "@/lib/templates/brand-presets";
+export {
+  buildCanonicalTemplateContent,
+  sanitizeExternalUrl,
+} from "@/lib/templates/canonical-content";

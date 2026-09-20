@@ -13,6 +13,7 @@ export {
 export {
   buildProjectFromWebsiteConfig,
   websiteConfigHasRenderableContent,
+  renderSectionsFromConfig,
 } from "@/lib/visual-editor/project-from-config";
 export {
   syncWebsiteConfigFromVisualProject,

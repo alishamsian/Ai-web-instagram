@@ -421,6 +421,369 @@ function renderFallback(section: SectionConfig): string {
   );
 }
 
+function renderLookbook(config: WebsiteConfig, section: SectionConfig): string {
+  const lb = config.content.lookbook;
+  const title = lb?.title || "Lookbook";
+  const items = lb?.items ?? [];
+  const cells = items
+    .map((item) => {
+      const url = mediaUrl(config, item.imageId) || "";
+      return `<figure data-collection="lookbook" data-lookbook-id="${escapeHtml(
+        item.id,
+      )}" style="margin:0;background:#eee;border-radius:12px;overflow:hidden;aspect-ratio:3/4;">
+        ${
+          url
+            ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(
+                item.caption || title,
+              )}" data-content-path="content.lookbook.items.imageId" data-media-id="${escapeHtml(
+                item.imageId,
+              )}" style="width:100%;height:100%;object-fit:cover;display:block;" />`
+            : ""
+        }
+      </figure>`;
+    })
+    .join("");
+  return sectionShell(
+    section,
+    `<div style="max-width:1100px;margin:0 auto;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.lookbook.title",
+      })} style="font-size:2rem;margin:0 0 8px;">${escapeHtml(title)}</h2>
+      ${
+        lb?.description
+          ? `<p${componentAttrs(section.id, "description", {
+              "data-content-path": "content.lookbook.description",
+            })} style="margin:0 0 24px;color:#555;">${escapeHtml(
+              lb.description,
+            )}</p>`
+          : ""
+      }
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">${cells}</div>
+    </div>`,
+  );
+}
+
+function renderShopTheLook(
+  config: WebsiteConfig,
+  section: SectionConfig,
+): string {
+  const stl = config.content.shopTheLook;
+  const title = stl?.title || "Shop the look";
+  const items = stl?.items ?? [];
+  const cards = items
+    .map((item) => {
+      const url = mediaUrl(config, item.imageId) || "";
+      return `<article data-collection="shopTheLook" data-shop-the-look-id="${escapeHtml(
+        item.id,
+      )}" style="border:1px solid #eee;border-radius:12px;overflow:hidden;">
+        ${
+          url
+            ? `<img src="${escapeHtml(url)}" alt="" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block;" />`
+            : `<div style="aspect-ratio:3/4;background:#f0f0f0;"></div>`
+        }
+        <div style="padding:12px;">
+          <h3 data-content-path="content.shopTheLook.items.title" style="margin:0;font-size:1rem;">${escapeHtml(
+            item.title,
+          )}</h3>
+        </div>
+      </article>`;
+    })
+    .join("");
+  return sectionShell(
+    section,
+    `<div style="max-width:1100px;margin:0 auto;text-align:center;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.shopTheLook.title",
+      })} style="font-size:2rem;margin:0 0 8px;">${escapeHtml(title)}</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;text-align:start;">${cards}</div>
+    </div>`,
+  );
+}
+
+function renderCategories(
+  config: WebsiteConfig,
+  section: SectionConfig,
+): string {
+  const cats = config.content.categories;
+  const title = cats?.title || "Categories";
+  const items = cats?.items ?? [];
+  const cards = items
+    .map((item) => {
+      const url = mediaUrl(config, item.imageId) || "";
+      return `<a href="${escapeHtml(
+        item.href || `/${item.slug}`,
+      )}" data-collection="categories" data-category-id="${escapeHtml(
+        item.id,
+      )}" style="display:block;text-decoration:none;color:inherit;border-radius:12px;overflow:hidden;border:1px solid #eee;">
+        ${
+          url
+            ? `<img src="${escapeHtml(url)}" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block;" />`
+            : `<div style="aspect-ratio:4/3;background:#f3f3f3;"></div>`
+        }
+        <p data-content-path="content.categories.items.title" style="margin:0;padding:12px;font-weight:600;">${escapeHtml(
+          item.title,
+        )}</p>
+      </a>`;
+    })
+    .join("");
+  return sectionShell(
+    section,
+    `<div style="max-width:1100px;margin:0 auto;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.categories.title",
+      })} style="font-size:2rem;margin:0 0 24px;">${escapeHtml(title)}</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">${cards}</div>
+    </div>`,
+  );
+}
+
+function renderPricing(config: WebsiteConfig, section: SectionConfig): string {
+  const pricing = config.content.pricing;
+  const title = pricing?.title || "Pricing";
+  const plans = pricing?.plans ?? [];
+  const cards = plans
+    .map((plan) => {
+      const features = plan.features
+        .map((f) => `<li style="margin:0 0 6px;">${escapeHtml(f)}</li>`)
+        .join("");
+      return `<article data-collection="pricing" data-plan-id="${escapeHtml(
+        plan.id,
+      )}" style="border:1px solid ${
+        plan.highlighted ? "#111" : "#e5e5e5"
+      };border-radius:16px;padding:24px;background:${
+        plan.highlighted ? "#111" : "#fff"
+      };color:${plan.highlighted ? "#fff" : "#111"};">
+        <h3 data-content-path="content.pricing.plans.name" style="margin:0 0 8px;font-size:1.25rem;">${escapeHtml(
+          plan.name,
+        )}</h3>
+        <p data-content-path="content.pricing.plans.price" style="margin:0 0 16px;font-size:2rem;font-weight:600;">${escapeHtml(
+          plan.price,
+        )}${
+          plan.period
+            ? `<span style="font-size:0.9rem;opacity:0.7;">/${escapeHtml(
+                plan.period,
+              )}</span>`
+            : ""
+        }</p>
+        <ul style="margin:0 0 20px;padding-inline-start:1.1rem;font-size:0.9rem;">${features}</ul>
+        <a href="${escapeHtml(
+          plan.ctaHref || "#",
+        )}" data-content-path="content.pricing.plans.ctaLabel" style="display:inline-block;padding:10px 16px;border-radius:999px;background:${
+          plan.highlighted ? "#fff" : "#111"
+        };color:${
+          plan.highlighted ? "#111" : "#fff"
+        };text-decoration:none;font-size:0.9rem;">${escapeHtml(
+          plan.ctaLabel || "Choose",
+        )}</a>
+      </article>`;
+    })
+    .join("");
+  return sectionShell(
+    section,
+    `<div style="max-width:1100px;margin:0 auto;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.pricing.title",
+      })} style="font-size:2rem;margin:0 0 8px;text-align:center;">${escapeHtml(
+        title,
+      )}</h2>
+      ${
+        pricing?.description
+          ? `<p${componentAttrs(section.id, "description", {
+              "data-content-path": "content.pricing.description",
+            })} style="margin:0 0 28px;text-align:center;color:#555;">${escapeHtml(
+              pricing.description,
+            )}</p>`
+          : ""
+      }
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">${cards}</div>
+    </div>`,
+  );
+}
+
+function renderMenu(config: WebsiteConfig, section: SectionConfig): string {
+  const menu = config.content.menu;
+  const title = menu?.title || "Menu";
+  const items = menu?.items ?? [];
+  const rows = items
+    .map((item) => {
+      return `<div data-collection="menu" data-menu-item-id="${escapeHtml(
+        item.id,
+      )}" style="display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid #eee;">
+        <div>
+          <strong data-content-path="content.menu.items.title">${escapeHtml(
+            item.title,
+          )}</strong>
+          ${
+            item.description
+              ? `<p data-content-path="content.menu.items.description" style="margin:4px 0 0;color:#666;font-size:0.9rem;">${escapeHtml(
+                  item.description,
+                )}</p>`
+              : ""
+          }
+        </div>
+        ${
+          item.price
+            ? `<span data-content-path="content.menu.items.price" style="white-space:nowrap;font-weight:600;">${escapeHtml(
+                item.price,
+              )}</span>`
+            : ""
+        }
+      </div>`;
+    })
+    .join("");
+  return sectionShell(
+    section,
+    `<div style="max-width:720px;margin:0 auto;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.menu.title",
+      })} style="font-size:2rem;margin:0 0 24px;">${escapeHtml(title)}</h2>
+      ${rows}
+    </div>`,
+  );
+}
+
+function renderLocation(config: WebsiteConfig, section: SectionConfig): string {
+  const loc = config.content.location;
+  const title = loc?.title || "Location";
+  const map = loc?.mapUrl
+    ? `<a href="${escapeHtml(loc.mapUrl)}" rel="noopener noreferrer" style="color:inherit;">${escapeHtml(
+        loc.mapUrl,
+      )}</a>`
+    : "";
+  return sectionShell(
+    section,
+    `<div style="max-width:720px;margin:0 auto;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.location.title",
+      })} style="font-size:2rem;margin:0 0 12px;">${escapeHtml(title)}</h2>
+      ${
+        loc?.address
+          ? `<p${componentAttrs(section.id, "address", {
+              "data-content-path": "content.location.address",
+            })} style="margin:0 0 6px;">${escapeHtml(loc.address)}</p>`
+          : ""
+      }
+      ${
+        loc?.city
+          ? `<p${componentAttrs(section.id, "city", {
+              "data-content-path": "content.location.city",
+            })} style="margin:0 0 6px;">${escapeHtml(loc.city)}</p>`
+          : ""
+      }
+      ${
+        loc?.hours
+          ? `<p${componentAttrs(section.id, "hours", {
+              "data-content-path": "content.location.hours",
+            })} style="margin:0 0 6px;">${escapeHtml(loc.hours)}</p>`
+          : ""
+      }
+      ${
+        loc?.phone
+          ? `<p${componentAttrs(section.id, "phone", {
+              "data-content-path": "content.location.phone",
+            })} style="margin:0 0 12px;">${escapeHtml(loc.phone)}</p>`
+          : ""
+      }
+      ${map}
+    </div>`,
+  );
+}
+
+function renderPortfolio(
+  config: WebsiteConfig,
+  section: SectionConfig,
+): string {
+  const portfolio = config.content.portfolio;
+  const title = portfolio?.title || "Work";
+  const items = portfolio?.items ?? [];
+  const cards = items
+    .map((item) => {
+      const url = mediaUrl(config, item.imageId) || "";
+      return `<article data-collection="portfolio" data-portfolio-id="${escapeHtml(
+        item.id,
+      )}" style="border-radius:12px;overflow:hidden;border:1px solid #eee;">
+        ${
+          url
+            ? `<img src="${escapeHtml(url)}" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;display:block;" />`
+            : `<div style="aspect-ratio:4/3;background:#f0f0f0;"></div>`
+        }
+        <div style="padding:12px;">
+          <h3 data-content-path="content.portfolio.items.title" style="margin:0 0 4px;">${escapeHtml(
+            item.title,
+          )}</h3>
+          ${
+            item.tag
+              ? `<p style="margin:0;color:#777;font-size:0.8rem;">${escapeHtml(
+                  item.tag,
+                )}</p>`
+              : ""
+          }
+        </div>
+      </article>`;
+    })
+    .join("");
+  return sectionShell(
+    section,
+    `<div style="max-width:1100px;margin:0 auto;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.portfolio.title",
+      })} style="font-size:2rem;margin:0 0 24px;">${escapeHtml(title)}</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">${cards}</div>
+    </div>`,
+  );
+}
+
+function renderProperties(
+  config: WebsiteConfig,
+  section: SectionConfig,
+): string {
+  const props = config.content.properties;
+  const title = props?.title || "Properties";
+  const items = props?.items ?? [];
+  const cards = items
+    .map((item) => {
+      const url = mediaUrl(config, item.imageId) || "";
+      return `<article data-collection="properties" data-property-id="${escapeHtml(
+        item.id,
+      )}" style="border-radius:12px;overflow:hidden;border:1px solid #eee;">
+        ${
+          url
+            ? `<img src="${escapeHtml(url)}" alt="" style="width:100%;aspect-ratio:16/10;object-fit:cover;display:block;" />`
+            : `<div style="aspect-ratio:16/10;background:#eee;"></div>`
+        }
+        <div style="padding:14px;">
+          <h3 data-content-path="content.properties.items.title" style="margin:0 0 4px;">${escapeHtml(
+            item.title,
+          )}</h3>
+          ${
+            item.location
+              ? `<p data-content-path="content.properties.items.location" style="margin:0 0 4px;color:#666;font-size:0.9rem;">${escapeHtml(
+                  item.location,
+                )}</p>`
+              : ""
+          }
+          ${
+            item.price
+              ? `<p data-content-path="content.properties.items.price" style="margin:0;font-weight:600;">${escapeHtml(
+                  item.price,
+                )}</p>`
+              : ""
+          }
+        </div>
+      </article>`;
+    })
+    .join("");
+  return sectionShell(
+    section,
+    `<div style="max-width:1100px;margin:0 auto;">
+      <h2${componentAttrs(section.id, "title", {
+        "data-content-path": "content.properties.title",
+      })} style="font-size:2rem;margin:0 0 24px;">${escapeHtml(title)}</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">${cards}</div>
+    </div>`,
+  );
+}
+
 function renderSection(config: WebsiteConfig, section: SectionConfig): string {
   const type = section.type as WebsiteSectionType;
   switch (type) {
@@ -442,6 +805,7 @@ function renderSection(config: WebsiteConfig, section: SectionConfig): string {
     case "faq":
       return renderFaq(config, section);
     case "contact":
+    case "reservations":
       return renderContact(config, section);
     case "cta":
     case "promo":
@@ -463,9 +827,34 @@ function renderSection(config: WebsiteConfig, section: SectionConfig): string {
         "Trust",
         (config.content.trust?.items ?? []).join(" · "),
       );
+    case "lookbook":
+      return renderLookbook(config, section);
+    case "shop-the-look":
+      return renderShopTheLook(config, section);
+    case "categories":
+      return renderCategories(config, section);
+    case "pricing":
+      return renderPricing(config, section);
+    case "menu":
+      return renderMenu(config, section);
+    case "location":
+      return renderLocation(config, section);
+    case "portfolio":
+    case "projects":
+      return renderPortfolio(config, section);
+    case "properties":
+      return renderProperties(config, section);
     default:
       return renderFallback(section);
   }
+}
+
+/** Render section list HTML from WebsiteConfig (shared by project builder). */
+export function renderSectionsFromConfig(
+  config: WebsiteConfig,
+  sections: SectionConfig[],
+): string {
+  return sections.map((section) => renderSection(config, section)).join("\n");
 }
 
 /** True when the site has real structural content (not empty shell). */
@@ -478,6 +867,10 @@ export function websiteConfigHasRenderableContent(
     return true;
   }
   if ((config.content.products?.items?.length ?? 0) > 0) return true;
+  if ((config.content.pricing?.plans?.length ?? 0) > 0) return true;
+  if ((config.content.menu?.items?.length ?? 0) > 0) return true;
+  if ((config.content.portfolio?.items?.length ?? 0) > 0) return true;
+  if ((config.content.properties?.items?.length ?? 0) > 0) return true;
   return false;
 }
 
@@ -488,20 +881,6 @@ export function buildProjectFromWebsiteConfig(
   const lang = config.settings.language === "en" ? "en" : "fa";
   const bg = config.brand.colors.background || "#ffffff";
   const fg = config.brand.colors.foreground || "#111111";
-  const sectionsHtml = config.sections
-    .map((section) => renderSection(config, section))
-    .join("\n");
-
-  const body = `<body data-website-page="${VISUAL_PAGE_HOME}" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
-    fg,
-  )};background:${escapeHtml(bg)};">
-${
-  sectionsHtml ||
-  `<main style="padding:64px 24px;text-align:center;"><h1>${escapeHtml(
-    config.brand.name || "Website",
-  )}</h1><p style="color:#666;">Add sections in Classic Editor or drop blocks here.</p></main>`
-}
-</body>`;
 
   const assets = Object.entries(config.media).map(([id, media]) => ({
     type: media.type === "video" ? "video" : "image",
@@ -510,34 +889,88 @@ ${
     id,
   }));
 
-  const pages = [
-    {
+  const pageMetas =
+    config.pages && config.pages.length > 0
+      ? config.pages
+      : [
+          {
+            id: VISUAL_PAGE_HOME,
+            slug: "",
+            name: "Home",
+            kind: "home" as const,
+            sections: config.sections,
+          },
+        ];
+
+  const pages = pageMetas.map((page) => {
+    const sections =
+      page.kind === "home"
+        ? config.sections
+        : page.sections && page.sections.length > 0
+          ? page.sections
+          : page.kind === "about"
+            ? config.sections.filter(
+                (s) => s.type === "about" || s.type === "footer",
+              )
+            : [];
+    const sectionsHtml = renderSectionsFromConfig(config, sections);
+    const body = `<body data-website-page="${escapeHtml(
+      page.id,
+    )}" data-page-slug="${escapeHtml(
+      page.slug,
+    )}" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
+      fg,
+    )};background:${escapeHtml(bg)};">
+${
+  sectionsHtml ||
+  `<main style="padding:64px 24px;text-align:center;"><h1>${escapeHtml(
+    page.name || config.brand.name || "Page",
+  )}</h1></main>`
+}
+</body>`;
+    return {
+      id: page.id,
+      name: page.name,
+      slug: page.slug,
+      component: body,
+    };
+  }) as ProjectData["pages"];
+
+  // Ensure home exists even if pages metadata omitted it
+  if (!pages?.some((p: { id?: string }) => p.id === VISUAL_PAGE_HOME)) {
+    const sectionsHtml = renderSectionsFromConfig(config, config.sections);
+    pages?.unshift({
       id: VISUAL_PAGE_HOME,
       name: "Home",
       slug: "",
-      component: body,
-    },
-  ] as ProjectData["pages"];
+      component: `<body data-website-page="${VISUAL_PAGE_HOME}" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
+        fg,
+      )};background:${escapeHtml(bg)};">
+${sectionsHtml}
+</body>`,
+    } as never);
+  }
 
+  // Legacy / Classic sites: synthesize About page from content.about when missing
   if (
-    config.content.about?.title?.trim() ||
-    config.content.about?.body?.trim()
+    !pages?.some((p: { id?: string }) => p.id === VISUAL_PAGE_ABOUT) &&
+    (config.content.about?.title?.trim() || config.content.about?.body?.trim())
   ) {
-    pages!.push({
+    const aboutSection =
+      config.sections.find((s) => s.type === "about") ??
+      ({
+        id: "about-page",
+        type: "about" as const,
+        visible: true,
+      } satisfies SectionConfig);
+    pages?.push({
       id: VISUAL_PAGE_ABOUT,
       name: "About",
       slug: "about",
       component: `<body data-website-page="${VISUAL_PAGE_ABOUT}" data-page-slug="about" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
         fg,
       )};background:${escapeHtml(bg)};">
-${renderAbout(
-  config,
-  config.sections.find((s) => s.type === "about") ?? {
-    id: "about-page",
-    type: "about" as const,
-    visible: true,
-  },
-)}
+${renderAbout(config, aboutSection)}
 </body>`,
     } as never);
   }

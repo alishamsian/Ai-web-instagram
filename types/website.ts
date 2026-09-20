@@ -16,7 +16,9 @@ export type WebsiteSectionType =
   | "lookbook" | "shop-the-look" | "collection-story" | "style-guide" | "designer-spotlight" | "fit-guide"
   | "shop-by-material" | "shop-by-occasion" | "stack-builder" | "jewelry-care"
   | "origin-explorer" | "flavor-profile" | "brew-guide" | "roaster-story" | "subscription" | "coffee-finder"
-  | "shop-by-room" | "shop-by-designer" | "materials" | "dimensions" | "projects" | "room-inspiration";
+  | "shop-by-room" | "shop-by-designer" | "materials" | "dimensions" | "projects" | "room-inspiration"
+  /** Phase 3.1 canonical sections */
+  | "pricing" | "menu" | "portfolio" | "properties" | "reservations";
 
 export interface ColorConfig { primary: string; secondary: string; accent: string; background: string; foreground: string; muted: string; }
 export interface TypographyConfig { heading: "serif" | "sans" | "display"; body: "sans" | "serif"; scale: "editorial" | "compact" | "bold"; }
@@ -37,6 +39,146 @@ export interface FAQConfig { title: string; items: FaqItem[]; }
 export interface ContactConfig { title: string; body: string; info: ContactInfo; }
 export interface PromoConfig { kicker: string; title: string; cta: string; ctaHref?: string; }
 export interface TrustConfig { items: string[]; }
+
+/** Phase 3.1 — lookbook items with stable identity (not array index). */
+export interface LookbookItem {
+  id: string;
+  imageId: string;
+  caption?: string;
+  href?: string;
+}
+export interface LookbookConfig {
+  title: string;
+  description?: string;
+  items: LookbookItem[];
+}
+
+export interface ShopTheLookItem {
+  id: string;
+  title: string;
+  description?: string;
+  imageId?: string;
+  /** Stable product ids — references content.products.items[].id */
+  productIds: string[];
+  href?: string;
+}
+export interface ShopTheLookConfig {
+  title: string;
+  description?: string;
+  items: ShopTheLookItem[];
+}
+
+export interface CategoryItem {
+  id: string;
+  title: string;
+  slug: string;
+  imageId?: string;
+  href?: string;
+}
+export interface CategoriesConfig {
+  title: string;
+  items: CategoryItem[];
+}
+
+export interface PricingPlan {
+  id: string;
+  name: string;
+  description?: string;
+  price: string;
+  period?: string;
+  features: string[];
+  highlighted?: boolean;
+  ctaLabel?: string;
+  ctaHref?: string;
+}
+export interface PricingConfig {
+  title: string;
+  description?: string;
+  plans: PricingPlan[];
+}
+
+export interface MenuCategory {
+  id: string;
+  title: string;
+}
+export interface MenuItem {
+  id: string;
+  title: string;
+  description?: string;
+  price?: string;
+  imageId?: string;
+  categoryId?: string;
+}
+export interface MenuConfig {
+  title: string;
+  description?: string;
+  categories: MenuCategory[];
+  items: MenuItem[];
+}
+
+export interface LocationConfig {
+  title: string;
+  address?: string;
+  city?: string;
+  hours?: string;
+  phone?: string;
+  /** Sanitized https URL only — never raw iframe HTML. */
+  mapUrl?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+}
+
+export interface PortfolioItem {
+  id: string;
+  title: string;
+  description?: string;
+  imageId?: string;
+  tag?: string;
+  href?: string;
+}
+export interface PortfolioConfig {
+  title: string;
+  description?: string;
+  items: PortfolioItem[];
+}
+
+export interface PropertyItem {
+  id: string;
+  title: string;
+  location?: string;
+  price?: string;
+  description?: string;
+  imageId?: string;
+  href?: string;
+}
+export interface PropertiesConfig {
+  title: string;
+  description?: string;
+  items: PropertyItem[];
+}
+
+export interface WebsiteContent {
+  hero: HeroConfig;
+  about?: AboutConfig;
+  products?: ProductSectionConfig;
+  services?: ServiceSectionConfig;
+  gallery?: GalleryConfig;
+  testimonials?: TestimonialConfig;
+  faq?: FAQConfig;
+  contact?: ContactConfig;
+  promo?: PromoConfig;
+  trust?: TrustConfig;
+  /** Phase 3.1 canonical collections — optional for legacy sites. */
+  lookbook?: LookbookConfig;
+  shopTheLook?: ShopTheLookConfig;
+  categories?: CategoriesConfig;
+  pricing?: PricingConfig;
+  menu?: MenuConfig;
+  location?: LocationConfig;
+  portfolio?: PortfolioConfig;
+  properties?: PropertiesConfig;
+}
+
 export interface SectionConfig { id: string; type: WebsiteSectionType; visible: boolean; variant?: string; settings?: Record<string, unknown>; }
 
 export type WebsiteThemeMode = "light" | "dark" | "system";
@@ -55,7 +197,7 @@ export interface WebsiteSettings {
 export interface WebsiteConfig {
   template: TemplateType;
   brand: { name: string; logo?: string; tagline?: string; colors: ColorConfig; typography: TypographyConfig; design?: BrandDesignConfig; };
-  content: { hero: HeroConfig; about?: AboutConfig; products?: ProductSectionConfig; services?: ServiceSectionConfig; gallery?: GalleryConfig; testimonials?: TestimonialConfig; faq?: FAQConfig; contact?: ContactConfig; promo?: PromoConfig; trust?: TrustConfig; };
+  content: WebsiteContent;
   sections: SectionConfig[];
   seo: SEOConfig;
   settings: WebsiteSettings;
@@ -92,6 +234,13 @@ export interface WebsitePage {
   title?: string;
   description?: string;
   kind: WebsitePageKind;
+  /**
+   * Page-local section list (Phase 3.1).
+   * Home also mirrors into WebsiteConfig.sections for Classic compatibility.
+   * Custom pages render from this list when present (canonical path),
+   * otherwise fall back to visual projection HTML.
+   */
+  sections?: SectionConfig[];
 }
 
 /** Persisted GrapesJS project JSON + metadata. Unknown keys must survive round-trips. */

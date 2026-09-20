@@ -35,7 +35,19 @@ export type EditorFieldPath =
   | "promo.kicker"
   | "promo.title"
   | "promo.cta"
-  | "trust.title";
+  | "trust.title"
+  | "lookbook.title"
+  | "lookbook.description"
+  | "shopTheLook.title"
+  | "shopTheLook.description"
+  | "categories.title"
+  | "pricing.title"
+  | "pricing.description"
+  | "menu.title"
+  | "menu.description"
+  | "location.title"
+  | "portfolio.title"
+  | "properties.title";
 
 export type SectionAction =
   | "duplicate"

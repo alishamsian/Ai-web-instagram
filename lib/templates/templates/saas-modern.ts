@@ -65,6 +65,9 @@ export const saasModernTemplate = defineTemplate({
           cta: "Compare plans",
         },
       }),
+      sec("pricing", "section-pricing", {
+        content: { title: "Pricing" },
+      }),
       sec("cta", "section-cta", {
         variant: "full-width",
         content: { title: "Ready when you are", cta: "Start free" },

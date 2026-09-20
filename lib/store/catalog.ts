@@ -63,12 +63,23 @@ function enrichProduct(
   };
 }
 
-/** Real product categories only — empty if fewer than 2 distinct real labels. */
+/** Prefer canonical content.categories; else derive from product categories. */
 export function getStoreCategories(
   config: WebsiteConfig,
   catalog: StoreCatalogProduct[],
 ): StoreCategory[] {
   const isFa = config.settings.language === "fa";
+  const canonical = config.content.categories?.items ?? [];
+  if (canonical.length > 0) {
+    return canonical.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: isFa ? "مشاهده مجموعه" : "Browse the set",
+      imageId: item.imageId,
+      href: item.href || `#shop`,
+    }));
+  }
+
   const titles = Array.from(
     new Set(
       catalog
@@ -84,7 +95,7 @@ export function getStoreCategories(
       catalog.find((p) => p.category === title) ??
       catalog[index % Math.max(catalog.length, 1)];
     return {
-      id: `cat-${index + 1}`,
+      id: `cat-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || index + 1}`,
       title,
       description: isFa ? "مشاهده مجموعه" : "Browse the set",
       imageId: match?.imageIds[0],

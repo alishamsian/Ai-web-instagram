@@ -52,6 +52,13 @@ import {
   renderStyleGuideSection,
   renderSubscriptionSection,
 } from "@/components/store/vertical-section-adapters";
+import {
+  renderLocationCanonicalSection,
+  renderMenuSection,
+  renderPortfolioCanonicalSection,
+  renderPricingSection,
+  renderPropertiesSection,
+} from "@/components/store/canonical-store-adapters";
 
 let bound = false;
 
@@ -79,8 +86,13 @@ export function ensureStoreSectionRenderersBound() {
     testimonials: renderTrustSection,
     columns: renderColumnsSection,
     services: renderUnsupportedStoreSection,
-    location: renderUnsupportedStoreSection,
+    location: renderLocationCanonicalSection,
     social: renderUnsupportedStoreSection,
+    pricing: renderPricingSection,
+    menu: renderMenuSection,
+    portfolio: renderPortfolioCanonicalSection,
+    properties: renderPropertiesSection,
+    reservations: renderContactSection,
 
     // Beauty
     "shop-by-concern": renderShopByConcernSection,

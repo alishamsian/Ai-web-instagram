@@ -23,7 +23,17 @@ export function runPublishPreflight(
     (p) => !p.hidden && Boolean(p.name?.trim()),
   );
 
-  if (products.length === 0) {
+  const requiresCommerce =
+    config.template === "store" ||
+    config.sections.some(
+      (s) =>
+        s.visible !== false &&
+        (s.type === "products" ||
+          s.type === "featured-products" ||
+          s.type === "bestsellers"),
+    );
+
+  if (requiresCommerce && products.length === 0) {
     errors.push({
       id: "no-products",
       severity: "error",
@@ -33,6 +43,27 @@ export function runPublishPreflight(
         en: "At least one product with a real name is required.",
       },
     });
+  } else if (!requiresCommerce && products.length === 0) {
+    // Non-store templates may publish without products (SaaS, agency, etc.)
+    const hasCanonicalBody =
+      (config.content.services?.items?.length ?? 0) > 0 ||
+      (config.content.pricing?.plans?.length ?? 0) > 0 ||
+      (config.content.menu?.items?.length ?? 0) > 0 ||
+      (config.content.portfolio?.items?.length ?? 0) > 0 ||
+      (config.content.properties?.items?.length ?? 0) > 0 ||
+      Boolean(config.content.about?.body?.trim()) ||
+      Boolean(config.content.hero.headline?.trim());
+    if (!hasCanonicalBody) {
+      warnings.push({
+        id: "sparse-content",
+        severity: "warning",
+        category: "content",
+        message: {
+          fa: "محتوای سایت بسیار کم است.",
+          en: "Site content looks sparse.",
+        },
+      });
+    }
   }
 
   if (!config.brand.name?.trim()) {

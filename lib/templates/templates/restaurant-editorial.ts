@@ -57,7 +57,7 @@ export const restaurantEditorialTemplate = defineTemplate({
           cta: "See tonight",
         },
       }),
-      sec("products", "section-products", {
+      sec("products", "section-menu", {
         content: { title: "Tonight" },
       }),
       sec("footer", "section-footer"),
@@ -88,6 +88,9 @@ export const restaurantEditorialTemplate = defineTemplate({
             subheadline: "Dinner seats and private gatherings.",
             cta: "Request a table",
           },
+        }),
+        sec("location", "section-location", {
+          content: { title: "Reservations & location" },
         }),
         sec("cta", "section-cta", {
           variant: "simple",

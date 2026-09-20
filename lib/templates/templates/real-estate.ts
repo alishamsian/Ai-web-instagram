@@ -64,7 +64,7 @@ export const realEstateTemplate = defineTemplate({
             cta: "Request a tour",
           },
         }),
-        sec("products", "section-products", {
+        sec("properties", "section-properties", {
           content: { title: "Listings" },
         }),
         sec("gallery", "section-gallery", { content: { title: "Galleries" } }),

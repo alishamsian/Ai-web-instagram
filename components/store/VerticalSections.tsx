@@ -280,10 +280,15 @@ export function VerticalLookbookSection({
   defaultKicker: string;
 }) {
   const isFa = config.settings.language === "fa";
-  const ids = config.content.gallery?.imageIds ?? [];
-  const images = ids
-    .map((id) => ({ id, media: siteMedia(config, id) }))
-    .filter((item) => item.media);
+  const lookbookItems = config.content.lookbook?.items ?? [];
+  const images =
+    lookbookItems.length > 0
+      ? lookbookItems
+          .map((item) => ({ id: item.id, media: siteMedia(config, item.imageId) }))
+          .filter((item) => item.media)
+      : (config.content.gallery?.imageIds ?? [])
+          .map((id) => ({ id, media: siteMedia(config, id) }))
+          .filter((item) => item.media);
 
   if (images.length === 0) return null;
 
@@ -292,13 +297,18 @@ export function VerticalLookbookSection({
       <div className="store-wrap">
         <StoreSectionHead
           kicker={settingString(section, "kicker", defaultKicker)}
-          title={settingString(section, "title", defaultTitle)}
+          title={settingString(
+            section,
+            "title",
+            config.content.lookbook?.title || defaultTitle,
+          )}
           lead={settingString(
             section,
             "description",
-            isFa
-              ? "فضا و استایل، بدون قاب‌های اضافه."
-              : "Atmosphere and style — no extra frames.",
+            config.content.lookbook?.description ||
+              (isFa
+                ? "فضا و استایل، بدون قاب‌های اضافه."
+                : "Atmosphere and style — no extra frames."),
           )}
         />
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">

@@ -30,8 +30,7 @@ export const portfolioCreatorTemplate = defineTemplate({
           cta: "View work",
         },
       }),
-      sec("gallery", "section-gallery", {
-        variant: "grid",
+      sec("portfolio", "section-portfolio", {
         content: { title: "Projects" },
       }),
       sec("about", "section-about", {
@@ -56,7 +55,7 @@ export const portfolioCreatorTemplate = defineTemplate({
           cta: "Contact",
         },
       }),
-      sec("gallery", "section-gallery", { variant: "masonry" }),
+      sec("portfolio", "section-portfolio", { content: { title: "Work" } }),
       sec("footer", "section-footer"),
     ]),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [

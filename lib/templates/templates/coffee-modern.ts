@@ -54,7 +54,7 @@ export const coffeeModernTemplate = defineTemplate({
           cta: "Order ahead",
         },
       }),
-      sec("products", "section-products", { content: { title: "Drinks & food" } }),
+      sec("products", "section-menu", { content: { title: "Drinks & food" } }),
       sec("footer", "section-footer"),
     ]),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [
@@ -75,11 +75,8 @@ export const coffeeModernTemplate = defineTemplate({
           cta: "Open maps",
         },
       }),
-      sec("contact", "section-contact", {
-        content: {
-          title: "Find the café",
-          body: "Weekday mornings through late afternoon — see the board for seasonal hours.",
-        },
+      sec("location", "section-location", {
+        content: { title: "Location" },
       }),
       sec("footer", "section-footer"),
     ]),

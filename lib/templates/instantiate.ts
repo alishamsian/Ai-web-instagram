@@ -1,6 +1,7 @@
 /**
  * Template → WebsiteConfig instantiation.
  * Deep-independent clones; pages/sections get stable mapped IDs.
+ * Phase 3.1: canonical content collections + page-local sections.
  */
 
 import type { ProjectData } from "grapesjs";
@@ -12,7 +13,9 @@ import type {
 import { createBlockHtml, nextSectionId } from "@/lib/visual-editor/registry";
 import { mergePreservedIntoHtml } from "@/lib/visual-editor/variants/switch";
 import { hrefForPageSlug } from "@/lib/visual-editor/pages";
+import { buildProjectFromWebsiteConfig } from "@/lib/visual-editor/project-from-config";
 import { getTemplate } from "@/lib/templates/registry";
+import { buildCanonicalTemplateContent } from "@/lib/templates/canonical-content";
 import {
   sectionTypeFromBlockId,
   TEMPLATE_SCHEMA_VERSION,
@@ -30,45 +33,15 @@ function deepClone<T>(value: T): T {
 function resolveWebsitePageId(templatePageId: string): string {
   if (templatePageId === "home") return "home";
   if (templatePageId === "about") return "about";
-  // Stable: template page id becomes website page id (deterministic, not random)
   return templatePageId.replace(/[^a-zA-Z0-9_-]/g, "-");
-}
-
-function buildPageMeta(
-  template: WebsiteTemplate,
-  locale: "fa" | "en",
-  pageIdMap: Record<string, string>,
-): WebsitePage[] {
-  return template.pages.map((p) => {
-    const id = pageIdMap[p.id];
-    return {
-      id,
-      slug: p.kind === "home" ? "" : p.slug,
-      name: locale === "fa" ? p.name.fa : p.name.en,
-      title: p.title
-        ? locale === "fa"
-          ? p.title.fa
-          : p.title.en
-        : undefined,
-      description: p.description
-        ? locale === "fa"
-          ? p.description.fa
-          : p.description.en
-        : undefined,
-      kind: p.kind,
-    };
-  });
 }
 
 function allocateSectionId(
   blockId: string,
   existing: string[],
-  pageId: string,
   key: string,
 ): string {
   const type = sectionTypeFromBlockId(blockId) || key;
-  // Prefer deterministic id for first of type on home; always unique via nextSectionId
-  void pageId;
   return nextSectionId(type, existing);
 }
 
@@ -99,30 +72,44 @@ function applySectionContent(
                       ? "content.contact.title"
                       : role === "body" && section.blockId === "section-contact"
                         ? "content.contact.body"
-                        : undefined,
+                        : role === "title" &&
+                            section.blockId === "section-pricing"
+                          ? "content.pricing.title"
+                          : role === "title" &&
+                              section.blockId === "section-menu"
+                            ? "content.menu.title"
+                            : role === "title" &&
+                                section.blockId === "section-lookbook"
+                              ? "content.lookbook.title"
+                              : role === "title" &&
+                                  section.blockId === "section-portfolio"
+                                ? "content.portfolio.title"
+                                : role === "title" &&
+                                    section.blockId === "section-properties"
+                                  ? "content.properties.title"
+                                  : role === "title" &&
+                                      section.blockId === "section-location"
+                                    ? "content.location.title"
+                                    : undefined,
   }));
   return mergePreservedIntoHtml(html, preserved);
 }
 
-function buildPageHtml(
+function buildSectionsForPage(
   page: TemplatePageDef,
   websitePageId: string,
   locale: "fa" | "en",
   colors: WebsiteConfig["brand"]["colors"],
   existingSectionIds: string[],
-  navHtml: string,
-): { html: string; sectionIds: string[]; homeSections: SectionConfig[] } {
+): { sections: SectionConfig[]; sectionIds: string[]; htmlParts: string[] } {
   const sectionIds: string[] = [];
-  const homeSections: SectionConfig[] = [];
-  const parts: string[] = [];
-
-  if (navHtml) parts.push(navHtml);
+  const sections: SectionConfig[] = [];
+  const htmlParts: string[] = [];
 
   for (const section of page.sections) {
     const sectionId = allocateSectionId(
       section.blockId,
       [...existingSectionIds, ...sectionIds],
-      websitePageId,
       section.key,
     );
     sectionIds.push(sectionId);
@@ -133,11 +120,11 @@ function buildPageHtml(
       variantId: section.variant,
       colors,
     });
-    parts.push(applySectionContent(html, section));
+    htmlParts.push(applySectionContent(html, section));
 
     const type = sectionTypeFromBlockId(section.blockId);
-    if (page.kind === "home" && type) {
-      homeSections.push({
+    if (type) {
+      sections.push({
         id: sectionId,
         type,
         visible: true,
@@ -146,12 +133,7 @@ function buildPageHtml(
     }
   }
 
-  const dir = locale === "fa" ? "rtl" : "ltr";
-  const body = `<body data-website-page="${websitePageId}" data-page-slug="${page.slug}" data-ve-source="template" data-ve-adapter="3" dir="${dir}" lang="${locale}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;">
-${parts.join("\n")}
-</body>`;
-
-  return { html: body, sectionIds, homeSections };
+  return { sections, sectionIds, htmlParts };
 }
 
 function buildNavHtml(
@@ -188,17 +170,25 @@ function buildHomeContent(
   const heroSec = home?.sections.find((s) => s.blockId === "section-hero");
   const aboutSec = home?.sections.find((s) => s.blockId === "section-about");
   const ctaSec = home?.sections.find((s) => s.blockId === "section-cta");
-  const contactSec = home?.sections.find((s) => s.blockId === "section-contact");
+  const contactSec = home?.sections.find(
+    (s) =>
+      s.blockId === "section-contact" || s.blockId === "section-reservations",
+  );
 
   return {
     hero: {
-      style: (heroSec?.variant as WebsiteConfig["content"]["hero"]["style"]) || "minimal",
+      style:
+        (heroSec?.variant as WebsiteConfig["content"]["hero"]["style"]) ||
+        "minimal",
       headline: heroSec?.content?.headline || brandName,
       subheadline:
         heroSec?.content?.subheadline ||
         template.brand.tagline ||
-        (locale === "fa" ? "ویترین آماده سفارشی‌سازی" : "A ready storefront to customize"),
-      cta: heroSec?.content?.cta || (locale === "fa" ? "شروع" : "Get started"),
+        (locale === "fa"
+          ? "ویترین آماده سفارشی‌سازی"
+          : "A ready storefront to customize"),
+      cta:
+        heroSec?.content?.cta || (locale === "fa" ? "شروع" : "Get started"),
     },
     about: {
       title: aboutSec?.content?.title || (locale === "fa" ? "درباره" : "About"),
@@ -210,14 +200,19 @@ function buildHomeContent(
     },
     promo: {
       kicker: "",
-      title: ctaSec?.content?.title || (locale === "fa" ? "آماده هستید؟" : "Ready when you are"),
+      title:
+        ctaSec?.content?.title ||
+        (locale === "fa" ? "آماده هستید؟" : "Ready when you are"),
       cta: ctaSec?.content?.cta || (locale === "fa" ? "تماس" : "Contact"),
     },
     contact: {
-      title: contactSec?.content?.title || (locale === "fa" ? "تماس" : "Contact"),
+      title:
+        contactSec?.content?.title || (locale === "fa" ? "تماس" : "Contact"),
       body:
         contactSec?.content?.body ||
-        (locale === "fa" ? "با ما در ارتباط باشید." : "Get in touch with us."),
+        (locale === "fa"
+          ? "با ما در ارتباط باشید."
+          : "Get in touch with us."),
       info: {
         phone: null,
         email: null,
@@ -263,39 +258,58 @@ export function instantiateTemplateDefinition(
     pageIdMap[p.id] = resolveWebsitePageId(p.id);
   }
 
-  const pages = buildPageMeta(template, locale, pageIdMap);
   const brand = deepClone(template.brand);
-  const navHtml = buildNavHtml(template, pageIdMap, pages, locale, brandName);
+  const baseContent = buildHomeContent(template, locale, brandName);
+  const { content, media } = buildCanonicalTemplateContent(
+    template,
+    locale,
+    brandName,
+    baseContent,
+  );
 
   const allSectionIds: string[] = [];
   let homeSections: SectionConfig[] = [];
-  const projectPages: NonNullable<ProjectData["pages"]> = [];
+  const pages: WebsitePage[] = [];
 
-  for (const page of template.pages) {
+  // First pass: allocate sections per page
+  const pageBuilds = template.pages.map((page) => {
     const websitePageId = pageIdMap[page.id];
-    const built = buildPageHtml(
+    const built = buildSectionsForPage(
       page,
       websitePageId,
       locale,
       brand.colors,
       allSectionIds,
-      navHtml,
     );
     allSectionIds.push(...built.sectionIds);
     if (page.kind === "home") {
-      homeSections = built.homeSections;
+      homeSections = built.sections;
     }
-    projectPages.push({
+    return { page, websitePageId, built };
+  });
+
+  for (const { page, websitePageId, built } of pageBuilds) {
+    pages.push({
       id: websitePageId,
-      name: locale === "fa" ? page.name.fa : page.name.en,
       slug: page.kind === "home" ? "" : page.slug,
-      component: built.html,
-    } as never);
+      name: locale === "fa" ? page.name.fa : page.name.en,
+      title: page.title
+        ? locale === "fa"
+          ? page.title.fa
+          : page.title.en
+        : undefined,
+      description: page.description
+        ? locale === "fa"
+          ? page.description.fa
+          : page.description.en
+        : undefined,
+      kind: page.kind,
+      sections: deepClone(built.sections),
+    });
   }
 
-  const content = buildHomeContent(template, locale, brandName);
-
-  const config: WebsiteConfig = {
+  // Draft config then rebuild visual project from canonical WebsiteConfig
+  const draft: WebsiteConfig = {
     template: template.legacyTemplate,
     brand: {
       name: brandName,
@@ -321,25 +335,42 @@ export function instantiateTemplateDefinition(
       published: false,
       vertical: template.metadata?.industry ?? null,
     },
-    media: {},
+    media,
     pages,
     visualEditor: {
       engine: "grapesjs",
       version: 2,
-      project: {
-        pages: projectPages,
-        styles: [],
-        assets: [],
-      } as ProjectData as never,
+      project: { pages: [], styles: [], assets: [] } as ProjectData as never,
       activePageId: "home",
     },
     templateCatalogId: template.id,
     templateSchemaVersion: TEMPLATE_SCHEMA_VERSION,
   };
 
-  // Ensure deep independence from template definition
+  const project = buildProjectFromWebsiteConfig(draft);
+  // Prepend shared nav into each projected page for editor UX
+  const navHtml = buildNavHtml(template, pageIdMap, pages, locale, brandName);
+  if (project.pages) {
+    project.pages = project.pages.map((p: { id?: string; component?: unknown; [key: string]: unknown }) => {
+      const component =
+        typeof p.component === "string" ? p.component : "";
+      const withNav = component.replace(
+        /(<body[^>]*>)/i,
+        `$1\n${navHtml}\n`,
+      );
+      return { ...p, component: withNav };
+    });
+  }
+
+  draft.visualEditor = {
+    engine: "grapesjs",
+    version: 2,
+    project: project as never,
+    activePageId: "home",
+  };
+
   return {
-    config: deepClone(config),
+    config: deepClone(draft),
     pageIdMap: { ...pageIdMap },
     templateId: template.id,
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import type { WebsiteConfig } from "@/types/website";
+import type { SectionConfig, WebsiteConfig } from "@/types/website";
 import type { WebsiteRenderMode } from "@/components/editor/EditContext";
 import {
   AboutSection,
@@ -13,6 +13,17 @@ import {
   ServicesSection,
   TestimonialsSection,
 } from "@/components/website/sections";
+import {
+  CategoriesSiteSection,
+  LocationSiteSection,
+  LookbookSiteSection,
+  MenuSiteSection,
+  PortfolioSiteSection,
+  PricingSiteSection,
+  PromoSiteSection,
+  PropertiesSiteSection,
+  ShopTheLookSiteSection,
+} from "@/components/website/canonical-sections";
 import { ProductPageView } from "@/components/website/ProductPage";
 import { WebsiteShell } from "@/components/website/shell";
 import { SiteNavProvider } from "@/components/website/SiteNavContext";
@@ -33,11 +44,82 @@ const sectionMap = {
   gallery: GallerySection,
   "instagram-feed": GallerySection,
   "featured-posts": GallerySection,
+  "featured-products": ProductsSection,
   testimonials: TestimonialsSection,
   faq: FAQSiteSection,
   contact: ContactSection,
+  reservations: ContactSection,
   footer: FooterSection,
+  cta: PromoSiteSection,
+  promo: PromoSiteSection,
+  lookbook: LookbookSiteSection,
+  "shop-the-look": ShopTheLookSiteSection,
+  categories: CategoriesSiteSection,
+  pricing: PricingSiteSection,
+  menu: MenuSiteSection,
+  location: LocationSiteSection,
+  portfolio: PortfolioSiteSection,
+  projects: PortfolioSiteSection,
+  properties: PropertiesSiteSection,
 };
+
+function SectionList({
+  view,
+  sections,
+  mode,
+  locale,
+}: {
+  view: WebsiteConfig;
+  sections: SectionConfig[];
+  mode: WebsiteRenderMode;
+  locale: "fa" | "en";
+}) {
+  const edit = useEditorEdit();
+  const visibleSections = sections.filter(
+    (section) => section.visible || mode === "editor",
+  );
+  const bodySections = visibleSections.filter((s) => s.type !== "footer");
+
+  return (
+    <>
+      {mode === "editor" && bodySections.length === 0 ? (
+        <CanvasEmptyState
+          locale={locale}
+          onAddSection={() => edit?.onRequestInsert?.(null)}
+          onBrowseTemplates={
+            edit?.onBrowseTemplates
+              ? () => edit.onBrowseTemplates?.()
+              : undefined
+          }
+        />
+      ) : null}
+      {visibleSections.map((section) => {
+        const Comp = sectionMap[section.type as keyof typeof sectionMap];
+        if (!Comp) return null;
+        const body = (
+          <div
+            className={cn(
+              !section.visible && mode === "editor" && "opacity-45",
+            )}
+          >
+            <Comp config={view} />
+          </div>
+        );
+        if (mode !== "editor") return <div key={section.id}>{body}</div>;
+        return (
+          <EditorSectionFrame
+            key={section.id}
+            sectionId={section.id}
+            label={sectionLabel(section.type, locale)}
+            settings={section.settings}
+          >
+            {body}
+          </EditorSectionFrame>
+        );
+      })}
+    </>
+  );
+}
 
 export function WebsiteRenderer({
   config,
@@ -61,10 +143,9 @@ export function WebsiteRenderer({
 }) {
   const view = polishWebsiteConfig(config);
   const locale = view.settings.language;
-  const edit = useEditorEdit();
   const resolvedPageId = pageId || "home";
 
-  // Custom visual pages: preview projection HTML (not GrapesJS canvas)
+  // Custom visual pages: prefer canonical page.sections when present
   if (resolvedPageId !== "home" && resolvedPageId !== "about") {
     const meta = (view.pages ?? []).find((p) => p.id === resolvedPageId) ?? {
       id: resolvedPageId,
@@ -72,6 +153,32 @@ export function WebsiteRenderer({
       name: resolvedPageId,
       kind: "custom" as const,
     };
+    if (meta.sections && meta.sections.length > 0) {
+      return (
+        <SiteNavProvider
+          value={{
+            basePath,
+            onProductNavigate,
+            onHomeNavigate,
+          }}
+        >
+          <WebsiteShell
+            config={view}
+            className={cn(
+              "vitrin-template",
+              `vitrin-template--${view.template}`,
+            )}
+          >
+            <SectionList
+              view={view}
+              sections={meta.sections}
+              mode={mode}
+              locale={locale}
+            />
+          </WebsiteShell>
+        </SiteNavProvider>
+      );
+    }
     return <VisualCustomPagePreview config={view} page={meta} />;
   }
 
@@ -81,9 +188,13 @@ export function WebsiteRenderer({
 
   // About page preview: about (+ footer) only — page-aware, still WebsiteRenderer
   if (resolvedPageId === "about" && !productSlug) {
-    const aboutSections = visibleSections.filter(
-      (s) => s.type === "about" || s.type === "footer",
-    );
+    const aboutPage = (view.pages ?? []).find((p) => p.id === "about");
+    const aboutSections =
+      aboutPage?.sections && aboutPage.sections.length > 0
+        ? aboutPage.sections
+        : visibleSections.filter(
+            (s) => s.type === "about" || s.type === "footer",
+          );
     return (
       <SiteNavProvider
         value={{
@@ -99,22 +210,17 @@ export function WebsiteRenderer({
           {aboutSections.length === 0 ? (
             <AboutSection config={view} />
           ) : (
-            aboutSections.map((section) => {
-              const Comp = sectionMap[section.type as keyof typeof sectionMap];
-              if (!Comp) return null;
-              return (
-                <div key={section.id}>
-                  <Comp config={view} />
-                </div>
-              );
-            })
+            <SectionList
+              view={view}
+              sections={aboutSections}
+              mode={mode}
+              locale={locale}
+            />
           )}
         </WebsiteShell>
       </SiteNavProvider>
     );
   }
-
-  const bodySections = visibleSections.filter((s) => s.type !== "footer");
 
   return (
     <SiteNavProvider
@@ -139,43 +245,12 @@ export function WebsiteRenderer({
           {productSlug ? (
             <ProductPageView config={view} productSlug={productSlug} />
           ) : (
-            <>
-              {mode === "editor" && bodySections.length === 0 ? (
-                <CanvasEmptyState
-                  locale={locale}
-                  onAddSection={() => edit?.onRequestInsert?.(null)}
-                  onBrowseTemplates={
-                    edit?.onBrowseTemplates
-                      ? () => edit.onBrowseTemplates?.()
-                      : undefined
-                  }
-                />
-              ) : null}
-              {visibleSections.map((section) => {
-                const Comp = sectionMap[section.type as keyof typeof sectionMap];
-                if (!Comp) return null;
-                const body = (
-                  <div
-                    className={cn(
-                      !section.visible && mode === "editor" && "opacity-45",
-                    )}
-                  >
-                    <Comp config={view} />
-                  </div>
-                );
-                if (mode !== "editor") return <div key={section.id}>{body}</div>;
-                return (
-                  <EditorSectionFrame
-                    key={section.id}
-                    sectionId={section.id}
-                    label={sectionLabel(section.type, locale)}
-                    settings={section.settings}
-                  >
-                    {body}
-                  </EditorSectionFrame>
-                );
-              })}
-            </>
+            <SectionList
+              view={view}
+              sections={view.sections}
+              mode={mode}
+              locale={locale}
+            />
           )}
         </WebsiteShell>
       )}
