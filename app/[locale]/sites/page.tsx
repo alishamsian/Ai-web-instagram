@@ -38,17 +38,31 @@ export default async function SitesPage({
             </h1>
             <p className="mt-3 max-w-xl text-muted-foreground">{dict.dashboard.sitesBody}</p>
           </div>
-          <Button asChild>
-            <Link href={`/${locale}/create`}>{dict.dashboard.emptyCta}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/${locale}/templates`}>
+                {dict.templateCatalog.title}
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href={`/${locale}/create`}>{dict.dashboard.emptyCta}</Link>
+            </Button>
+          </div>
         </div>
 
         {websites.length === 0 ? (
           <div className="mt-12 rounded-[2rem] border border-dashed border-border bg-white/70 px-8 py-16 text-center">
             <p className="text-lg">{dict.dashboard.empty}</p>
-            <Button asChild className="mt-6">
-              <Link href={`/${locale}/create`}>{dict.dashboard.emptyCta}</Link>
-            </Button>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <Button asChild variant="outline">
+                <Link href={`/${locale}/templates`}>
+                  {dict.templateCatalog.title}
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href={`/${locale}/create`}>{dict.dashboard.emptyCta}</Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

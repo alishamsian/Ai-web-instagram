@@ -73,6 +73,13 @@ export interface WebsiteConfig {
    * Canonical product model remains the rest of WebsiteConfig.
    */
   visualEditor?: VisualEditorState;
+  /**
+   * Phase 3 full-site template provenance (optional).
+   * Absent on pre-Phase-3 / Instagram-imported sites — that is valid.
+   * Does NOT replace `template` (legacy TemplateType for Classic family).
+   */
+  templateCatalogId?: string;
+  templateSchemaVersion?: number;
 }
 
 /** Stable multi-page identity (Phase 2.2). Reserved: home, about. */
