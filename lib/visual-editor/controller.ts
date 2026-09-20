@@ -4,8 +4,13 @@
  */
 
 import type { Editor, EditorConfig, ProjectData } from "grapesjs";
-import { VISUAL_BLOCKS, VISUAL_SECTIONS } from "@/lib/visual-editor/blocks";
+import { registryAsGrapesBlocks } from "@/lib/visual-editor/registry";
 import { VISUAL_DEVICES, type VisualDeviceId } from "@/lib/visual-editor/devices";
+import {
+  resolveVisualDesignTokens,
+  visualDesignTokenStyleTag,
+} from "@/lib/visual-editor/design-tokens";
+import type { WebsiteConfig } from "@/types/website";
 
 export type VisualEditorPanels = {
   canvas: HTMLElement;
@@ -20,6 +25,8 @@ export type CreateVisualEditorOptions = {
   panels: VisualEditorPanels;
   project: ProjectData;
   locale: "fa" | "en";
+  /** Optional brand config for canvas design tokens. */
+  websiteConfig?: WebsiteConfig;
   /** Existing site media for AssetManager */
   mediaAssets?: Array<{
     id: string;
@@ -35,17 +42,10 @@ export type CreateVisualEditorOptions = {
 
 function registerBlocks(editor: Editor, locale: "fa" | "en") {
   const bm = editor.BlockManager;
-  for (const block of [...VISUAL_BLOCKS, ...VISUAL_SECTIONS]) {
+  for (const block of registryAsGrapesBlocks(locale)) {
     bm.add(block.id, {
-      label: locale === "fa" ? block.label.fa : block.label.en,
-      category:
-        block.category === "sections"
-          ? locale === "fa"
-            ? "سکشن‌ها"
-            : "Sections"
-          : locale === "fa"
-            ? "بلوک‌ها"
-            : "Blocks",
+      label: block.label,
+      category: block.category,
       content: block.content,
       media: block.media,
     });
@@ -77,6 +77,18 @@ export async function createVisualEditor(
     return null;
   }
 
+  const canvasStyles = [
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+  ];
+  if (options.websiteConfig) {
+    const tokens = resolveVisualDesignTokens(options.websiteConfig);
+    // Inline style tag via data URL keeps tokens in canvas without extra fetch
+    const css = visualDesignTokenStyleTag(tokens);
+    canvasStyles.push(
+      `data:text/css;charset=utf-8,${encodeURIComponent(css)}`,
+    );
+  }
+
   const config: EditorConfig = {
     container: options.panels.canvas,
     height: "100%",
@@ -87,9 +99,7 @@ export async function createVisualEditor(
     showOffsets: true,
     showOffsetsSelected: true,
     canvas: {
-      styles: [
-        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
-      ],
+      styles: canvasStyles,
     },
     deviceManager: {
       devices: VISUAL_DEVICES.map((d) => ({

@@ -102,3 +102,35 @@ export {
   PageOpError,
   type PageOpErrorCode,
 } from "@/lib/visual-editor/pages";
+export {
+  getVisualRegistry,
+  getVisualBlock,
+  listVisualBlocks,
+  createBlockHtml,
+  registryAsGrapesBlocks,
+  nextSectionId,
+  defaultVariantId,
+  resolveVariantId,
+  HERO_VARIANTS,
+  CTA_VARIANTS,
+  TESTIMONIAL_VARIANTS,
+} from "@/lib/visual-editor/registry";
+export {
+  insertVisualBlock,
+  applySectionVariant,
+  type InsertVisualBlockResult,
+} from "@/lib/visual-editor/insert";
+export {
+  resolveVisualDesignTokens,
+  visualDesignTokenCssVars,
+  visualDesignTokenStyleTag,
+  type VisualDesignTokens,
+} from "@/lib/visual-editor/design-tokens";
+export {
+  getComponentStyle,
+  setComponentStyle,
+  setComponentStyles,
+  relevantInspectorGroups,
+  type InspectorGroup,
+} from "@/lib/visual-editor/inspector-model";
+

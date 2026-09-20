@@ -35,7 +35,9 @@ import {
   duplicateVisualPage,
   ensureWebsitePages,
   getActiveVisualPageId,
+  insertVisualBlock,
   openAssetManager,
+  pageIdFromSlug,
   PageOpError,
   renameVisualPage,
   reorderPageMeta,
@@ -47,7 +49,6 @@ import {
   toggleSelectedVisibility,
   uniqueCopyName,
   uniqueCopySlug,
-  pageIdFromSlug,
   validateNewPageInput,
   visualProjectFingerprint,
   visualRedo,
@@ -62,21 +63,27 @@ import {
 } from "@/lib/visual-editor";
 import { VisualEditorLoading } from "@/components/visual-editor/VisualEditorLoading";
 import { VisualPagesPanel } from "@/components/visual-editor/VisualPagesPanel";
+import { VisualBlockLibrary } from "@/components/visual-editor/VisualBlockLibrary";
+import { VisualInspectorPanel } from "@/components/visual-editor/VisualInspectorPanel";
+import { VisualNavigator } from "@/components/visual-editor/VisualNavigator";
 import "@/app/visual-editor.css";
 import "grapesjs/dist/css/grapes.min.css";
 import {
   ArrowLeft,
+  Bold,
   Copy,
   EyeOff,
   ImageIcon,
+  Italic,
+  Link2,
   Redo2,
   Save,
   Trash2,
   Undo2,
 } from "lucide-react";
 
-type LeftTab = "pages" | "sections" | "blocks" | "components" | "assets";
-type RightTab = "style" | "settings";
+type LeftTab = "pages" | "library" | "assets" | "navigator";
+type RightTab = "inspector" | "style";
 
 const AUTOSAVE_MS = 1200;
 
@@ -121,9 +128,10 @@ export function VisualEditorShell({
   const [device, setDevice] = useState<VisualDeviceId>("desktop");
   const [zoom, setZoom] = useState<VisualZoomMode>(100);
   const [leftTab, setLeftTab] = useState<LeftTab>(
-    initialPage ? "pages" : "blocks",
+    initialPage ? "pages" : "library",
   );
-  const [rightTab, setRightTab] = useState<RightTab>("style");
+  const [rightTab, setRightTab] = useState<RightTab>("inspector");
+  const [selectedIsText, setSelectedIsText] = useState(false);
   const [pageMeta, setPageMeta] = useState<WebsitePage[]>(
     initialConfig.pages ?? [],
   );
@@ -136,6 +144,7 @@ export function VisualEditorShell({
   const [canRedo, setCanRedo] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
   const [selectedIsImage, setSelectedIsImage] = useState(false);
+  const [editorInstance, setEditorInstance] = useState<Editor | null>(null);
   const [mediaMap, setMediaMap] = useState(website.config.media);
   const siteName = website.config.brand.name || website.slug || "Website";
 
@@ -425,6 +434,30 @@ export function VisualEditorShell({
     },
     [pullConfigFromEditor],
   );
+
+  const handleInsertBlock = useCallback(
+    (blockId: string, variantId?: string) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      const result = insertVisualBlock(ed, {
+        blockId,
+        locale,
+        variantId,
+        existingSectionIds: (configRef.current.sections ?? []).map((s) => s.id),
+        colors: configRef.current.brand.colors,
+      });
+      if (!result.ok) {
+        setPageError(result.error);
+        return;
+      }
+      setPageError(null);
+      // Canonical home sections are registered on sync via data-section-* metadata.
+      refreshDirtyFromEditor();
+      syncHistoryFlags();
+    },
+    [locale, refreshDirtyFromEditor, syncHistoryFlags],
+  );
+
   useEffect(() => {
     refreshDirtyRef.current = refreshDirtyFromEditor;
     syncHistoryRef.current = syncHistoryFlags;
@@ -542,15 +575,27 @@ export function VisualEditorShell({
             const selected = ed?.getSelected();
             const ok = Boolean(selected && !selected.is("wrapper"));
             setHasSelection(ok);
+            const tag = String(selected?.get("tagName") || "").toLowerCase();
+            const type = String(selected?.get("type") || "");
             setSelectedIsImage(
               Boolean(
                 selected &&
                   (selected.is("image") ||
-                    selected.get("tagName") === "img" ||
-                    selected.get("type") === "image"),
+                    tag === "img" ||
+                    type === "image"),
+              ),
+            );
+            setSelectedIsText(
+              Boolean(
+                selected &&
+                  (type === "text" ||
+                    ["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "a", "button"].includes(
+                      tag,
+                    )),
               ),
             );
           },
+          websiteConfig: configRef.current,
         });
 
         if (!editor || editorMountIdRef.current !== mountId) {
@@ -560,6 +605,7 @@ export function VisualEditorShell({
 
         created = editor;
         editorRef.current = editor;
+        setEditorInstance(editor);
         // Fingerprint AFTER loadProjectData — GrapesJS normalizes the project on load.
         lastSavedFingerprint.current = visualProjectFingerprint(
           serializeVisualProject(editor),
@@ -620,6 +666,7 @@ export function VisualEditorShell({
         if (editorRef.current === created) {
           editorRef.current = null;
         }
+        setEditorInstance(null);
       }
     };
   }, [locale, website.id]);
@@ -851,9 +898,8 @@ export function VisualEditorShell({
             {(
               [
                 ["pages", isFa ? "صفحات" : "Pages"],
-                ["blocks", isFa ? "بلوک‌ها" : "Blocks"],
-                ["sections", isFa ? "سکشن‌ها" : "Sections"],
-                ["components", isFa ? "کامپوننت" : "Components"],
+                ["library", isFa ? "کتابخانه" : "Library"],
+                ["navigator", isFa ? "لایه‌ها" : "Layers"],
                 ["assets", isFa ? "رسانه" : "Assets"],
               ] as const
             ).map(([id, label]) => (
@@ -885,21 +931,17 @@ export function VisualEditorShell({
                 onMove={handleMovePage}
               />
             ) : null}
-            <div
-              ref={blocksRef}
-              style={{
-                display:
-                  leftTab === "blocks" || leftTab === "sections"
-                    ? "block"
-                    : "none",
-              }}
-            />
-            {leftTab === "components" ? (
-              <p className="ve-assets-hint">
-                {isFa
-                  ? "رجیستری کامپوننت‌ها در Phase ۲. از Blocks و Sections استفاده کنید."
-                  : "Component registry connects in Phase 2. Use Blocks and Sections for now."}
-              </p>
+            {leftTab === "library" ? (
+              <VisualBlockLibrary isFa={isFa} onInsert={handleInsertBlock} />
+            ) : null}
+            {/* Hidden GrapesJS BlockManager host — keeps drag registration alive */}
+            <div ref={blocksRef} hidden aria-hidden="true" />
+            {leftTab === "navigator" ? (
+              <VisualNavigator
+                editor={editorInstance}
+                isFa={isFa}
+                onChange={refreshDirtyFromEditor}
+              />
             ) : null}
             {leftTab === "assets" ? (
               <div>
@@ -978,7 +1020,21 @@ export function VisualEditorShell({
           </div>
         </aside>
 
-        <main className="ve-canvas-wrap">
+        <main
+          className="ve-canvas-wrap"
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes("text/ve-block-id")) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }
+          }}
+          onDrop={(e) => {
+            const blockId = e.dataTransfer.getData("text/ve-block-id");
+            if (!blockId) return;
+            e.preventDefault();
+            handleInsertBlock(blockId);
+          }}
+        >
           <div className="ve-canvas-toolbar" aria-label="Contextual toolbar">
             <button
               type="button"
@@ -1025,6 +1081,72 @@ export function VisualEditorShell({
             >
               <Trash2 size={14} />
             </button>
+            {selectedIsText ? (
+              <>
+                <button
+                  type="button"
+                  className="ve-btn"
+                  disabled={!hasSelection}
+                  aria-label="Bold"
+                  title="Bold"
+                  onClick={() => {
+                    const ed = editorRef.current;
+                    const sel = ed?.getSelected();
+                    if (!sel) return;
+                    const weight = String(sel.getStyle()?.["font-weight"] || "");
+                    sel.addStyle({
+                      "font-weight": weight === "700" || weight === "bold" ? "400" : "700",
+                    });
+                    refreshDirtyFromEditor();
+                  }}
+                >
+                  <Bold size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="ve-btn"
+                  disabled={!hasSelection}
+                  aria-label="Italic"
+                  title="Italic"
+                  onClick={() => {
+                    const ed = editorRef.current;
+                    const sel = ed?.getSelected();
+                    if (!sel) return;
+                    const style = String(sel.getStyle()?.["font-style"] || "");
+                    sel.addStyle({
+                      "font-style": style === "italic" ? "normal" : "italic",
+                    });
+                    refreshDirtyFromEditor();
+                  }}
+                >
+                  <Italic size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="ve-btn"
+                  disabled={!hasSelection}
+                  aria-label="Link"
+                  title="Link"
+                  onClick={() => {
+                    const ed = editorRef.current;
+                    const sel = ed?.getSelected();
+                    if (!sel) return;
+                    const href = window.prompt(
+                      isFa ? "آدرس لینک" : "Link URL",
+                      sel.getAttributes()?.href || "https://",
+                    );
+                    if (href == null) return;
+                    sel.addAttributes({ href });
+                    if (String(sel.get("tagName") || "").toLowerCase() !== "a") {
+                      sel.set("tagName", "a");
+                    }
+                    refreshDirtyFromEditor();
+                  }}
+                >
+                  <Link2 size={14} />
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
               className="ve-btn"
@@ -1047,34 +1169,35 @@ export function VisualEditorShell({
             <button
               type="button"
               className="ve-tab"
-              data-active={rightTab === "style"}
-              onClick={() => setRightTab("style")}
+              data-active={rightTab === "inspector"}
+              onClick={() => setRightTab("inspector")}
             >
-              {isFa ? "استایل" : "Style"}
+              {isFa ? "بازرس" : "Inspector"}
             </button>
             <button
               type="button"
               className="ve-tab"
-              data-active={rightTab === "settings"}
-              onClick={() => setRightTab("settings")}
+              data-active={rightTab === "style"}
+              onClick={() => setRightTab("style")}
             >
-              {isFa ? "تنظیمات" : "Settings"}
+              {isFa ? "استایل GJS" : "Style (GJS)"}
             </button>
           </div>
           <div className="ve-panel">
+            {rightTab === "inspector" ? (
+              <VisualInspectorPanel
+                editor={editorInstance}
+                isFa={isFa}
+                device={device}
+                onChange={refreshDirtyFromEditor}
+              />
+            ) : null}
             <div
               ref={stylesRef}
               style={{ display: rightTab === "style" ? "block" : "none" }}
             />
-            <div
-              ref={traitsRef}
-              style={{ display: rightTab === "settings" ? "block" : "none" }}
-            />
-            <div
-              ref={layersRef}
-              style={{ marginTop: 16 }}
-              aria-label="Layers"
-            />
+            <div ref={traitsRef} hidden aria-hidden="true" />
+            <div ref={layersRef} hidden aria-hidden="true" />
           </div>
         </aside>
       </div>

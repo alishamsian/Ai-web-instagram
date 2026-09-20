@@ -526,3 +526,193 @@
   line-height: 1.5;
   padding: 8px;
 }
+
+.ve-library {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+.ve-library__search {
+  display: block;
+}
+
+.ve-library__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ve-library__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  overflow: auto;
+  padding-bottom: 8px;
+}
+
+.ve-library__card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.ve-library__card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ve-library__card-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: grab;
+  text-align: start;
+}
+
+.ve-library__card-main:focus-visible {
+  outline: 2px solid var(--ve-accent);
+  outline-offset: -2px;
+}
+
+.ve-library__card-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ve-library__card-meta {
+  font-size: 10px;
+  color: var(--ve-muted);
+}
+
+.ve-library__variants {
+  display: grid;
+  gap: 4px;
+  padding: 0 8px 8px;
+}
+
+.ve-inspector-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ve-inspector-panel__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.ve-inspector-panel__body {
+  display: grid;
+  gap: 10px;
+}
+
+.ve-box-model {
+  font-size: 11px;
+}
+
+.ve-box-model__margin,
+.ve-box-model__padding {
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ve-box-model__padding {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ve-box-model__label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ve-muted);
+}
+
+.ve-box-model__row {
+  display: grid;
+  place-items: center;
+  margin-block: 4px;
+}
+
+.ve-box-model__mid {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 2.2fr) 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+.ve-box-model__content {
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ve-muted);
+}
+
+.ve-navigator__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ve-navigator__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+  border-radius: 6px;
+}
+
+.ve-navigator__row[data-active="true"] {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ve-navigator__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.ve-navigator__label:focus-visible {
+  outline: 2px solid var(--ve-accent);
+  outline-offset: 1px;
+}
+
+.ve-shell .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+

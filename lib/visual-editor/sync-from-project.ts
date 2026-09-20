@@ -924,7 +924,20 @@ export function syncWebsiteConfigFromVisualProject(
     const seen = new Set<string>();
     for (const meta of sectionMeta) {
       const existing = byId.get(meta.id);
-      if (!existing) continue;
+      if (!existing) {
+        // New section inserted in Visual Editor (home only reaches here)
+        if (meta.type) {
+          ordered.push({
+            id: meta.id,
+            type: meta.type as SectionConfig["type"],
+            visible: meta.visible,
+            variant: meta.variant,
+            settings: meta.settings,
+          });
+          seen.add(meta.id);
+        }
+        continue;
+      }
       ordered.push({
         ...existing,
         visible: meta.visible,
