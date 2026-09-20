@@ -33,6 +33,10 @@ import { CanvasEmptyState } from "@/components/editor/CanvasEmptyState";
 import { useEditorEdit } from "@/components/editor/EditContext";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { polishWebsiteConfig } from "@/lib/website/polish";
+import {
+  resolveHomeSections,
+  shouldUseCanonicalHomeRenderer,
+} from "@/lib/website/canonical-render";
 import { cn } from "@/lib/utils";
 import { VisualCustomPagePreview } from "@/components/visual-editor/VisualCustomPagePreview";
 
@@ -222,6 +226,84 @@ export function WebsiteRenderer({
     );
   }
 
+  // Product PDP: store templates keep StoreRenderer; others use ProductPageView.
+  if (productSlug) {
+    return (
+      <SiteNavProvider
+        value={{
+          basePath,
+          onProductNavigate,
+          onHomeNavigate,
+        }}
+      >
+        {view.template === "store" ? (
+          <StoreRenderer
+            config={view}
+            productSlug={productSlug}
+            websiteId={websiteId}
+            mode={mode}
+          />
+        ) : (
+          <WebsiteShell
+            config={view}
+            className={cn(
+              "vitrin-template",
+              `vitrin-template--${view.template}`,
+            )}
+          >
+            <ProductPageView config={view} productSlug={productSlug} />
+          </WebsiteShell>
+        )}
+      </SiteNavProvider>
+    );
+  }
+
+  // New template sites: Home via page.sections → shared WebsiteRenderer path.
+  if (shouldUseCanonicalHomeRenderer(view)) {
+    const homeSections = resolveHomeSections(view);
+    return (
+      <SiteNavProvider
+        value={{
+          basePath,
+          onProductNavigate,
+          onHomeNavigate,
+        }}
+      >
+        <WebsiteShell
+          config={view}
+          className={cn("vitrin-template", `vitrin-template--${view.template}`)}
+        >
+          <SectionList
+            view={view}
+            sections={homeSections}
+            mode={mode}
+            locale={locale}
+          />
+        </WebsiteShell>
+      </SiteNavProvider>
+    );
+  }
+
+  // Legacy store sites (no template catalog metadata): StoreRenderer compatibility.
+  if (view.template === "store") {
+    return (
+      <SiteNavProvider
+        value={{
+          basePath,
+          onProductNavigate,
+          onHomeNavigate,
+        }}
+      >
+        <StoreRenderer
+          config={view}
+          productSlug={productSlug}
+          websiteId={websiteId}
+          mode={mode}
+        />
+      </SiteNavProvider>
+    );
+  }
+
   return (
     <SiteNavProvider
       value={{
@@ -230,30 +312,17 @@ export function WebsiteRenderer({
         onHomeNavigate,
       }}
     >
-      {view.template === "store" ? (
-        <StoreRenderer
-          config={view}
-          productSlug={productSlug}
-          websiteId={websiteId}
+      <WebsiteShell
+        config={view}
+        className={cn("vitrin-template", `vitrin-template--${view.template}`)}
+      >
+        <SectionList
+          view={view}
+          sections={view.sections}
           mode={mode}
+          locale={locale}
         />
-      ) : (
-        <WebsiteShell
-          config={view}
-          className={cn("vitrin-template", `vitrin-template--${view.template}`)}
-        >
-          {productSlug ? (
-            <ProductPageView config={view} productSlug={productSlug} />
-          ) : (
-            <SectionList
-              view={view}
-              sections={view.sections}
-              mode={mode}
-              locale={locale}
-            />
-          )}
-        </WebsiteShell>
-      )}
+      </WebsiteShell>
     </SiteNavProvider>
   );
 }

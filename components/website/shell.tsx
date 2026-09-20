@@ -26,6 +26,19 @@ export function siteMedia(config: WebsiteConfig, id?: string) {
 
 function siteNavLinks(config: WebsiteConfig, basePath: string, isStore: boolean, isFa: boolean) {
   const links: { href: string; label: string; home?: boolean }[] = [];
+  const pages = (config.pages ?? []).filter((p) => p.id !== "home" && p.kind !== "home");
+  if (pages.length > 0) {
+    for (const page of pages) {
+      const slug = (page.slug || page.id).replace(/^\/+/, "");
+      const href = basePath
+        ? `${basePath}${slug ? `?page=${encodeURIComponent(slug)}` : ""}`
+        : slug
+          ? `?page=${encodeURIComponent(slug)}`
+          : "#top";
+      links.push({ href, label: page.name || page.id });
+    }
+    return links;
+  }
   if (config.content.products?.items.length) {
     links.push({
       href: isStore ? `${basePath || ""}#products` : "#products",

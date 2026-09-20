@@ -186,8 +186,14 @@ export function PricingSiteSection({ config }: { config: WebsiteConfig }) {
   const pricing = config.content.pricing;
   if (!pricing?.plans?.length) return null;
   const c = config.brand.colors;
+  const locale = config.settings.language;
+  const priceLabel = locale === "fa" ? "قیمت" : "Price";
   return (
-    <section className="vitrin-section" data-section="pricing">
+    <section
+      className="vitrin-section"
+      data-section="pricing"
+      aria-label={pricing.title}
+    >
       <div className="vitrin-wrap">
         <div className="text-center">
           <Title config={config}>
@@ -209,17 +215,24 @@ export function PricingSiteSection({ config }: { config: WebsiteConfig }) {
             <article
               key={plan.id}
               className="rounded-2xl border p-6"
+              aria-labelledby={`pricing-plan-${plan.id}`}
               style={{
                 borderColor: plan.highlighted ? c.foreground : undefined,
                 background: plan.highlighted ? c.foreground : c.background,
                 color: plan.highlighted ? c.background : c.foreground,
               }}
             >
-              <h3 className="text-lg font-semibold">{plan.name}</h3>
+              <h3
+                id={`pricing-plan-${plan.id}`}
+                className="text-lg font-semibold"
+              >
+                {plan.name}
+              </h3>
               {plan.description ? (
                 <p className="mt-1 text-sm opacity-80">{plan.description}</p>
               ) : null}
               <p className="mt-4 text-3xl font-semibold">
+                <span className="sr-only">{`${priceLabel}: `}</span>
                 {plan.price}
                 {plan.period ? (
                   <span className="text-sm font-normal opacity-70">
@@ -255,8 +268,14 @@ export function PricingSiteSection({ config }: { config: WebsiteConfig }) {
 export function MenuSiteSection({ config }: { config: WebsiteConfig }) {
   const menu = config.content.menu;
   if (!menu?.items?.length) return null;
+  const locale = config.settings.language;
+  const priceLabel = locale === "fa" ? "قیمت" : "Price";
   return (
-    <section className="vitrin-section" data-section="menu">
+    <section
+      className="vitrin-section"
+      data-section="menu"
+      aria-label={menu.title}
+    >
       <div className="vitrin-wrap max-w-2xl">
         <Title config={config}>
           <EditableText path="menu.title" value={menu.title} as="span" />
@@ -271,26 +290,34 @@ export function MenuSiteSection({ config }: { config: WebsiteConfig }) {
             />
           </p>
         ) : null}
-        <div className="mt-8 divide-y divide-border">
-          {menu.items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-start justify-between gap-4 py-4"
-            >
-              <div>
-                <p className="font-medium">{item.title}</p>
-                {item.description ? (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {item.description}
+        <ul className="mt-8 list-none divide-y divide-border p-0">
+          {menu.items.map((item) => {
+            const titleId = `menu-item-${item.id}-title`;
+            return (
+              <li
+                key={item.id}
+                className="flex items-start justify-between gap-4 py-4"
+              >
+                <div>
+                  <h3 id={titleId} className="m-0 text-base font-medium">
+                    {item.title}
+                  </h3>
+                  {item.description ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {item.description}
+                    </p>
+                  ) : null}
+                </div>
+                {item.price ? (
+                  <p className="m-0 shrink-0 font-semibold">
+                    <span className="sr-only">{`${priceLabel}: `}</span>
+                    {item.price}
                   </p>
                 ) : null}
-              </div>
-              {item.price ? (
-                <span className="shrink-0 font-semibold">{item.price}</span>
-              ) : null}
-            </div>
-          ))}
-        </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );

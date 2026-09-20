@@ -173,6 +173,8 @@ export function syncPagesMetaFromProject(
       title: prev?.title,
       description: prev?.description,
       kind,
+      // Preserve canonical page.sections — GrapesJS project is visual projection only.
+      sections: prev?.sections ? structuredClone(prev.sections) : prev?.sections,
     });
   }
   return next.length > 0 ? next : ensureDefaultPages(config.pages);
@@ -204,6 +206,7 @@ export function ensureDefaultPages(
         : p.id === VISUAL_PAGE_ABOUT
           ? "about"
           : normalizePageSlug(p.slug || p.id),
+    sections: p.sections,
   }));
 }
 

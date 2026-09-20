@@ -1,4 +1,5 @@
 import type { WebsiteConfig } from "@/types/website";
+import { collectVisibleSectionTypes } from "@/lib/website/canonical-render";
 
 export type PublishIssue = {
   id: string;
@@ -23,15 +24,12 @@ export function runPublishPreflight(
     (p) => !p.hidden && Boolean(p.name?.trim()),
   );
 
+  const sectionTypes = collectVisibleSectionTypes(config);
   const requiresCommerce =
-    config.template === "store" ||
-    config.sections.some(
-      (s) =>
-        s.visible !== false &&
-        (s.type === "products" ||
-          s.type === "featured-products" ||
-          s.type === "bestsellers"),
-    );
+    (config.template === "store" && !config.templateCatalogId) ||
+    sectionTypes.has("products") ||
+    sectionTypes.has("featured-products") ||
+    sectionTypes.has("bestsellers");
 
   if (requiresCommerce && products.length === 0) {
     errors.push({
