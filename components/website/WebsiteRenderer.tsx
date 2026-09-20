@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { VisualCustomPagePreview } from "@/components/visual-editor/VisualCustomPagePreview";
 import { SectionRenderProvider } from "@/components/website/SectionRenderContext";
+import { NestedComponentTree } from "@/components/website/NestedComponentTree";
 
 const sectionMap = {
   hero: HeroSection,
@@ -100,7 +101,8 @@ function SectionList({
       ) : null}
       {visibleSections.map((section) => {
         const Comp = sectionMap[section.type as keyof typeof sectionMap];
-        if (!Comp) return null;
+        const hasTree = Boolean(section.components?.length);
+        if (!Comp && !hasTree) return null;
         const body = (
           <div
             className={cn(
@@ -112,7 +114,13 @@ function SectionList({
             data-visible={section.visible !== false ? "true" : "false"}
           >
             <SectionRenderProvider section={section}>
-              <Comp config={view} />
+              {Comp ? <Comp config={view} /> : null}
+              {hasTree ? (
+                <NestedComponentTree
+                  nodes={section.components}
+                  config={view}
+                />
+              ) : null}
             </SectionRenderProvider>
           </div>
         );

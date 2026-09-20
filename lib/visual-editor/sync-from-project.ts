@@ -25,6 +25,7 @@ import {
   type VisualCollectionKey,
 } from "@/lib/visual-editor/ids";
 import { syncPagesMetaFromProject } from "@/lib/visual-editor/pages";
+import { applyCanonicalComponentsFromProject } from "@/lib/visual-editor/canonical-components";
 
 function decodeEntities(value: string): string {
   return value
@@ -99,6 +100,10 @@ export function mergeSectionsFromMeta(
           : prev.settings
             ? structuredClone(prev.settings)
             : undefined,
+      // Preserve nested canonical tree until applyCanonicalComponents overwrites
+      components: prev.components
+        ? structuredClone(prev.components)
+        : undefined,
     });
     seen.add(m.id);
   }
@@ -990,6 +995,7 @@ function applyCollectionOrders(
  * - syncs collection fields/order by stable item id
  * - syncs section order/visibility/variant/settings into pages[].sections
  *   (and mirrors home into top-level sections for legacy compatibility)
+ * - Phase 3.2.1: syncs nested product component trees into section.components
  */
 export function syncWebsiteConfigFromVisualProject(
   config: WebsiteConfig,
@@ -1030,6 +1036,9 @@ export function syncWebsiteConfigFromVisualProject(
   // 5) Align page metadata first, then sync per-page section structure
   next.pages = syncPagesMetaFromProject(next, project);
   applyPageSectionsFromProject(next, project);
+
+  // 6) Canonical nested component trees (Phase 3.2.1) — product SoT
+  applyCanonicalComponentsFromProject(next, project);
 
   next.visualEditor = {
     engine: "grapesjs",

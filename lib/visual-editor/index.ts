@@ -211,4 +211,31 @@ export {
   formatCssLength,
   type InspectorGroup,
 } from "@/lib/visual-editor/inspector-model";
+export {
+  applyCanonicalComponentsFromProject,
+  extractPageSectionComponentTrees,
+  grapesNodeToProductNode,
+  grapesJsonToProductNode,
+  productNodeToGrapesJson,
+  productNodeToHtml,
+  productForestToHtml,
+  appendComponentsToSectionHtml,
+  extractComponentsFromSectionNode,
+} from "@/lib/visual-editor/canonical-components";
+export {
+  mintComponentId,
+  createComponentNode,
+  normalizeComponentNode,
+  normalizeComponentTree,
+  normalizeWebsiteComponentTrees,
+  duplicateComponentSubtree,
+  duplicateComponentForest,
+  resolveComponentStyleProp,
+  isComponentVisibleAt,
+  walkComponentTree,
+  findComponentById,
+  reorderSiblings,
+  removeComponentById,
+  componentTreeFingerprint,
+} from "@/lib/website/component-tree";
 

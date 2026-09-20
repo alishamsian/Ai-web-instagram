@@ -179,7 +179,59 @@ export interface WebsiteContent {
   properties?: PropertiesConfig;
 }
 
-export interface SectionConfig { id: string; type: WebsiteSectionType; visible: boolean; variant?: string; settings?: Record<string, unknown>; }
+/**
+ * Canonical nested product component (Phase 3.2.1).
+ * Lives under SectionConfig.components — independent of GrapesJS JSON.
+ * visualEditor.project may mirror this as an editing projection/cache only.
+ */
+export type WebsiteComponentType = string;
+
+export type WebsiteComponentResponsiveStyles = {
+  desktop?: Record<string, string>;
+  tablet?: Record<string, string>;
+  mobile?: Record<string, string>;
+};
+
+export type WebsiteComponentVisibility = {
+  desktop?: boolean;
+  tablet?: boolean;
+  mobile?: boolean;
+};
+
+export interface WebsiteComponentNode {
+  id: string;
+  type: WebsiteComponentType;
+  children?: WebsiteComponentNode[];
+  /** Component-specific props (href, alt, objectFit, placeholder, …). */
+  props?: Record<string, unknown>;
+  /** Editable content payload (text, label, rich text, …). */
+  content?: Record<string, unknown>;
+  /** Desktop-base styles (CSS property → value). */
+  styles?: Record<string, string>;
+  /** Per-breakpoint style overrides; unset inherits from larger breakpoint. */
+  responsive?: WebsiteComponentResponsiveStyles;
+  visibility?: WebsiteComponentVisibility;
+  variant?: string;
+  /** Editing constraint — still rendered. */
+  locked?: boolean;
+  /** Explicitly hidden in all breakpoints when true. */
+  hidden?: boolean;
+}
+
+export interface SectionConfig {
+  id: string;
+  type: WebsiteSectionType;
+  visible: boolean;
+  variant?: string;
+  settings?: Record<string, unknown>;
+  /**
+   * Canonical nested component tree for freeform / nested builder content.
+   * Specialized section renderers (hero, products, …) still use WebsiteContent;
+   * this tree is rendered in addition when present.
+   * Absent on pre-3.2.1 configs — valid; do not invent empty arrays on load.
+   */
+  components?: WebsiteComponentNode[];
+}
 
 export type WebsiteThemeMode = "light" | "dark" | "system";
 export interface WebsiteSettings {
@@ -211,7 +263,9 @@ export interface WebsiteConfig {
   pages?: WebsitePage[];
   /**
    * GrapesJS visual-editor projection (optional).
-   * Classic Editor / WebsiteRenderer ignore this field.
+   * Classic Editor ignores this field.
+   * WebsiteRenderer prefers canonical section.components for nested freeform trees;
+   * visualEditor.project remains an editing projection/cache, not publish SoT.
    * Canonical product model remains the rest of WebsiteConfig.
    */
   visualEditor?: VisualEditorState;

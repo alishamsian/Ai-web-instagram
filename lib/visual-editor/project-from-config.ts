@@ -16,6 +16,10 @@ import {
   stableCollectionItemId,
 } from "@/lib/visual-editor/ids";
 import { resolveHomeSectionsForProjection } from "@/lib/website/canonical-render";
+import {
+  appendComponentsToSectionHtml,
+  productForestToHtml,
+} from "@/lib/visual-editor/canonical-components";
 
 function escapeHtml(value: string): string {
   return value
@@ -786,35 +790,54 @@ function renderProperties(
 }
 
 function renderSection(config: WebsiteConfig, section: SectionConfig): string {
+  // Freeform-only sections (e.g. page__freeform) render the canonical tree alone
+  if (
+    section.components?.length &&
+    (section.type === "columns" || section.id.endsWith("__freeform"))
+  ) {
+    const inner = productForestToHtml(section.components);
+    return sectionShell(section, inner);
+  }
+
   const type = section.type as WebsiteSectionType;
+  let html: string;
   switch (type) {
     case "hero":
-      return renderHero(config, section);
+      html = renderHero(config, section);
+      break;
     case "about":
-      return renderAbout(config, section);
+      html = renderAbout(config, section);
+      break;
     case "products":
     case "featured-products":
     case "bestsellers":
     case "product-spotlight":
-      return renderProducts(config, section);
+      html = renderProducts(config, section);
+      break;
     case "gallery":
     case "instagram-feed":
     case "featured-posts":
-      return renderGallery(config, section);
+      html = renderGallery(config, section);
+      break;
     case "testimonials":
-      return renderTestimonials(config, section);
+      html = renderTestimonials(config, section);
+      break;
     case "faq":
-      return renderFaq(config, section);
+      html = renderFaq(config, section);
+      break;
     case "contact":
     case "reservations":
-      return renderContact(config, section);
+      html = renderContact(config, section);
+      break;
     case "cta":
     case "promo":
-      return renderPromo(config, section);
+      html = renderPromo(config, section);
+      break;
     case "footer":
-      return renderFooter(config, section);
+      html = renderFooter(config, section);
+      break;
     case "services":
-      return renderGenericTitleBody(
+      html = renderGenericTitleBody(
         section,
         config.content.services?.title || "Services",
         (config.content.services?.items ?? [])
@@ -822,32 +845,44 @@ function renderSection(config: WebsiteConfig, section: SectionConfig): string {
           .join(" · ") || "",
         "content.services.title",
       );
+      break;
     case "trust":
-      return renderGenericTitleBody(
+      html = renderGenericTitleBody(
         section,
         "Trust",
         (config.content.trust?.items ?? []).join(" · "),
       );
+      break;
     case "lookbook":
-      return renderLookbook(config, section);
+      html = renderLookbook(config, section);
+      break;
     case "shop-the-look":
-      return renderShopTheLook(config, section);
+      html = renderShopTheLook(config, section);
+      break;
     case "categories":
-      return renderCategories(config, section);
+      html = renderCategories(config, section);
+      break;
     case "pricing":
-      return renderPricing(config, section);
+      html = renderPricing(config, section);
+      break;
     case "menu":
-      return renderMenu(config, section);
+      html = renderMenu(config, section);
+      break;
     case "location":
-      return renderLocation(config, section);
+      html = renderLocation(config, section);
+      break;
     case "portfolio":
     case "projects":
-      return renderPortfolio(config, section);
+      html = renderPortfolio(config, section);
+      break;
     case "properties":
-      return renderProperties(config, section);
+      html = renderProperties(config, section);
+      break;
     default:
-      return renderFallback(section);
+      html = renderFallback(section);
+      break;
   }
+  return appendComponentsToSectionHtml(html, section.components);
 }
 
 /** Render section list HTML from WebsiteConfig (shared by project builder). */

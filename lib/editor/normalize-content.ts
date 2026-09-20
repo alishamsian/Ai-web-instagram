@@ -7,6 +7,7 @@ import type { WebsiteConfig } from "@/types/website";
 import { createLegacyEntityId } from "@/lib/editor/ids";
 import { getSectionVariants } from "@/lib/store/registry/catalog";
 import { normalizeSectionVariants } from "@/lib/store/registry/variant-api";
+import { normalizeWebsiteComponentTrees } from "@/lib/website/component-tree";
 
 function identitySeed(...parts: string[]): string {
   return parts.map((part) => part.trim()).join("|");
@@ -174,9 +175,11 @@ export function normalizeLegacyHeroVariant(
   };
 }
 
-/** Run all soft content normalizations (identity + legacy variants). */
+/** Run all soft content normalizations (identity + legacy variants + component trees). */
 export function normalizeEditorConfig(config: WebsiteConfig): WebsiteConfig {
-  return normalizeSectionVariants(
-    normalizeLegacyHeroVariant(normalizeCollectionIdentities(config)),
+  return normalizeWebsiteComponentTrees(
+    normalizeSectionVariants(
+      normalizeLegacyHeroVariant(normalizeCollectionIdentities(config)),
+    ),
   );
 }

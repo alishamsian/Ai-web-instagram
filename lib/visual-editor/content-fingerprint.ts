@@ -38,6 +38,7 @@ function sectionFingerprintSlice(
     visible: s.visible !== false,
     variant: s.variant ?? null,
     settings: s.settings ?? null,
+    components: s.components ?? null,
   }));
 }
 

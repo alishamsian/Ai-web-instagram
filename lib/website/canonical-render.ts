@@ -44,6 +44,7 @@ export function resolveHomeSectionsForProjection(
       visible: overlay.visible,
       variant: overlay.variant ?? s.variant,
       settings: overlay.settings ?? s.settings,
+      components: overlay.components ?? s.components,
     };
   });
 }
