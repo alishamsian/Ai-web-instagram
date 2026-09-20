@@ -179,7 +179,13 @@ function NestedNode({
 
   switch (type) {
     case "content-heading": {
-      const Tag = (node.props?.tagName as "h1" | "h2" | "h3" | "h4") || "h2";
+      const level =
+        (typeof node.content?.level === "string" && node.content.level) ||
+        (typeof node.props?.tagName === "string" && node.props.tagName) ||
+        "h2";
+      const Tag = (/^h[1-6]$/i.test(String(level))
+        ? String(level).toLowerCase()
+        : "h2") as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
       return <Tag {...common}>{textOf(node)}</Tag>;
     }
     case "content-text":

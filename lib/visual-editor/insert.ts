@@ -50,6 +50,15 @@ function collectExistingSectionIds(editor: Editor): string[] {
     }) => {
       const attrs = cmp.getAttributes?.() ?? {};
       if (attrs["data-section-id"]) ids.push(attrs["data-section-id"]);
+      // Freeform inserts scope ids as `${type}-N__role` — treat scopes as taken
+      // so nextSectionId never reuses them (prevents duplicate component ids).
+      const componentId = attrs["data-component-id"];
+      if (componentId) {
+        const scope = componentId.includes("__")
+          ? componentId.slice(0, componentId.indexOf("__"))
+          : componentId;
+        if (scope) ids.push(scope);
+      }
       const kids = cmp.components?.();
       const list = Array.isArray(kids)
         ? kids
@@ -178,9 +187,23 @@ export function insertVisualBlock(
       const selected = editor.getSelected();
       if (selected && !selected.is("wrapper")) {
         const parent = selected.parent() || wrapper;
+        const parentAttrs = parent.getAttributes?.() ?? {};
+        const parentBlockId = parent.is("wrapper")
+          ? "wrapper"
+          : normalizeBlockId(
+              parentAttrs["data-component-type"] ||
+                (parentAttrs["data-section-type"]
+                  ? `section-${parentAttrs["data-section-type"]}`
+                  : undefined),
+            );
+        const nest = canNestBlocks(parentBlockId ?? "wrapper", options.blockId);
+        if (!nest.accepted) {
+          return { ok: false, error: nest.reason || "Invalid drop target" };
+        }
         const idx = selected.index();
         appendAt(parent, html, idx + 1);
       } else {
+        // Page root always accepts sections and freeform blocks.
         appendAt(wrapper, html);
       }
     }

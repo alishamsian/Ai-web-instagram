@@ -191,6 +191,16 @@ function contentFromNode(
   ) {
     if (text) content.text = text;
   }
+  if (type === "content-heading") {
+    const tag = (node.tagName || "").toLowerCase();
+    const fromAttr = attrString(attrs, "data-heading-level");
+    if (fromAttr && /^h[1-6]$/.test(fromAttr)) {
+      content.level = fromAttr;
+    } else if (/^h[1-6]$/.test(tag) && tag !== "h2") {
+      // Non-default heading tags imply an explicit level even without attr.
+      content.level = tag;
+    }
+  }
   if (type === "content-button" || type === "nav-navbar") {
     const href = attrString(attrs, "href");
     if (href) content.href = href;
@@ -244,7 +254,7 @@ function propsFromNode(
   const props: Record<string, unknown> = {};
   // Only persist tagName when it differs from the type default
   const tag = (node.tagName || "").toLowerCase();
-  const defaultTag = tagForType(type, undefined);
+  const defaultTag = tagForType(type, undefined, undefined);
   if (tag && tag !== defaultTag && tag !== "div") {
     props.tagName = tag;
   }
@@ -616,11 +626,29 @@ function visibilityAttrs(
   return parts.join("");
 }
 
-function tagForType(type: string, props?: Record<string, unknown>): string {
+function headingTagFromNode(
+  props?: Record<string, unknown>,
+  content?: Record<string, unknown>,
+): string | undefined {
+  const fromProps =
+    typeof props?.tagName === "string" ? String(props.tagName).toLowerCase() : "";
+  if (/^h[1-6]$/.test(fromProps)) return fromProps;
+  const fromLevel =
+    typeof content?.level === "string" ? String(content.level).toLowerCase() : "";
+  if (/^h[1-6]$/.test(fromLevel)) return fromLevel;
+  return undefined;
+}
+
+function tagForType(
+  type: string,
+  props?: Record<string, unknown>,
+  content?: Record<string, unknown>,
+): string {
+  if (type === "content-heading") {
+    return headingTagFromNode(props, content) || "h2";
+  }
   if (typeof props?.tagName === "string") return String(props.tagName);
   switch (type) {
-    case "content-heading":
-      return "h2";
     case "content-text":
       return "p";
     case "content-button":
@@ -654,7 +682,7 @@ function tagForType(type: string, props?: Record<string, unknown>): string {
  */
 export function productNodeToHtml(node: WebsiteComponentNode): string {
   const type = node.type || "unknown";
-  const tag = tagForType(type, node.props);
+  const tag = tagForType(type, node.props, node.content);
   const style = styleObjectToCss(node.styles);
   const text =
     (typeof node.content?.text === "string" && node.content.text) ||
@@ -668,6 +696,9 @@ export function productNodeToHtml(node: WebsiteComponentNode): string {
       ? ` data-component-variant="${escapeHtml(node.variant)}"`
       : "",
     node.locked ? ` ${LOCK_ATTR}="true"` : "",
+    type === "content-heading" && typeof node.content?.level === "string"
+      ? ` data-heading-level="${escapeHtml(String(node.content.level))}"`
+      : "",
     responsiveAttrs(node.responsive),
     visibilityAttrs(node.visibility, node.hidden),
     style ? ` style="${escapeHtml(style)}"` : "",
@@ -743,7 +774,7 @@ export function productForestToHtml(nodes: WebsiteComponentNode[]): string {
  */
 export function productNodeToGrapesJson(node: WebsiteComponentNode): GjsNode {
   const type = node.type || "unknown";
-  const tag = tagForType(type, node.props);
+  const tag = tagForType(type, node.props, node.content);
   const attributes: Record<string, string> = {
     "data-component-id": node.id,
     "data-component-type": type,
@@ -751,6 +782,12 @@ export function productNodeToGrapesJson(node: WebsiteComponentNode): GjsNode {
   if (node.variant) attributes["data-component-variant"] = node.variant;
   if (node.locked) attributes[LOCK_ATTR] = "true";
   if (node.hidden) attributes["data-visible"] = "false";
+  if (type === "content-heading") {
+    const level =
+      (typeof node.content?.level === "string" && node.content.level) ||
+      headingTagFromNode(node.props, node.content);
+    if (level) attributes["data-heading-level"] = level;
+  }
   if (node.visibility) {
     for (const device of ["desktop", "tablet", "mobile"] as const) {
       const v = node.visibility[device];

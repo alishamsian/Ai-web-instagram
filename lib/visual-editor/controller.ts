@@ -4,7 +4,10 @@
  */
 
 import type { Editor, EditorConfig, ProjectData } from "grapesjs";
-import { registryAsGrapesBlocks } from "@/lib/visual-editor/registry";
+import {
+  createBlockHtml,
+  registryAsGrapesBlocks,
+} from "@/lib/visual-editor/registry";
 import { VISUAL_DEVICES, type VisualDeviceId } from "@/lib/visual-editor/devices";
 import {
   resolveVisualDesignTokens,
@@ -44,14 +47,53 @@ export type CreateVisualEditorOptions = {
   onHover?: (payload: { id: string; label: string } | null) => void;
 };
 
+function collectEditorScopeIds(editor: Editor): string[] {
+  const ids: string[] = [];
+  try {
+    const wrapper = editor.getWrapper();
+    const walk = (cmp: {
+      getAttributes?: () => Record<string, string>;
+      components?: () => { models?: unknown[] } | unknown[];
+    }) => {
+      const attrs = cmp.getAttributes?.() ?? {};
+      if (attrs["data-section-id"]) ids.push(attrs["data-section-id"]);
+      const componentId = attrs["data-component-id"];
+      if (componentId) {
+        const scope = componentId.includes("__")
+          ? componentId.slice(0, componentId.indexOf("__"))
+          : componentId;
+        if (scope) ids.push(scope);
+      }
+      const kids = cmp.components?.();
+      const list = Array.isArray(kids)
+        ? kids
+        : ((kids as { models?: unknown[] } | undefined)?.models ?? []);
+      for (const child of list) walk(child as typeof cmp);
+    };
+    if (wrapper) walk(wrapper as never);
+  } catch {
+    // ignore
+  }
+  return ids;
+}
+
 function registerBlocks(editor: Editor, locale: "fa" | "en") {
   const bm = editor.BlockManager;
-  for (const block of registryAsGrapesBlocks(locale)) {
-    bm.add(block.id, {
-      label: block.label,
-      category: block.category,
-      content: block.content,
-      media: block.media,
+  for (const meta of registryAsGrapesBlocks(locale)) {
+    bm.add(meta.id, {
+      label: meta.label,
+      category: meta.category,
+      media: meta.media,
+      // Fresh IDs on every drag — never reuse static preview scopes.
+      content: () => {
+        const pageId = editor.Pages.getSelected()?.getId() || "home";
+        const { html } = createBlockHtml(meta.id, {
+          locale,
+          pageId,
+          existingSectionIds: collectEditorScopeIds(editor),
+        });
+        return html;
+      },
     });
   }
 }

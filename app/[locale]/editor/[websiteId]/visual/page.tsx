@@ -54,7 +54,13 @@ export default async function VisualEditorPage({
     <VisualEditorErrorBoundary locale={locale} websiteId={websiteId}>
       <Suspense
         fallback={
-          <VisualEditorLoading label="Loading website editor…" />
+          <VisualEditorLoading
+            label={
+              locale === "fa"
+                ? "در حال بارگذاری ویرایشگر…"
+                : "Loading website editor…"
+            }
+          />
         }
       >
         <VisualEditorShell
