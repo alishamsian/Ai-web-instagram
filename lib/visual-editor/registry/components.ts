@@ -257,7 +257,7 @@ export const COMPONENT_BLOCKS: VisualBlockDefinition[] = [
         ctx.pageId,
         "content-heading",
         "font-size:2rem;font-weight:600;line-height:1.2;margin:0;color:var(--ve-color-foreground,#111);",
-        "Heading",
+        ctx.locale === "fa" ? "عنوان" : "Heading",
       ),
   },
   {
@@ -276,7 +276,7 @@ export const COMPONENT_BLOCKS: VisualBlockDefinition[] = [
         ctx.pageId,
         "content-text",
         "font-size:1rem;line-height:1.6;margin:0;color:var(--ve-color-foreground,#444);",
-        "Edit this paragraph.",
+        ctx.locale === "fa" ? "این پاراگراف را ویرایش کنید." : "Edit this paragraph.",
       ),
   },
   {
@@ -296,7 +296,7 @@ export const COMPONENT_BLOCKS: VisualBlockDefinition[] = [
         ctx.pageId,
         "content-button",
         `display:inline-block;padding:12px 22px;background:${bg};color:#fff;text-decoration:none;border-radius:var(--ve-radius-md,6px);font-weight:500;`,
-        "Button",
+        ctx.locale === "fa" ? "دکمه" : "Button",
         { href: "#" },
       );
     },
@@ -483,8 +483,8 @@ export const COMPONENT_BLOCKS: VisualBlockDefinition[] = [
   <strong style="font-size:1.1rem;">Brand</strong>
   <div style="display:flex;gap:16px;align-items:center;">
     <a href="#" style="text-decoration:none;color:inherit;">Home</a>
-    <a href="#" style="text-decoration:none;color:inherit;">About</a>
-    <a href="#" style="text-decoration:none;color:inherit;">Contact</a>
+    <a href="#" style="text-decoration:none;color:inherit;">${ctx.locale === "fa" ? "درباره" : "About"}</a>
+    <a href="#" style="text-decoration:none;color:inherit;">${ctx.locale === "fa" ? "تماس" : "Contact"}</a>
   </div>
 </nav>`,
   },

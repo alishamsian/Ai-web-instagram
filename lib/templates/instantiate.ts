@@ -16,6 +16,7 @@ import { hrefForPageSlug } from "@/lib/visual-editor/pages";
 import { buildProjectFromWebsiteConfig } from "@/lib/visual-editor/project-from-config";
 import { getTemplate } from "@/lib/templates/registry";
 import { buildCanonicalTemplateContent } from "@/lib/templates/canonical-content";
+import { pickLocalized } from "@/lib/templates/localize";
 import {
   sectionTypeFromBlockId,
   TEMPLATE_SCHEMA_VERSION,
@@ -48,50 +49,57 @@ function allocateSectionId(
 function applySectionContent(
   html: string,
   section: TemplateSectionDef,
+  locale: "fa" | "en",
 ): string {
   if (!section.content) return html;
-  const preserved = Object.entries(section.content).map(([role, text]) => ({
-    role,
-    text,
-    contentPath:
-      role === "headline"
-        ? "content.hero.headline"
-        : role === "subheadline"
-          ? "content.hero.subheadline"
-          : role === "cta" && section.blockId === "section-hero"
-            ? "content.hero.cta"
-            : role === "title" && section.blockId === "section-about"
-              ? "content.about.title"
-              : role === "body" && section.blockId === "section-about"
-                ? "content.about.body"
-                : role === "title" && section.blockId === "section-cta"
-                  ? "content.promo.title"
-                  : role === "cta" && section.blockId === "section-cta"
-                    ? "content.promo.cta"
-                    : role === "title" && section.blockId === "section-contact"
-                      ? "content.contact.title"
-                      : role === "body" && section.blockId === "section-contact"
-                        ? "content.contact.body"
-                        : role === "title" &&
-                            section.blockId === "section-pricing"
-                          ? "content.pricing.title"
-                          : role === "title" &&
-                              section.blockId === "section-menu"
-                            ? "content.menu.title"
+  const preserved = Object.entries(section.content)
+    .map(([role, raw]) => {
+      const text = pickLocalized(raw, locale);
+      if (!text) return null;
+      return {
+        role,
+        text,
+        contentPath:
+          role === "headline"
+            ? "content.hero.headline"
+            : role === "subheadline"
+              ? "content.hero.subheadline"
+              : role === "cta" && section.blockId === "section-hero"
+                ? "content.hero.cta"
+                : role === "title" && section.blockId === "section-about"
+                  ? "content.about.title"
+                  : role === "body" && section.blockId === "section-about"
+                    ? "content.about.body"
+                    : role === "title" && section.blockId === "section-cta"
+                      ? "content.promo.title"
+                      : role === "cta" && section.blockId === "section-cta"
+                        ? "content.promo.cta"
+                        : role === "title" && section.blockId === "section-contact"
+                          ? "content.contact.title"
+                          : role === "body" && section.blockId === "section-contact"
+                            ? "content.contact.body"
                             : role === "title" &&
-                                section.blockId === "section-lookbook"
-                              ? "content.lookbook.title"
+                                section.blockId === "section-pricing"
+                              ? "content.pricing.title"
                               : role === "title" &&
-                                  section.blockId === "section-portfolio"
-                                ? "content.portfolio.title"
+                                  section.blockId === "section-menu"
+                                ? "content.menu.title"
                                 : role === "title" &&
-                                    section.blockId === "section-properties"
-                                  ? "content.properties.title"
+                                    section.blockId === "section-lookbook"
+                                  ? "content.lookbook.title"
                                   : role === "title" &&
-                                      section.blockId === "section-location"
-                                    ? "content.location.title"
-                                    : undefined,
-  }));
+                                      section.blockId === "section-portfolio"
+                                    ? "content.portfolio.title"
+                                    : role === "title" &&
+                                        section.blockId === "section-properties"
+                                      ? "content.properties.title"
+                                      : role === "title" &&
+                                          section.blockId === "section-location"
+                                        ? "content.location.title"
+                                        : undefined,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
   return mergePreservedIntoHtml(html, preserved);
 }
 
@@ -120,7 +128,7 @@ function buildSectionsForPage(
       variantId: section.variant,
       colors,
     });
-    htmlParts.push(applySectionContent(html, section));
+    htmlParts.push(applySectionContent(html, section, locale));
 
     const type = sectionTypeFromBlockId(section.blockId);
     if (type) {
@@ -180,20 +188,24 @@ function buildHomeContent(
       style:
         (heroSec?.variant as WebsiteConfig["content"]["hero"]["style"]) ||
         "minimal",
-      headline: heroSec?.content?.headline || brandName,
+      headline:
+        pickLocalized(heroSec?.content?.headline, locale) || brandName,
       subheadline:
-        heroSec?.content?.subheadline ||
-        template.brand.tagline ||
+        pickLocalized(heroSec?.content?.subheadline, locale) ||
+        (locale === "en" ? template.brand.tagline : undefined) ||
         (locale === "fa"
           ? "ویترین آماده سفارشی‌سازی"
           : "A ready storefront to customize"),
       cta:
-        heroSec?.content?.cta || (locale === "fa" ? "شروع" : "Get started"),
+        pickLocalized(heroSec?.content?.cta, locale) ||
+        (locale === "fa" ? "شروع" : "Get started"),
     },
     about: {
-      title: aboutSec?.content?.title || (locale === "fa" ? "درباره" : "About"),
+      title:
+        pickLocalized(aboutSec?.content?.title, locale) ||
+        (locale === "fa" ? "درباره" : "About"),
       body:
-        aboutSec?.content?.body ||
+        pickLocalized(aboutSec?.content?.body, locale) ||
         (locale === "fa"
           ? "داستان برند را اینجا بنویسید."
           : "Tell your brand story here."),
@@ -201,15 +213,18 @@ function buildHomeContent(
     promo: {
       kicker: "",
       title:
-        ctaSec?.content?.title ||
+        pickLocalized(ctaSec?.content?.title, locale) ||
         (locale === "fa" ? "آماده هستید؟" : "Ready when you are"),
-      cta: ctaSec?.content?.cta || (locale === "fa" ? "تماس" : "Contact"),
+      cta:
+        pickLocalized(ctaSec?.content?.cta, locale) ||
+        (locale === "fa" ? "تماس" : "Contact"),
     },
     contact: {
       title:
-        contactSec?.content?.title || (locale === "fa" ? "تماس" : "Contact"),
+        pickLocalized(contactSec?.content?.title, locale) ||
+        (locale === "fa" ? "تماس" : "Contact"),
       body:
-        contactSec?.content?.body ||
+        pickLocalized(contactSec?.content?.body, locale) ||
         (locale === "fa"
           ? "با ما در ارتباط باشید."
           : "Get in touch with us."),
@@ -245,7 +260,7 @@ export function instantiateTemplateDefinition(
   template: WebsiteTemplate,
   options: InstantiateTemplateOptions = {},
 ): InstantiateTemplateResult {
-  const locale = options.locale || options.language || "en";
+  const locale = options.locale || options.language || "fa";
   const language = options.language || locale;
   const direction =
     options.direction || (language === "fa" ? "rtl" : "ltr");

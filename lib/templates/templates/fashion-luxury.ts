@@ -26,31 +26,31 @@ export const fashionLuxuryTemplate = defineTemplate({
         variant: "split",
         canonical: true,
         content: {
-          headline: "New collection",
-          subheadline: "Quiet luxury for everyday movement.",
-          cta: "Shop the collection",
+          headline: { fa: "کالکشن جدید", en: "New collection" },
+          subheadline: { fa: "لوکس آرام برای حرکت روزمره.", en: "Quiet luxury for everyday movement." },
+          cta: { fa: "خرید کالکشن", en: "Shop the collection" },
         },
       }),
       sec("lookbook", "section-lookbook", {
-        content: { title: "Lookbook" },
+        content: { title: { fa: "لوک‌بوک", en: "Lookbook" } },
       }),
       sec("featured", "section-featured-products", {
-        content: { title: "Selected pieces" },
+        content: { title: { fa: "قطعات منتخب", en: "Selected pieces" } },
       }),
       sec("about", "section-about", {
         variant: "split",
         canonical: true,
         content: {
-          title: "The atelier",
-          body: "We design apparel with precise cuts and natural fabrics — made to move from day to evening.",
+          title: { fa: "آتلیه", en: "The atelier" },
+          body: { fa: "پوشاک با برش دقیق و پارچه طبیعی — از روز تا شب.", en: "We design apparel with precise cuts and natural fabrics — made to move from day to evening." },
         },
       }),
       sec("cta", "section-cta", {
         variant: "simple",
         canonical: true,
         content: {
-          title: "Discover the look",
-          cta: "Browse shop",
+          title: { fa: "کشف این لوک", en: "Discover the look" },
+          cta: { fa: "مرور فروشگاه", en: "Browse shop" },
         },
       }),
       sec("footer", "section-footer"),
@@ -59,16 +59,16 @@ export const fashionLuxuryTemplate = defineTemplate({
       sec("hero", "section-hero", {
         variant: "minimal",
         content: {
-          headline: "Shop",
-          subheadline: "Essentials and seasonal drops.",
-          cta: "View all",
+          headline: { fa: "فروشگاه", en: "Shop" },
+          subheadline: { fa: "ضروری‌ها و دراپ‌های فصلی.", en: "Essentials and seasonal drops." },
+          cta: { fa: "مشاهده همه", en: "View all" },
         },
       }),
       sec("products", "section-products", {
-        content: { title: "Collection" },
+        content: { title: { fa: "کالکشن", en: "Collection" } },
       }),
       sec("categories", "section-categories", {
-        content: { title: "Shop by category" },
+        content: { title: { fa: "خرید بر اساس دسته", en: "Shop by category" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -76,13 +76,13 @@ export const fashionLuxuryTemplate = defineTemplate({
       sec("about", "section-about", {
         variant: "story",
         content: {
-          title: "Our story",
-          body: "A contemporary label focused on calm silhouettes and lasting materials.",
+          title: { fa: "داستان ما", en: "Our story" },
+          body: { fa: "برندی معاصر با تمرکز روی فرم‌های آرام و متریال ماندگار.", en: "A contemporary label focused on calm silhouettes and lasting materials." },
         },
       }),
       sec("gallery", "section-gallery", {
         variant: "grid",
-        content: { title: "Studio" },
+        content: { title: { fa: "استودیو", en: "Studio" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -90,9 +90,9 @@ export const fashionLuxuryTemplate = defineTemplate({
       sec("hero", "section-hero", {
         variant: "editorial",
         content: {
-          headline: "Season lookbook",
-          subheadline: "Styled looks without the noise.",
-          cta: "Shop the look",
+          headline: { fa: "لوک‌بوک فصل", en: "Season lookbook" },
+          subheadline: { fa: "لوک‌های استایل‌شده بدون شلوغی.", en: "Styled looks without the noise." },
+          cta: { fa: "خرید این لوک", en: "Shop the look" },
         },
       }),
       sec("lookbook", "section-lookbook"),
@@ -102,13 +102,13 @@ export const fashionLuxuryTemplate = defineTemplate({
     page("contact", "contact", { fa: "تماس", en: "Contact" }, "custom", [
       sec("contact", "section-contact", {
         content: {
-          title: "Contact",
-          body: "Questions about sizing, shipping, or custom orders — write to us.",
+          title: { fa: "تماس", en: "Contact" },
+          body: { fa: "سوال سایز، ارسال یا سفارش سفارشی — به ما بنویسید.", en: "Questions about sizing, shipping, or custom orders — write to us." },
         },
       }),
       sec("cta", "section-cta", {
         variant: "split",
-        content: { title: "Visit the atelier", cta: "Book a visit" },
+        content: { title: { fa: "بازدید از آتلیه", en: "Visit the atelier" }, cta: { fa: "رزرو بازدید", en: "Book a visit" } },
       }),
       sec("footer", "section-footer"),
     ]),

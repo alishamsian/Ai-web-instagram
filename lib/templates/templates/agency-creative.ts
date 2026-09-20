@@ -22,20 +22,20 @@ export const agencyCreativeTemplate = defineTemplate({
         variant: "centered",
         canonical: true,
         content: {
-          headline: "Design that earns attention",
-          subheadline: "Brand sites, launches, and systems — crafted live.",
-          cta: "Start a project",
+          headline: { fa: "طراحی که توجه می‌گیرد", en: "Design that earns attention" },
+          subheadline: { fa: "سایت برند، لانچ و سیستم‌ها — زنده و دقیق.", en: "Brand sites, launches, and systems — crafted live." },
+          cta: { fa: "شروع پروژه", en: "Start a project" },
         },
       }),
       sec("services", "section-services", {
-        content: { title: "What we do" },
+        content: { title: { fa: "چه می‌کنیم", en: "What we do" } },
       }),
       sec("portfolio", "section-portfolio", {
-        content: { title: "Selected work" },
+        content: { title: { fa: "نمونه کارها", en: "Selected work" } },
       }),
       sec("cta", "section-cta", {
         variant: "split",
-        content: { title: "Have a brief?", cta: "Contact us" },
+        content: { title: { fa: "بریف دارید؟", en: "Have a brief?" }, cta: { fa: "تماس با ما", en: "Contact us" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -43,9 +43,9 @@ export const agencyCreativeTemplate = defineTemplate({
       sec("hero", "section-hero", {
         variant: "minimal",
         content: {
-          headline: "Services",
-          subheadline: "From concept to published craft.",
-          cta: "See work",
+          headline: { fa: "خدمات", en: "Services" },
+          subheadline: { fa: "از ایده تا اثر منتشرشده.", en: "From concept to published craft." },
+          cta: { fa: "مشاهده کارها", en: "See work" },
         },
       }),
       sec("services", "section-services"),
@@ -55,19 +55,19 @@ export const agencyCreativeTemplate = defineTemplate({
       sec("hero", "section-hero", {
         variant: "editorial",
         content: {
-          headline: "Work",
-          subheadline: "Recent launches and systems.",
-          cta: "Inquire",
+          headline: { fa: "کارها", en: "Work" },
+          subheadline: { fa: "لانچ‌ها و سیستم‌های اخیر.", en: "Recent launches and systems." },
+          cta: { fa: "استعلام", en: "Inquire" },
         },
       }),
-      sec("portfolio", "section-portfolio", { content: { title: "Work" } }),
+      sec("portfolio", "section-portfolio", { content: { title: { fa: "کارها", en: "Work" } } }),
       sec("footer", "section-footer"),
     ]),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [
       sec("about", "section-about", {
         content: {
-          title: "The studio",
-          body: "A small team focused on clarity, motion, and durable brand systems.",
+          title: { fa: "استودیو", en: "The studio" },
+          body: { fa: "تیمی کوچک با تمرکز روی وضوح، حرکت و سیستم‌های برند ماندگار.", en: "A small team focused on clarity, motion, and durable brand systems." },
         },
       }),
       sec("testimonials", "section-testimonials", { variant: "quote" }),
@@ -76,8 +76,8 @@ export const agencyCreativeTemplate = defineTemplate({
     page("contact", "contact", { fa: "تماس", en: "Contact" }, "custom", [
       sec("contact", "section-contact", {
         content: {
-          title: "Start a project",
-          body: "Tell us about timeline, goals, and constraints.",
+          title: { fa: "شروع پروژه", en: "Start a project" },
+          body: { fa: "از زمان‌بندی، اهداف و محدودیت‌ها بگویید.", en: "Tell us about timeline, goals, and constraints." },
         },
       }),
       sec("footer", "section-footer"),

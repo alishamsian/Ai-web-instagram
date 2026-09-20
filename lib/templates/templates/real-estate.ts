@@ -25,28 +25,28 @@ export const realEstateTemplate = defineTemplate({
         variant: "split",
         canonical: true,
         content: {
-          headline: "Homes with presence",
-          subheadline: "Curated listings and calm guidance through every step.",
-          cta: "View properties",
+          headline: { fa: "خانه‌هایی با حضور", en: "Homes with presence" },
+          subheadline: { fa: "آگهی‌های گزیده و راهنمایی آرام در هر مرحله.", en: "Curated listings and calm guidance through every step." },
+          cta: { fa: "مشاهده املاک", en: "View properties" },
         },
       }),
       sec("featured", "section-featured-products", {
-        content: { title: "Featured homes" },
+        content: { title: { fa: "خانه‌های ویژه", en: "Featured homes" } },
       }),
       sec("about", "section-about", {
         canonical: true,
         content: {
-          title: "Advisory",
-          body: "We help buyers and sellers move with clarity — fewer listings, better fits.",
+          title: { fa: "مشاوره", en: "Advisory" },
+          body: { fa: "به خریدار و فروشنده کمک می‌کنیم با وضوح حرکت کنند — آگهی کمتر، تناسب بهتر.", en: "We help buyers and sellers move with clarity — fewer listings, better fits." },
         },
       }),
       sec("testimonials", "section-testimonials", {
         variant: "cards",
-        content: { title: "Client stories" },
+        content: { title: { fa: "داستان مشتریان", en: "Client stories" } },
       }),
       sec("cta", "section-cta", {
         variant: "split",
-        content: { title: "Ready to talk?", cta: "Contact an advisor" },
+        content: { title: { fa: "آماده صحبتید؟", en: "Ready to talk?" }, cta: { fa: "تماس با مشاور", en: "Contact an advisor" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -59,23 +59,23 @@ export const realEstateTemplate = defineTemplate({
         sec("hero", "section-hero", {
           variant: "minimal",
           content: {
-            headline: "Properties",
-            subheadline: "Active listings and private viewings.",
-            cta: "Request a tour",
+            headline: { fa: "املاک", en: "Properties" },
+            subheadline: { fa: "آگهی‌های فعال و بازدید خصوصی.", en: "Active listings and private viewings." },
+            cta: { fa: "درخواست بازدید", en: "Request a tour" },
           },
         }),
         sec("properties", "section-properties", {
-          content: { title: "Listings" },
+          content: { title: { fa: "آگهی‌ها", en: "Listings" } },
         }),
-        sec("gallery", "section-gallery", { content: { title: "Galleries" } }),
+        sec("gallery", "section-gallery", { content: { title: { fa: "گالری‌ها", en: "Galleries" } } }),
         sec("footer", "section-footer"),
       ],
     ),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [
       sec("about", "section-about", {
         content: {
-          title: "About the practice",
-          body: "A focused real-estate studio for city homes and quiet suburbs.",
+          title: { fa: "درباره دفتر", en: "About the practice" },
+          body: { fa: "استودیوی متمرکز املاک برای خانه‌های شهری و حومه آرام.", en: "A focused real-estate studio for city homes and quiet suburbs." },
         },
       }),
       sec("footer", "section-footer"),
@@ -83,8 +83,8 @@ export const realEstateTemplate = defineTemplate({
     page("contact", "contact", { fa: "تماس", en: "Contact" }, "custom", [
       sec("contact", "section-contact", {
         content: {
-          title: "Contact",
-          body: "Buying, selling, and valuation inquiries.",
+          title: { fa: "تماس", en: "Contact" },
+          body: { fa: "خرید، فروش و استعلام قیمت‌گذاری.", en: "Buying, selling, and valuation inquiries." },
         },
       }),
       sec("footer", "section-footer"),

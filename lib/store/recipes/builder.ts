@@ -100,7 +100,7 @@ export function buildWebsiteConfigFromRecipe(
 ): WebsiteConfig {
   const recipe = resolveRecipe(input.recipe ?? input.recipeId);
   const seed = input.seed ? structuredClone(input.seed) : undefined;
-  const locale = seed?.locale ?? seed?.settings?.language ?? "en";
+  const locale = seed?.locale ?? seed?.settings?.language ?? "fa";
   const brandName =
     seed?.brandName ?? seed?.brand?.name ?? recipe.label.en ?? recipe.id;
 

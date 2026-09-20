@@ -20,10 +20,17 @@ import {
   sectionOpen,
 } from "@/lib/visual-editor/registry/markup";
 
+type Locale = "fa" | "en";
+
+function t(locale: Locale, fa: string, en: string): string {
+  return locale === "fa" ? fa : en;
+}
+
 function heroMarkup(
   variant: string,
   sectionId: string,
   pageId: string,
+  locale: Locale,
   colors?: { primary?: string; accent?: string; foreground?: string },
 ): string {
   const accent = colors?.accent || colors?.primary || "#ef6351";
@@ -44,14 +51,26 @@ function heroMarkup(
 
   const headline = `<h1${componentAttrs(sectionId, "headline", {
     "data-content-path": "content.hero.headline",
-  })} style="font-size:clamp(2rem,5vw,3.25rem);line-height:1.1;margin:0 0 16px;font-weight:600;">Build something memorable</h1>`;
+  })} style="font-size:clamp(2rem,5vw,3.25rem);line-height:1.1;margin:0 0 16px;font-weight:600;">${t(
+    locale,
+    "چیزی به‌یادماندنی بسازید",
+    "Build something memorable",
+  )}</h1>`;
   const sub = `<p${componentAttrs(sectionId, "subheadline", {
     "data-content-path": "content.hero.subheadline",
-  })} style="font-size:1.1rem;opacity:0.8;margin:0 0 28px;line-height:1.6;color:${variant === "overlay" ? "#ddd" : "#444"};">A clean hero for your brand story and primary call to action.</p>`;
+  })} style="font-size:1.1rem;opacity:0.8;margin:0 0 28px;line-height:1.6;color:${variant === "overlay" ? "#ddd" : "#444"};">${t(
+    locale,
+    "هیرویی تمیز برای داستان برند و فراخوان اصلی شما.",
+    "A clean hero for your brand story and primary call to action.",
+  )}</p>`;
   const cta = `<a${componentAttrs(sectionId, "cta", {
     "data-content-path": "content.hero.cta",
     href: "#",
-  })} style="display:inline-block;padding:14px 28px;background:${accent};color:#fff;text-decoration:none;border-radius:8px;font-weight:500;">Get started</a>`;
+  })} style="display:inline-block;padding:14px 28px;background:${accent};color:#fff;text-decoration:none;border-radius:8px;font-weight:500;">${t(
+    locale,
+    "شروع کنید",
+    "Get started",
+  )}</a>`;
 
   if (variant === "split") {
     return `${open}<div style="max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1.1fr 0.9fr;gap:40px;align-items:center;">
@@ -69,6 +88,7 @@ function ctaMarkup(
   variant: string,
   sectionId: string,
   pageId: string,
+  locale: Locale,
   accent?: string,
 ): string {
   const bg =
@@ -90,23 +110,23 @@ function ctaMarkup(
   <div>
     <h2${componentAttrs(sectionId, "title", {
       "data-content-path": "content.promo.title",
-    })} style="font-size:1.75rem;margin:0 0 8px;">Ready when you are</h2>
-    <p style="margin:0;color:#555;">Start editing live — no refresh required.</p>
+    })} style="font-size:1.75rem;margin:0 0 8px;">${t(locale, "هر وقت آماده باشید", "Ready when you are")}</h2>
+    <p style="margin:0;color:#555;">${t(locale, "زنده ویرایش کنید — بدون نیاز به رفرش.", "Start editing live — no refresh required.")}</p>
   </div>
   <a${componentAttrs(sectionId, "cta", {
     "data-content-path": "content.promo.cta",
     href: "#",
-  })} style="display:inline-block;padding:12px 24px;background:#111;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Contact us</a>
+  })} style="display:inline-block;padding:12px 24px;background:#111;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">${t(locale, "تماس با ما", "Contact us")}</a>
 </div>${sectionClose()}`;
   }
   return `${open}<h2${componentAttrs(sectionId, "title", {
     "data-content-path": "content.promo.title",
-  })} style="font-size:2rem;margin:0 0 12px;">Ready when you are</h2>
-<p style="margin:0 0 24px;opacity:0.9;">Start editing live — no refresh required.</p>
+  })} style="font-size:2rem;margin:0 0 12px;">${t(locale, "هر وقت آماده باشید", "Ready when you are")}</h2>
+<p style="margin:0 0 24px;opacity:0.9;">${t(locale, "زنده ویرایش کنید — بدون نیاز به رفرش.", "Start editing live — no refresh required.")}</p>
 <a${componentAttrs(sectionId, "cta", {
   "data-content-path": "content.promo.cta",
   href: "#",
-})} style="display:inline-block;padding:12px 24px;background:#fff;color:#111;text-decoration:none;border-radius:8px;font-weight:600;">Contact us</a>${sectionClose()}`;
+})} style="display:inline-block;padding:12px 24px;background:#fff;color:#111;text-decoration:none;border-radius:8px;font-weight:600;">${t(locale, "تماس با ما", "Contact us")}</a>${sectionClose()}`;
 }
 
 export const SECTION_BLOCKS: VisualBlockDefinition[] = [
@@ -126,7 +146,7 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
     variants: HERO_VARIANTS,
     create: (ctx) => {
       const variant = resolveVariantId(HERO_VARIANTS, ctx.variantId) || "minimal";
-      return heroMarkup(variant, ctx.sectionId, ctx.pageId, ctx.colors);
+      return heroMarkup(variant, ctx.sectionId, ctx.pageId, ctx.locale, ctx.colors);
     },
   },
   {
@@ -153,10 +173,10 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
   <div>
     <h2${componentAttrs(ctx.sectionId, "title", {
       "data-content-path": "content.about.title",
-    })} style="font-size:2rem;margin:0 0 16px;">About</h2>
+    })} style="font-size:2rem;margin:0 0 16px;">${t(ctx.locale, "درباره", "About")}</h2>
     <p${componentAttrs(ctx.sectionId, "body", {
       "data-content-path": "content.about.body",
-    })} style="margin:0;color:#444;line-height:1.7;">Tell your brand story with clarity and craft.</p>
+    })} style="margin:0;color:#444;line-height:1.7;">${t(ctx.locale, "داستان برند را با وضوح و دقت روایت کنید.", "Tell your brand story with clarity and craft.")}</p>
   </div>
   <div style="min-height:240px;border-radius:12px;background:#e8e8e8;"></div>
 </div>${sectionClose()}`;
@@ -182,10 +202,10 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
       return `${open}<div style="max-width:1100px;margin:0 auto;">
   <h2${componentAttrs(ctx.sectionId, "title", {
     "data-content-path": "content.services.title",
-  })} style="font-size:2rem;margin:0 0 32px;text-align:center;">Services</h2>
+  })} style="font-size:2rem;margin:0 0 32px;text-align:center;">${t(ctx.locale, "خدمات", "Services")}</h2>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-    <div style="padding:28px;border-radius:12px;background:#111;color:#fff;"><h3 style="margin:0 0 8px;">Brand sites</h3><p style="margin:0;opacity:0.8;">Marketing sites with editorial clarity.</p></div>
-    <div style="padding:28px;border-radius:12px;background:#f4f4f5;"><h3 style="margin:0 0 8px;">Product launches</h3><p style="margin:0;color:#555;">Landing pages that convert without clutter.</p></div>
+    <div style="padding:28px;border-radius:12px;background:#111;color:#fff;"><h3 style="margin:0 0 8px;">${t(ctx.locale, "سایت برند", "Brand sites")}</h3><p style="margin:0;opacity:0.8;">${t(ctx.locale, "سایت‌های مارکتینگ با وضوح ادیتوریال.", "Marketing sites with editorial clarity.")}</p></div>
+    <div style="padding:28px;border-radius:12px;background:#f4f4f5;"><h3 style="margin:0 0 8px;">${t(ctx.locale, "لانچ محصول", "Product launches")}</h3><p style="margin:0;color:#555;">${t(ctx.locale, "لندینگ‌هایی که بدون شلوغی تبدیل می‌کنند.", "Landing pages that convert without clutter.")}</p></div>
   </div>
 </div>${sectionClose()}`;
     },
@@ -237,7 +257,7 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-featured-products",
       });
       return `${open}<div style="max-width:1100px;margin:0 auto;text-align:center;">
-  <h2 style="font-size:2rem;margin:0 0 24px;">Featured</h2>
+  <h2 style="font-size:2rem;margin:0 0 24px;">${t(ctx.locale, "ویژه", "Featured")}</h2>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
     <div style="aspect-ratio:1;background:#f0f0f0;border-radius:10px;"></div>
     <div style="aspect-ratio:1;background:#f0f0f0;border-radius:10px;"></div>
@@ -269,7 +289,7 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
       return `${open}<div style="max-width:1100px;margin:0 auto;">
   <h2${componentAttrs(ctx.sectionId, "title", {
     "data-content-path": "content.gallery.title",
-  })} style="font-size:2rem;margin:0 0 24px;text-align:center;">Gallery</h2>
+  })} style="font-size:2rem;margin:0 0 24px;text-align:center;">${t(ctx.locale, "گالری", "Gallery")}</h2>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
     <div style="aspect-ratio:4/3;background:#e8e8e8;border-radius:8px;"></div>
     <div style="aspect-ratio:4/3;background:#e8e8e8;border-radius:8px;"></div>
@@ -301,16 +321,16 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
       });
       if (variant === "cards") {
         return `${open}<div style="max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-  <div style="padding:24px;border-radius:12px;background:#1a1a22;"><p style="margin:0 0 12px;line-height:1.6;">“Clean, intentional editing.”</p><p style="margin:0;opacity:0.65;">— Designer</p></div>
-  <div style="padding:24px;border-radius:12px;background:#1a1a22;"><p style="margin:0 0 12px;line-height:1.6;">“Feels like a real design tool.”</p><p style="margin:0;opacity:0.65;">— Founder</p></div>
+  <div style="padding:24px;border-radius:12px;background:#1a1a22;"><p style="margin:0 0 12px;line-height:1.6;">${t(ctx.locale, "«ویرایش تمیز و هدفمند.»", "“Clean, intentional editing.”")}</p><p style="margin:0;opacity:0.65;">${t(ctx.locale, "— طراح", "— Designer")}</p></div>
+  <div style="padding:24px;border-radius:12px;background:#1a1a22;"><p style="margin:0 0 12px;line-height:1.6;">${t(ctx.locale, "«حس یک ابزار طراحی واقعی.»", "“Feels like a real design tool.”")}</p><p style="margin:0;opacity:0.65;">${t(ctx.locale, "— بنیان‌گذار", "— Founder")}</p></div>
 </div>${sectionClose()}`;
       }
       return `${open}<div style="max-width:720px;margin:0 auto;text-align:center;">
   <h2${componentAttrs(ctx.sectionId, "title", {
     "data-content-path": "content.testimonials.title",
-  })} style="font-size:1.5rem;margin:0 0 24px;opacity:0.7;">Testimonials</h2>
-  <p style="font-size:1.35rem;line-height:1.6;margin:0 0 20px;">“The editor feels like a real design tool — not a form with a preview.”</p>
-  <p style="margin:0;opacity:0.65;font-size:0.9rem;">— Founder</p>
+  })} style="font-size:1.5rem;margin:0 0 24px;opacity:0.7;">${t(ctx.locale, "نظرات", "Testimonials")}</h2>
+  <p style="font-size:1.35rem;line-height:1.6;margin:0 0 20px;">${t(ctx.locale, "«ویرایشگر مثل یک ابزار طراحی واقعی است — نه فرمی با پیش‌نمایش.»", "“The editor feels like a real design tool — not a form with a preview.”")}</p>
+  <p style="margin:0;opacity:0.65;font-size:0.9rem;">${t(ctx.locale, "— بنیان‌گذار", "— Founder")}</p>
 </div>${sectionClose()}`;
     },
   },
@@ -334,9 +354,9 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
       return `${open}<div style="max-width:720px;margin:0 auto;">
   <h2${componentAttrs(ctx.sectionId, "title", {
     "data-content-path": "content.faq.title",
-  })} style="font-size:2rem;margin:0 0 24px;text-align:center;">FAQ</h2>
-  <div style="border-top:1px solid #e5e5e5;padding:16px 0;"><strong>How do I edit?</strong><p style="margin:8px 0 0;color:#555;">Select any element and use the inspector.</p></div>
-  <div style="border-top:1px solid #e5e5e5;padding:16px 0;"><strong>Does it save?</strong><p style="margin:8px 0 0;color:#555;">Yes — autosave keeps your draft current.</p></div>
+  })} style="font-size:2rem;margin:0 0 24px;text-align:center;">${t(ctx.locale, "سوالات متداول", "FAQ")}</h2>
+  <div style="border-top:1px solid #e5e5e5;padding:16px 0;"><strong>${t(ctx.locale, "چطور ویرایش کنم؟", "How do I edit?")}</strong><p style="margin:8px 0 0;color:#555;">${t(ctx.locale, "هر عنصر را انتخاب کنید و از بازرس استفاده کنید.", "Select any element and use the inspector.")}</p></div>
+  <div style="border-top:1px solid #e5e5e5;padding:16px 0;"><strong>${t(ctx.locale, "ذخیره می‌شود؟", "Does it save?")}</strong><p style="margin:8px 0 0;color:#555;">${t(ctx.locale, "بله — ذخیره خودکار پیش‌نویس را به‌روز نگه می‌دارد.", "Yes — autosave keeps your draft current.")}</p></div>
 </div>${sectionClose()}`;
     },
   },
@@ -356,6 +376,7 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         variant,
         ctx.sectionId,
         ctx.pageId,
+        ctx.locale,
         ctx.colors?.accent || ctx.colors?.primary,
       );
     },
@@ -381,15 +402,15 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
       return `${open}<div style="max-width:560px;margin:0 auto;">
   <h2${componentAttrs(ctx.sectionId, "title", {
     "data-content-path": "content.contact.title",
-  })} style="font-size:2rem;margin:0 0 24px;text-align:center;">Contact</h2>
+  })} style="font-size:2rem;margin:0 0 24px;text-align:center;">${t(ctx.locale, "تماس", "Contact")}</h2>
   <p${componentAttrs(ctx.sectionId, "body", {
     "data-content-path": "content.contact.body",
-  })} style="text-align:center;color:#555;margin:0 0 24px;">We usually reply within one business day.</p>
+  })} style="text-align:center;color:#555;margin:0 0 24px;">${t(ctx.locale, "معمولاً ظرف یک روز کاری پاسخ می‌دهیم.", "We usually reply within one business day.")}</p>
   <form style="display:grid;gap:12px;">
-    <input placeholder="Name" style="padding:12px 14px;border:1px solid #ddd;border-radius:8px;" />
-    <input placeholder="Email" type="email" style="padding:12px 14px;border:1px solid #ddd;border-radius:8px;" />
-    <textarea placeholder="Message" rows="4" style="padding:12px 14px;border:1px solid #ddd;border-radius:8px;resize:vertical;"></textarea>
-    <button type="button" style="padding:12px;background:#111;color:#fff;border:0;border-radius:8px;font-weight:500;">Send</button>
+    <input placeholder="${t(ctx.locale, "نام", "Name")}" style="padding:12px 14px;border:1px solid #ddd;border-radius:8px;" />
+    <input placeholder="${t(ctx.locale, "ایمیل", "Email")}" type="email" style="padding:12px 14px;border:1px solid #ddd;border-radius:8px;" />
+    <textarea placeholder="${t(ctx.locale, "پیام", "Message")}" rows="4" style="padding:12px 14px;border:1px solid #ddd;border-radius:8px;resize:vertical;"></textarea>
+    <button type="button" style="padding:12px;background:#111;color:#fff;border:0;border-radius:8px;font-weight:500;">${t(ctx.locale, "ارسال", "Send")}</button>
   </form>
 </div>${sectionClose()}`;
     },
@@ -412,8 +433,8 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-social",
       });
       return `${open}<div style="max-width:640px;margin:0 auto;text-align:center;">
-  <h2 style="font-size:1.75rem;margin:0 0 16px;">Follow us</h2>
-  <p style="margin:0;color:#555;">Instagram · TikTok · YouTube</p>
+  <h2 style="font-size:1.75rem;margin:0 0 16px;">${t(ctx.locale, "ما را دنبال کنید", "Follow us")}</h2>
+  <p style="margin:0;color:#555;">${t(ctx.locale, "اینستاگرام · تیک‌تاک · یوتیوب", "Instagram · TikTok · YouTube")}</p>
 </div>${sectionClose()}`;
     },
   },
@@ -437,8 +458,8 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         style: "padding:40px 24px;background:#0f0f12;color:#aaa;text-align:center;",
       });
       return `${open}<p style="margin:0;font-size:0.9rem;">© ${escapeHtml(
-        "Brand",
-      )} — Built with Vitrin</p>${sectionClose("footer")}`;
+        t(ctx.locale, "برند", "Brand"),
+      )} — ${t(ctx.locale, "ساخته‌شده با ویترین", "Built with Vitrin")}</p>${sectionClose("footer")}`;
     },
   },
   {
@@ -459,7 +480,7 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-lookbook",
       });
       return `${open}<div style="max-width:1100px;margin:0 auto;">
-  <h2 style="font-size:2rem;margin:0 0 24px;">Lookbook</h2>
+  <h2 style="font-size:2rem;margin:0 0 24px;">${t(ctx.locale, "لوک‌بوک", "Lookbook")}</h2>
   <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;min-height:320px;">
     <div style="background:#e8e8e8;border-radius:12px;"></div>
     <div style="display:grid;gap:12px;"><div style="background:#eee;border-radius:12px;"></div><div style="background:#eee;border-radius:12px;"></div></div>
@@ -485,8 +506,8 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-shop-the-look",
       });
       return `${open}<div style="max-width:1100px;margin:0 auto;text-align:center;">
-  <h2 style="font-size:2rem;margin:0 0 8px;">Shop the look</h2>
-  <p style="margin:0 0 24px;color:#555;">Curated pieces from this season.</p>
+  <h2 style="font-size:2rem;margin:0 0 8px;">${t(ctx.locale, "خرید این لوک", "Shop the look")}</h2>
+  <p style="margin:0 0 24px;color:#555;">${t(ctx.locale, "قطعات گزیده از این فصل.", "Curated pieces from this season.")}</p>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
     <div style="aspect-ratio:3/4;background:#f0f0f0;border-radius:10px;"></div>
     <div style="aspect-ratio:3/4;background:#f0f0f0;border-radius:10px;"></div>
@@ -514,12 +535,12 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-categories",
       });
       return `${open}<div style="max-width:1100px;margin:0 auto;">
-  <h2 style="font-size:2rem;margin:0 0 24px;text-align:center;">Shop by category</h2>
+  <h2 style="font-size:2rem;margin:0 0 24px;text-align:center;">${t(ctx.locale, "خرید بر اساس دسته", "Shop by category")}</h2>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-    <div style="padding:32px;background:#111;color:#fff;border-radius:12px;text-align:center;">New</div>
-    <div style="padding:32px;background:#f4f4f5;border-radius:12px;text-align:center;">Bestsellers</div>
-    <div style="padding:32px;background:#f4f4f5;border-radius:12px;text-align:center;">Essentials</div>
-    <div style="padding:32px;background:#f4f4f5;border-radius:12px;text-align:center;">Sale</div>
+    <div style="padding:32px;background:#111;color:#fff;border-radius:12px;text-align:center;">${t(ctx.locale, "جدید", "New")}</div>
+    <div style="padding:32px;background:#f4f4f5;border-radius:12px;text-align:center;">${t(ctx.locale, "پرفروش", "Bestsellers")}</div>
+    <div style="padding:32px;background:#f4f4f5;border-radius:12px;text-align:center;">${t(ctx.locale, "ضروری‌ها", "Essentials")}</div>
+    <div style="padding:32px;background:#f4f4f5;border-radius:12px;text-align:center;">${t(ctx.locale, "حراج", "Sale")}</div>
   </div>
 </div>${sectionClose()}`;
     },
@@ -542,11 +563,11 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-pricing",
       });
       return `${open}<div style="max-width:1100px;margin:0 auto;text-align:center;">
-  <h2 data-content-path="content.pricing.title" style="font-size:2rem;margin:0 0 24px;">Pricing</h2>
+  <h2 data-content-path="content.pricing.title" style="font-size:2rem;margin:0 0 24px;">${t(ctx.locale, "قیمت‌گذاری", "Pricing")}</h2>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:start;">
-    <div data-collection="pricing" data-plan-id="plan-starter" style="border:1px solid #e5e5e5;border-radius:16px;padding:24px;"><strong>Starter</strong><p style="font-size:1.75rem;margin:8px 0;">$0</p></div>
-    <div data-collection="pricing" data-plan-id="plan-pro" style="border:1px solid #111;border-radius:16px;padding:24px;background:#111;color:#fff;"><strong>Pro</strong><p style="font-size:1.75rem;margin:8px 0;">$29</p></div>
-    <div data-collection="pricing" data-plan-id="plan-enterprise" style="border:1px solid #e5e5e5;border-radius:16px;padding:24px;"><strong>Enterprise</strong><p style="font-size:1.75rem;margin:8px 0;">Custom</p></div>
+    <div data-collection="pricing" data-plan-id="plan-starter" style="border:1px solid #e5e5e5;border-radius:16px;padding:24px;"><strong>${t(ctx.locale, "شروع", "Starter")}</strong><p style="font-size:1.75rem;margin:8px 0;">${t(ctx.locale, "۰ تومان", "$0")}</p></div>
+    <div data-collection="pricing" data-plan-id="plan-pro" style="border:1px solid #111;border-radius:16px;padding:24px;background:#111;color:#fff;"><strong>${t(ctx.locale, "حرفه‌ای", "Pro")}</strong><p style="font-size:1.75rem;margin:8px 0;">$29</p></div>
+    <div data-collection="pricing" data-plan-id="plan-enterprise" style="border:1px solid #e5e5e5;border-radius:16px;padding:24px;"><strong>${t(ctx.locale, "سازمانی", "Enterprise")}</strong><p style="font-size:1.75rem;margin:8px 0;">${t(ctx.locale, "سفارشی", "Custom")}</p></div>
   </div>
 </div>${sectionClose()}`;
     },
@@ -569,8 +590,8 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-menu",
       });
       return `${open}<div style="max-width:720px;margin:0 auto;">
-  <h2 data-content-path="content.menu.title" style="font-size:2rem;margin:0 0 24px;">Menu</h2>
-  <div data-collection="menu" data-menu-item-id="mi-1" style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eee;"><strong>Season salad</strong><span>18</span></div>
+  <h2 data-content-path="content.menu.title" style="font-size:2rem;margin:0 0 24px;">${t(ctx.locale, "منو", "Menu")}</h2>
+  <div data-collection="menu" data-menu-item-id="mi-1" style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eee;"><strong>${t(ctx.locale, "سالاد فصل", "Season salad")}</strong><span>18</span></div>
 </div>${sectionClose()}`;
     },
   },
@@ -592,8 +613,8 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-location",
       });
       return `${open}<div style="max-width:720px;margin:0 auto;">
-  <h2 data-content-path="content.location.title" style="font-size:2rem;margin:0 0 12px;">Location</h2>
-  <p data-content-path="content.location.address" style="margin:0;">Address</p>
+  <h2 data-content-path="content.location.title" style="font-size:2rem;margin:0 0 12px;">${t(ctx.locale, "مکان", "Location")}</h2>
+  <p data-content-path="content.location.address" style="margin:0;">${t(ctx.locale, "آدرس", "Address")}</p>
 </div>${sectionClose()}`;
     },
   },
@@ -615,7 +636,7 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-portfolio",
       });
       return `${open}<div style="max-width:1100px;margin:0 auto;">
-  <h2 data-content-path="content.portfolio.title" style="font-size:2rem;margin:0 0 24px;">Work</h2>
+  <h2 data-content-path="content.portfolio.title" style="font-size:2rem;margin:0 0 24px;">${t(ctx.locale, "کارها", "Work")}</h2>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
     <div data-collection="portfolio" data-portfolio-id="work-1" style="aspect-ratio:4/3;background:#eee;border-radius:12px;"></div>
     <div data-collection="portfolio" data-portfolio-id="work-2" style="aspect-ratio:4/3;background:#eee;border-radius:12px;"></div>
@@ -642,9 +663,9 @@ export const SECTION_BLOCKS: VisualBlockDefinition[] = [
         blockId: "section-properties",
       });
       return `${open}<div style="max-width:1100px;margin:0 auto;">
-  <h2 data-content-path="content.properties.title" style="font-size:2rem;margin:0 0 24px;">Properties</h2>
+  <h2 data-content-path="content.properties.title" style="font-size:2rem;margin:0 0 24px;">${t(ctx.locale, "املاک", "Properties")}</h2>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-    <div data-collection="properties" data-property-id="prop-1" style="border:1px solid #eee;border-radius:12px;overflow:hidden;"><div style="aspect-ratio:16/10;background:#eee;"></div><div style="padding:12px;"><strong>Harbor Loft</strong></div></div>
+    <div data-collection="properties" data-property-id="prop-1" style="border:1px solid #eee;border-radius:12px;overflow:hidden;"><div style="aspect-ratio:16/10;background:#eee;"></div><div style="padding:12px;"><strong>${t(ctx.locale, "لوفت بندر", "Harbor Loft")}</strong></div></div>
   </div>
 </div>${sectionClose()}`;
     },

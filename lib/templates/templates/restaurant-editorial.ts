@@ -25,26 +25,26 @@ export const restaurantEditorialTemplate = defineTemplate({
         variant: "overlay",
         canonical: true,
         content: {
-          headline: "Fresh seasonal dining",
-          subheadline: "A kitchen rooted in local produce and slow evenings.",
-          cta: "Reserve a table",
+          headline: { fa: "غذای فصلی تازه", en: "Fresh seasonal dining" },
+          subheadline: { fa: "آشپزخانه‌ای بر پایه محصول محلی و شب‌های آرام.", en: "A kitchen rooted in local produce and slow evenings." },
+          cta: { fa: "رزرو میز", en: "Reserve a table" },
         },
       }),
       sec("about", "section-about", {
         variant: "split",
         canonical: true,
         content: {
-          title: "Our kitchen",
-          body: "We cook what the season offers — short menus, clear flavors, warm hospitality.",
+          title: { fa: "آشپزخانه ما", en: "Our kitchen" },
+          body: { fa: "آنچه فصل می‌دهد می‌پزیم — منوی کوتاه، طعم روشن، مهمان‌نوازی گرم.", en: "We cook what the season offers — short menus, clear flavors, warm hospitality." },
         },
       }),
       sec("gallery", "section-gallery", {
         variant: "masonry",
-        content: { title: "The room" },
+        content: { title: { fa: "سالن", en: "The room" } },
       }),
       sec("cta", "section-cta", {
         variant: "full-width",
-        content: { title: "Reserve a table", cta: "Book now" },
+        content: { title: { fa: "رزرو میز", en: "Reserve a table" }, cta: { fa: "همین حالا رزرو کنید", en: "Book now" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -52,26 +52,26 @@ export const restaurantEditorialTemplate = defineTemplate({
       sec("hero", "section-hero", {
         variant: "minimal",
         content: {
-          headline: "Our menu",
-          subheadline: "Starters, mains, and dessert — updated weekly.",
-          cta: "See tonight",
+          headline: { fa: "منوی ما", en: "Our menu" },
+          subheadline: { fa: "پیش‌غذا، غذای اصلی و دسر — به‌روز هفتگی.", en: "Starters, mains, and dessert — updated weekly." },
+          cta: { fa: "منوی امشب", en: "See tonight" },
         },
       }),
       sec("products", "section-menu", {
-        content: { title: "Tonight" },
+        content: { title: { fa: "امشب", en: "Tonight" } },
       }),
       sec("footer", "section-footer"),
     ]),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [
       sec("about", "section-about", {
         content: {
-          title: "About us",
-          body: "A neighborhood restaurant with an editorial eye — food first, no fuss.",
+          title: { fa: "درباره ما", en: "About us" },
+          body: { fa: "رستوران محله‌ای با نگاه ادیتوریال — غذا اول، بدون حاشیه.", en: "A neighborhood restaurant with an editorial eye — food first, no fuss." },
         },
       }),
       sec("testimonials", "section-testimonials", {
         variant: "quote",
-        content: { title: "Guests say" },
+        content: { title: { fa: "مهمان‌ها می‌گویند", en: "Guests say" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -84,22 +84,22 @@ export const restaurantEditorialTemplate = defineTemplate({
         sec("hero", "section-hero", {
           variant: "centered",
           content: {
-            headline: "Reservations",
-            subheadline: "Dinner seats and private gatherings.",
-            cta: "Request a table",
+            headline: { fa: "رزرو", en: "Reservations" },
+            subheadline: { fa: "میز شام و دورهمی‌های خصوصی.", en: "Dinner seats and private gatherings." },
+            cta: { fa: "درخواست میز", en: "Request a table" },
           },
         }),
         sec("location", "section-location", {
-          content: { title: "Reservations & location" },
+          content: { title: { fa: "رزرو و مکان", en: "Reservations & location" } },
         }),
         sec("cta", "section-cta", {
           variant: "simple",
-          content: { title: "Book your evening", cta: "Reserve" },
+          content: { title: { fa: "شب‌تان را رزرو کنید", en: "Book your evening" }, cta: { fa: "رزرو", en: "Reserve" } },
         }),
         sec("contact", "section-contact", {
           content: {
-            title: "Or call us",
-            body: "For larger parties and events, reach the front desk.",
+            title: { fa: "یا تماس بگیرید", en: "Or call us" },
+            body: { fa: "برای مهمانی و رویداد بزرگ‌تر با پذیرش تماس بگیرید.", en: "For larger parties and events, reach the front desk." },
           },
         }),
         sec("footer", "section-footer"),
@@ -108,8 +108,8 @@ export const restaurantEditorialTemplate = defineTemplate({
     page("contact", "contact", { fa: "تماس", en: "Contact" }, "custom", [
       sec("contact", "section-contact", {
         content: {
-          title: "Find us",
-          body: "Hours, location, and directions.",
+          title: { fa: "پیدا کردن ما", en: "Find us" },
+          body: { fa: "ساعات، مکان و مسیر.", en: "Hours, location, and directions." },
         },
       }),
       sec("footer", "section-footer"),

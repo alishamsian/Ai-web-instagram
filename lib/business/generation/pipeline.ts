@@ -45,8 +45,10 @@ function resolveLocale(
 ): "fa" | "en" {
   if (explicit) return explicit;
   const locale = (profile.locale ?? "").toLowerCase();
-  if (locale.startsWith("fa")) return "fa";
-  return "en";
+  if (locale.startsWith("en")) return "en";
+  if (locale.startsWith("fa") || locale.startsWith("ar")) return "fa";
+  // Product default is Persian (DEFAULT_LOCALE).
+  return "fa";
 }
 
 /** Stable non-cryptographic id from URL for deterministic media keys. */

@@ -14,9 +14,14 @@ function resolveLocale(
   explicit?: ContentLocale,
 ): ContentLocale {
   if (explicit) return explicit;
-  const locale = (profile.locale ?? profile.languages?.[0] ?? "en").toLowerCase();
+  const locale = (
+    profile.locale ??
+    profile.languages?.[0] ??
+    "fa"
+  ).toLowerCase();
+  if (locale.startsWith("en")) return "en";
   if (locale.startsWith("fa") || locale.startsWith("ar")) return "fa";
-  return "en";
+  return "fa";
 }
 
 function brandNameOf(profile: BusinessProfile, locale: ContentLocale): string {

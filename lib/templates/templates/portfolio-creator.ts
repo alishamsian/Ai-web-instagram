@@ -25,24 +25,24 @@ export const portfolioCreatorTemplate = defineTemplate({
         variant: "minimal",
         canonical: true,
         content: {
-          headline: "Selected work",
-          subheadline: "A focused portfolio for people who ship craft.",
-          cta: "View work",
+          headline: { fa: "نمونه کارها", en: "Selected work" },
+          subheadline: { fa: "پورتفولیوی متمرکز برای کسانی که کار دستی می‌سازند.", en: "A focused portfolio for people who ship craft." },
+          cta: { fa: "مشاهده کارها", en: "View work" },
         },
       }),
       sec("portfolio", "section-portfolio", {
-        content: { title: "Projects" },
+        content: { title: { fa: "پروژه‌ها", en: "Projects" } },
       }),
       sec("about", "section-about", {
         canonical: true,
         content: {
-          title: "About",
-          body: "Independent designer working across brand, web, and editorial.",
+          title: { fa: "درباره", en: "About" },
+          body: { fa: "طراح مستقل در برند، وب و ادیتوریال.", en: "Independent designer working across brand, web, and editorial." },
         },
       }),
       sec("cta", "section-cta", {
         variant: "simple",
-        content: { title: "Available for select projects", cta: "Email me" },
+        content: { title: { fa: "آماده پروژه‌های منتخب", en: "Available for select projects" }, cta: { fa: "ایمیل بزنید", en: "Email me" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -50,31 +50,31 @@ export const portfolioCreatorTemplate = defineTemplate({
       sec("hero", "section-hero", {
         variant: "minimal",
         content: {
-          headline: "Work",
-          subheadline: "Case studies and stills.",
-          cta: "Contact",
+          headline: { fa: "کارها", en: "Work" },
+          subheadline: { fa: "کیس‌استادی و تصاویر.", en: "Case studies and stills." },
+          cta: { fa: "تماس", en: "Contact" },
         },
       }),
-      sec("portfolio", "section-portfolio", { content: { title: "Work" } }),
+      sec("portfolio", "section-portfolio", { content: { title: { fa: "کارها", en: "Work" } } }),
       sec("footer", "section-footer"),
     ]),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [
       sec("about", "section-about", {
         content: {
-          title: "Bio",
-          body: "I help brands find a calmer visual language — online and in print.",
+          title: { fa: "بیو", en: "Bio" },
+          body: { fa: "به برندها کمک می‌کنم زبان بصری آرام‌تری پیدا کنند — آنلاین و چاپی.", en: "I help brands find a calmer visual language — online and in print." },
         },
       }),
       sec("services", "section-services", {
-        content: { title: "Capabilities" },
+        content: { title: { fa: "توانمندی‌ها", en: "Capabilities" } },
       }),
       sec("footer", "section-footer"),
     ]),
     page("contact", "contact", { fa: "تماس", en: "Contact" }, "custom", [
       sec("contact", "section-contact", {
         content: {
-          title: "Contact",
-          body: "Commissions and collaborations.",
+          title: { fa: "تماس", en: "Contact" },
+          body: { fa: "سفارش و همکاری.", en: "Commissions and collaborations." },
         },
       }),
       sec("footer", "section-footer"),

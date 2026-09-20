@@ -22,24 +22,24 @@ export const beautyPremiumTemplate = defineTemplate({
         variant: "overlay",
         canonical: true,
         content: {
-          headline: "Care, calmly presented",
-          subheadline: "Routines and treatments with a clear path.",
-          cta: "Explore care",
+          headline: { fa: "مراقبت، با روایت آرام", en: "Care, calmly presented" },
+          subheadline: { fa: "روتین و درمان با مسیر روشن.", en: "Routines and treatments with a clear path." },
+          cta: { fa: "کاوش مراقبت", en: "Explore care" },
         },
       }),
       sec("services", "section-services", {
-        content: { title: "Services" },
+        content: { title: { fa: "خدمات", en: "Services" } },
       }),
       sec("featured", "section-featured-products", {
-        content: { title: "Featured products" },
+        content: { title: { fa: "محصولات ویژه", en: "Featured products" } },
       }),
       sec("testimonials", "section-testimonials", {
         variant: "cards",
-        content: { title: "Client notes" },
+        content: { title: { fa: "یادداشت مشتریان", en: "Client notes" } },
       }),
       sec("cta", "section-cta", {
         variant: "simple",
-        content: { title: "Book a consultation", cta: "Get in touch" },
+        content: { title: { fa: "رزرو مشاوره", en: "Book a consultation" }, cta: { fa: "در تماس باشید", en: "Get in touch" } },
       }),
       sec("footer", "section-footer"),
     ]),
@@ -47,42 +47,42 @@ export const beautyPremiumTemplate = defineTemplate({
       sec("hero", "section-hero", {
         variant: "minimal",
         content: {
-          headline: "Services",
-          subheadline: "Facials, rituals, and seasonal care.",
-          cta: "Book",
+          headline: { fa: "خدمات", en: "Services" },
+          subheadline: { fa: "فیشیال، آیین‌ها و مراقبت فصلی.", en: "Facials, rituals, and seasonal care." },
+          cta: { fa: "رزرو", en: "Book" },
         },
       }),
       sec("services", "section-services"),
-      sec("faq", "section-faq", { content: { title: "Before you visit" } }),
+      sec("faq", "section-faq", { content: { title: { fa: "قبل از مراجعه", en: "Before you visit" } } }),
       sec("footer", "section-footer"),
     ]),
     page("about", "about", { fa: "درباره", en: "About" }, "about", [
       sec("about", "section-about", {
         content: {
-          title: "Our approach",
-          body: "Gentle formulas, honest guidance, and a quiet studio atmosphere.",
+          title: { fa: "رویکرد ما", en: "Our approach" },
+          body: { fa: "فرمول‌های ملایم، راهنمایی صادقانه و فضای آرام استودیو.", en: "Gentle formulas, honest guidance, and a quiet studio atmosphere." },
         },
       }),
-      sec("gallery", "section-gallery", { content: { title: "Studio" } }),
+      sec("gallery", "section-gallery", { content: { title: { fa: "استودیو", en: "Studio" } } }),
       sec("footer", "section-footer"),
     ]),
     page("products", "products", { fa: "محصولات", en: "Products" }, "custom", [
       sec("hero", "section-hero", {
         variant: "split",
         content: {
-          headline: "Products",
-          subheadline: "Home care that matches the studio ritual.",
-          cta: "Shop",
+          headline: { fa: "محصولات", en: "Products" },
+          subheadline: { fa: "مراقبت خانگی هم‌راستا با آیین استودیو.", en: "Home care that matches the studio ritual." },
+          cta: { fa: "فروشگاه", en: "Shop" },
         },
       }),
-      sec("products", "section-products", { content: { title: "Care collection" } }),
+      sec("products", "section-products", { content: { title: { fa: "مجموعه مراقبت", en: "Care collection" } } }),
       sec("footer", "section-footer"),
     ]),
     page("contact", "contact", { fa: "تماس", en: "Contact" }, "custom", [
       sec("contact", "section-contact", {
         content: {
-          title: "Visit & contact",
-          body: "Appointments, product questions, and collaborations.",
+          title: { fa: "بازدید و تماس", en: "Visit & contact" },
+          body: { fa: "نوبت، سوال محصول و همکاری.", en: "Appointments, product questions, and collaborations." },
         },
       }),
       sec("footer", "section-footer"),

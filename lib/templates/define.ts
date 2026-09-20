@@ -61,7 +61,7 @@ export function sec(
   blockId: string,
   opts?: {
     variant?: string;
-    content?: Record<string, string>;
+    content?: Record<string, string | { fa: string; en: string }>;
     canonical?: boolean;
   },
 ): TemplatePageDef["sections"][number] {

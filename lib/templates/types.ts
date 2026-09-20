@@ -69,14 +69,16 @@ export type TemplateBrandPreset = {
   tagline?: string;
 };
 
+export type LocalizedText = string | { fa: string; en: string };
+
 export type TemplateSectionDef = {
   /** Stable key within the page (e.g. "hero", "cta"). */
   key: string;
   /** Visual registry block id, e.g. "section-hero". */
   blockId: string;
   variant?: string;
-  /** Optional content role → text for create-time merge. */
-  content?: Record<string, string>;
+  /** Optional content role → text for create-time merge (bilingual preferred). */
+  content?: Record<string, LocalizedText>;
   /** Maps to WebsiteConfig content paths when on home (optional). */
   canonical?: boolean;
 };
