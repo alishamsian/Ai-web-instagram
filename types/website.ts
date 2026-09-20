@@ -61,11 +61,30 @@ export interface WebsiteConfig {
   settings: WebsiteSettings;
   media: Record<string, { url: string; alt: string; type: "image" | "video"; videoUrl?: string | null }>;
   /**
+   * Site page metadata for the multi-page visual builder.
+   * Ordering is array order; identity is `id` (never array index).
+   * Classic Editor ignores this field; WebsiteRenderer uses it for page-aware preview.
+   * GrapesJS page trees remain under visualEditor.project (projection only).
+   */
+  pages?: WebsitePage[];
+  /**
    * GrapesJS visual-editor projection (optional).
    * Classic Editor / WebsiteRenderer ignore this field.
    * Canonical product model remains the rest of WebsiteConfig.
    */
   visualEditor?: VisualEditorState;
+}
+
+/** Stable multi-page identity (Phase 2.2). Reserved: home, about. */
+export type WebsitePageKind = "home" | "about" | "custom";
+
+export interface WebsitePage {
+  id: string;
+  slug: string;
+  name: string;
+  title?: string;
+  description?: string;
+  kind: WebsitePageKind;
 }
 
 /** Persisted GrapesJS project JSON + metadata. Unknown keys must survive round-trips. */

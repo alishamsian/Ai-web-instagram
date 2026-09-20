@@ -14,27 +14,41 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import type { Editor } from "grapesjs";
-import type { WebsiteConfig, WebsiteRecord } from "@/types/website";
+import type { WebsiteConfig, WebsitePage, WebsiteRecord } from "@/types/website";
 import type { Locale } from "@/lib/config/env";
 import {
   applyMediaToSelectedImage,
   applyVisualProjectToWebsiteConfig,
+  blankPageComponent,
   canVisualRedo,
   canVisualUndo,
+  clearVisualUndoHistory,
   createSaveQueue,
   createVisualEditor,
+  createVisualPage,
   deleteSelected,
+  deleteVisualPage,
   destroyVisualEditor,
   duplicateSelected,
+  duplicateVisualPage,
+  ensureWebsitePages,
   getActiveVisualPageId,
-  getVisualPages,
   openAssetManager,
+  PageOpError,
+  renameVisualPage,
+  reorderPageMeta,
+  reorderVisualPages,
   selectVisualPage,
   serializeVisualProject,
   setVisualDevice,
   setVisualZoom,
   toggleSelectedVisibility,
+  uniqueCopyName,
+  uniqueCopySlug,
+  pageIdFromSlug,
+  validateNewPageInput,
   visualProjectFingerprint,
   visualRedo,
   visualUndo,
@@ -43,9 +57,11 @@ import {
   type VisualSaveState,
   type VisualZoomMode,
   VISUAL_DEVICES,
+  VISUAL_PAGE_HOME,
   VISUAL_ZOOM_OPTIONS,
 } from "@/lib/visual-editor";
 import { VisualEditorLoading } from "@/components/visual-editor/VisualEditorLoading";
+import { VisualPagesPanel } from "@/components/visual-editor/VisualPagesPanel";
 import "@/app/visual-editor.css";
 import "grapesjs/dist/css/grapes.min.css";
 import {
@@ -67,10 +83,15 @@ const AUTOSAVE_MS = 1200;
 export function VisualEditorShell({
   website,
   locale,
+  initialPage = null,
 }: {
   website: WebsiteRecord;
   locale: Locale;
+  /** Stable page id/slug from URL `?page=` (server-resolved; avoids useSearchParams hydration). */
+  initialPage?: string | null;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const isFa = locale === "fa";
   const canvasRef = useRef<HTMLDivElement>(null);
   const blocksRef = useRef<HTMLDivElement>(null);
@@ -78,7 +99,9 @@ export function VisualEditorShell({
   const stylesRef = useRef<HTMLDivElement>(null);
   const traitsRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
-  const configRef = useRef<WebsiteConfig>(structuredClone(website.config));
+  const initialConfig = structuredClone(website.config);
+  initialConfig.pages = ensureWebsitePages(initialConfig);
+  const configRef = useRef<WebsiteConfig>(initialConfig);
   const versionRef = useRef(website.version);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedFingerprint = useRef("");
@@ -87,18 +110,27 @@ export function VisualEditorShell({
   const editorMountIdRef = useRef(0);
   const refreshDirtyRef = useRef<() => void>(() => {});
   const syncHistoryRef = useRef<() => void>(() => {});
+  const switchingPageRef = useRef(false);
 
+  const initialPageFromUrlRef = useRef(initialPage);
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<VisualSaveState>("clean");
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [device, setDevice] = useState<VisualDeviceId>("desktop");
   const [zoom, setZoom] = useState<VisualZoomMode>(100);
-  const [leftTab, setLeftTab] = useState<LeftTab>("blocks");
+  const [leftTab, setLeftTab] = useState<LeftTab>(
+    initialPage ? "pages" : "blocks",
+  );
   const [rightTab, setRightTab] = useState<RightTab>("style");
-  const [pages, setPages] = useState<{ id: string; name: string }[]>([]);
+  const [pageMeta, setPageMeta] = useState<WebsitePage[]>(
+    initialConfig.pages ?? [],
+  );
   const [activePageId, setActivePageId] = useState(
-    website.config.visualEditor?.activePageId || "home",
+    initialPage ||
+      website.config.visualEditor?.activePageId ||
+      VISUAL_PAGE_HOME,
   );
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -128,6 +160,10 @@ export function VisualEditorShell({
   const refreshDirtyFromEditor = useCallback(() => {
     const ed = editorRef.current;
     if (!ed) return;
+    if (switchingPageRef.current) {
+      syncHistoryFlags();
+      return;
+    }
     const project = serializeVisualProject(ed);
     const fingerprint = visualProjectFingerprint(project);
     const dirty = fingerprint !== lastSavedFingerprint.current;
@@ -138,9 +174,9 @@ export function VisualEditorShell({
       return "clean";
     });
     syncHistoryFlags();
-    setPages(getVisualPages(ed));
     const pid = getActiveVisualPageId(ed);
     if (pid) setActivePageId(pid);
+    if (configRef.current.pages) setPageMeta(configRef.current.pages);
   }, [syncHistoryFlags]);
 
   const pullConfigFromEditor = useCallback((): WebsiteConfig => {
@@ -152,9 +188,243 @@ export function VisualEditorShell({
       activePageId: pageId,
     });
     configRef.current = next;
+    setPageMeta(next.pages ?? []);
     return next;
   }, []);
 
+  const writePageToUrl = useCallback(
+    (pageId: string) => {
+      const qs =
+        pageId === VISUAL_PAGE_HOME
+          ? ""
+          : `?page=${encodeURIComponent(pageId)}`;
+      router.replace(`${pathname}${qs}`, { scroll: false });
+    },
+    [pathname, router],
+  );
+
+  const switchToPage = useCallback(
+    (pageId: string) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      if (getActiveVisualPageId(ed) === pageId) {
+        setActivePageId(pageId);
+        writePageToUrl(pageId);
+        return;
+      }
+      switchingPageRef.current = true;
+      const beforeFp = visualProjectFingerprint(serializeVisualProject(ed));
+      const wasDirty = beforeFp !== lastSavedFingerprint.current;
+      pullConfigFromEditor();
+      selectVisualPage(ed, pageId);
+      clearVisualUndoHistory(ed);
+      setActivePageId(pageId);
+      writePageToUrl(pageId);
+      syncHistoryFlags();
+      if (!wasDirty) {
+        lastSavedFingerprint.current = visualProjectFingerprint(
+          serializeVisualProject(ed),
+        );
+        setSaveState((prev) =>
+          prev === "saving" || prev === "conflict" ? prev : "clean",
+        );
+      } else {
+        setSaveState((prev) =>
+          prev === "saving" || prev === "conflict" ? prev : "dirty",
+        );
+      }
+      switchingPageRef.current = false;
+      if (configRef.current.pages) setPageMeta(configRef.current.pages);
+    },
+    [pullConfigFromEditor, syncHistoryFlags, writePageToUrl],
+  );
+  const handleCreatePage = useCallback(
+    async (input: { name: string; slug: string }) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      setPageError(null);
+      try {
+        pullConfigFromEditor();
+        const pages = ensureWebsitePages(configRef.current);
+        const validated = validateNewPageInput(input.name, input.slug, pages);
+        const dir =
+          configRef.current.settings.direction === "rtl" ? "rtl" : "ltr";
+        const lang =
+          configRef.current.settings.language === "en" ? "en" : "fa";
+        createVisualPage(ed, {
+          id: validated.id,
+          name: validated.name,
+          slug: validated.slug,
+          componentHtml: blankPageComponent({
+            id: validated.id,
+            name: validated.name,
+            slug: validated.slug,
+            dir,
+            lang,
+          }),
+        });
+        clearVisualUndoHistory(ed);
+        const next = pullConfigFromEditor();
+        setPageMeta(next.pages ?? []);
+        setActivePageId(validated.id);
+        writePageToUrl(validated.id);
+        setSaveState("dirty");
+      } catch (err) {
+        setPageError(
+          err instanceof PageOpError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to create page",
+        );
+      }
+    },
+    [pullConfigFromEditor, writePageToUrl],
+  );
+
+  const handleRenamePage = useCallback(
+    async (pageId: string, patch: { name: string; slug?: string }) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      setPageError(null);
+      try {
+        pullConfigFromEditor();
+        renameVisualPage(ed, pageId, patch);
+        const next = pullConfigFromEditor();
+        // Ensure slug/name land in pages meta
+        if (next.pages) {
+          next.pages = next.pages.map((p) =>
+            p.id === pageId
+              ? {
+                  ...p,
+                  name: patch.name.trim() || p.name,
+                  slug:
+                    p.kind === "custom" && patch.slug !== undefined
+                      ? patch.slug
+                      : p.slug,
+                }
+              : p,
+          );
+          configRef.current = next;
+          setPageMeta(next.pages);
+        }
+        setSaveState("dirty");
+      } catch (err) {
+        setPageError(
+          err instanceof PageOpError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to rename page",
+        );
+      }
+    },
+    [pullConfigFromEditor],
+  );
+
+  const handleDuplicatePage = useCallback(
+    async (pageId: string) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      setPageError(null);
+      try {
+        pullConfigFromEditor();
+        const pages = ensureWebsitePages(configRef.current);
+        const source = pages.find((p) => p.id === pageId);
+        if (!source) throw new PageOpError("PAGE_NOT_FOUND", "Page not found");
+        const slug = uniqueCopySlug(
+          source.slug || source.id,
+          pages,
+        );
+        const name = uniqueCopyName(source.name, pages);
+        const id = pageIdFromSlug(slug);
+        duplicateVisualPage(ed, pageId, { id, name, slug });
+        clearVisualUndoHistory(ed);
+        const next = pullConfigFromEditor();
+        setPageMeta(next.pages ?? []);
+        setActivePageId(id);
+        writePageToUrl(id);
+        setSaveState("dirty");
+      } catch (err) {
+        setPageError(
+          err instanceof PageOpError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to duplicate page",
+        );
+      }
+    },
+    [pullConfigFromEditor, writePageToUrl],
+  );
+
+  const handleDeletePage = useCallback(
+    async (pageId: string) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      setPageError(null);
+      try {
+        pullConfigFromEditor();
+        deleteVisualPage(ed, pageId);
+        clearVisualUndoHistory(ed);
+        const next = pullConfigFromEditor();
+        const active = getActiveVisualPageId(ed) || VISUAL_PAGE_HOME;
+        setPageMeta(next.pages ?? []);
+        setActivePageId(active);
+        writePageToUrl(active);
+        setSaveState("dirty");
+      } catch (err) {
+        setPageError(
+          err instanceof PageOpError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to delete page",
+        );
+      }
+    },
+    [pullConfigFromEditor, writePageToUrl],
+  );
+
+  const handleMovePage = useCallback(
+    async (pageId: string, direction: "up" | "down") => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      setPageError(null);
+      try {
+        pullConfigFromEditor();
+        const pages = [...ensureWebsitePages(configRef.current)];
+        const index = pages.findIndex((p) => p.id === pageId);
+        if (index < 0) return;
+        const swapWith = direction === "up" ? index - 1 : index + 1;
+        if (swapWith < 0 || swapWith >= pages.length) return;
+        // Keep home first
+        if (pages[swapWith]?.id === VISUAL_PAGE_HOME && direction === "up") {
+          return;
+        }
+        if (pages[index]?.id === VISUAL_PAGE_HOME) return;
+        const tmp = pages[index];
+        pages[index] = pages[swapWith];
+        pages[swapWith] = tmp;
+        reorderVisualPages(
+          ed,
+          pages.map((p) => p.id),
+        );
+        configRef.current.pages = reorderPageMeta(
+          ensureWebsitePages(configRef.current),
+          pages.map((p) => p.id),
+        );
+        const next = pullConfigFromEditor();
+        setPageMeta(next.pages ?? []);
+        setSaveState("dirty");
+      } catch (err) {
+        setPageError(
+          err instanceof Error ? err.message : "Failed to reorder pages",
+        );
+      }
+    },
+    [pullConfigFromEditor],
+  );
   useEffect(() => {
     refreshDirtyRef.current = refreshDirtyFromEditor;
     syncHistoryRef.current = syncHistoryFlags;
@@ -300,13 +570,27 @@ export function VisualEditorShell({
         } catch {
           // older grapes builds may not expose clear
         }
-        setPages(getVisualPages(editor));
+        const syncedPages = ensureWebsitePages({
+          ...configRef.current,
+          visualEditor: {
+            engine: "grapesjs",
+            version: 2,
+            project: serializeVisualProject(editor) as Record<string, unknown>,
+          },
+        });
+        configRef.current.pages = syncedPages;
+        setPageMeta(syncedPages);
         const preferred =
+          initialPageFromUrlRef.current ||
           configRef.current.visualEditor?.activePageId ||
           getActiveVisualPageId(editor) ||
-          "home";
-        selectVisualPage(editor, preferred);
-        setActivePageId(preferred);
+          VISUAL_PAGE_HOME;
+        const available = editor.Pages.getAll().map((p) => p.getId());
+        const safePreferred = available.includes(preferred)
+          ? preferred
+          : available[0] || VISUAL_PAGE_HOME;
+        selectVisualPage(editor, safePreferred);
+        setActivePageId(safePreferred);
         setVisualDevice(editor, "desktop");
         setVisualZoom(editor, 100);
         syncHistoryRef.current();
@@ -530,7 +814,11 @@ export function VisualEditorShell({
             {statusLabel}
           </span>
           <Link
-            href={`/${locale}/preview/${website.id}`}
+            href={`/${locale}/preview/${website.id}${
+              activePageId && activePageId !== VISUAL_PAGE_HOME
+                ? `?page=${encodeURIComponent(activePageId)}`
+                : ""
+            }`}
             target="_blank"
             className="ve-btn"
             style={{ textDecoration: "none" }}
@@ -584,27 +872,18 @@ export function VisualEditorShell({
           </div>
           <div className="ve-panel">
             {leftTab === "pages" ? (
-              <div className="ve-pages">
-                {pages.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    className="ve-page-item"
-                    data-active={activePageId === page.id}
-                    onClick={() => {
-                      const ed = editorRef.current;
-                      if (!ed) return;
-                      // Persist current page into project before switching
-                      pullConfigFromEditor();
-                      selectVisualPage(ed, page.id);
-                      setActivePageId(page.id);
-                      refreshDirtyFromEditor();
-                    }}
-                  >
-                    {page.name}
-                  </button>
-                ))}
-              </div>
+              <VisualPagesPanel
+                pages={pageMeta}
+                activePageId={activePageId}
+                isFa={isFa}
+                error={pageError}
+                onSelect={switchToPage}
+                onCreate={handleCreatePage}
+                onRename={handleRenamePage}
+                onDuplicate={handleDuplicatePage}
+                onDelete={handleDeletePage}
+                onMove={handleMovePage}
+              />
             ) : null}
             <div
               ref={blocksRef}

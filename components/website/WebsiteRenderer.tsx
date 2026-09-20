@@ -23,6 +23,7 @@ import { useEditorEdit } from "@/components/editor/EditContext";
 import { sectionLabel } from "@/components/editor/editor-utils";
 import { polishWebsiteConfig } from "@/lib/website/polish";
 import { cn } from "@/lib/utils";
+import { VisualCustomPagePreview } from "@/components/visual-editor/VisualCustomPagePreview";
 
 const sectionMap = {
   hero: HeroSection,
@@ -44,6 +45,7 @@ export function WebsiteRenderer({
   productSlug,
   websiteId,
   mode = "published",
+  pageId,
   onProductNavigate,
   onHomeNavigate,
 }: {
@@ -52,15 +54,66 @@ export function WebsiteRenderer({
   productSlug?: string;
   websiteId?: string;
   mode?: WebsiteRenderMode;
+  /** Multi-page preview: home | about | custom page id */
+  pageId?: string;
   onProductNavigate?: (slug: string) => void;
   onHomeNavigate?: () => void;
 }) {
   const view = polishWebsiteConfig(config);
   const locale = view.settings.language;
   const edit = useEditorEdit();
+  const resolvedPageId = pageId || "home";
+
+  // Custom visual pages: preview projection HTML (not GrapesJS canvas)
+  if (resolvedPageId !== "home" && resolvedPageId !== "about") {
+    const meta = (view.pages ?? []).find((p) => p.id === resolvedPageId) ?? {
+      id: resolvedPageId,
+      slug: resolvedPageId,
+      name: resolvedPageId,
+      kind: "custom" as const,
+    };
+    return <VisualCustomPagePreview config={view} page={meta} />;
+  }
+
   const visibleSections = view.sections.filter(
     (section) => section.visible || mode === "editor",
   );
+
+  // About page preview: about (+ footer) only — page-aware, still WebsiteRenderer
+  if (resolvedPageId === "about" && !productSlug) {
+    const aboutSections = visibleSections.filter(
+      (s) => s.type === "about" || s.type === "footer",
+    );
+    return (
+      <SiteNavProvider
+        value={{
+          basePath,
+          onProductNavigate,
+          onHomeNavigate,
+        }}
+      >
+        <WebsiteShell
+          config={view}
+          className={cn("vitrin-template", `vitrin-template--${view.template}`)}
+        >
+          {aboutSections.length === 0 ? (
+            <AboutSection config={view} />
+          ) : (
+            aboutSections.map((section) => {
+              const Comp = sectionMap[section.type as keyof typeof sectionMap];
+              if (!Comp) return null;
+              return (
+                <div key={section.id}>
+                  <Comp config={view} />
+                </div>
+              );
+            })
+          )}
+        </WebsiteShell>
+      </SiteNavProvider>
+    );
+  }
+
   const bodySections = visibleSections.filter((s) => s.type !== "footer");
 
   return (

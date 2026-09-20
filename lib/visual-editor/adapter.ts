@@ -132,6 +132,7 @@ export function assertAdapterPreservesConfig(
     if (
       key === "visualEditor" ||
       key === "content" ||
+      key === "pages" ||
       [
         "template",
         "brand",

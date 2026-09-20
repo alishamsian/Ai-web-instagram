@@ -242,11 +242,22 @@ export function setVisualDevice(editor: Editor, device: VisualDeviceId) {
   editor.setDevice(match.grapesName);
 }
 
-export function getVisualPages(editor: Editor): { id: string; name: string }[] {
-  return editor.Pages.getAll().map((page) => ({
-    id: page.getId(),
-    name: String(page.getName() || page.getId()),
-  }));
+export function getVisualPages(editor: Editor): {
+  id: string;
+  name: string;
+  slug?: string;
+}[] {
+  return editor.Pages.getAll().map((page) => {
+    const id = page.getId();
+    const attrs = (page as unknown as { get?: (k: string) => unknown }).get?.(
+      "slug",
+    );
+    return {
+      id,
+      name: String(page.getName() || id),
+      slug: typeof attrs === "string" ? attrs : undefined,
+    };
+  });
 }
 
 export function selectVisualPage(editor: Editor, pageId: string) {
@@ -254,8 +265,129 @@ export function selectVisualPage(editor: Editor, pageId: string) {
   if (page) editor.Pages.select(page);
 }
 
+/** Clear undo stack at page boundaries (page-safe history). */
+export function clearVisualUndoHistory(editor: Editor) {
+  try {
+    editor.UndoManager.clear();
+  } catch {
+    // older grapes builds
+  }
+}
+
 export function getActiveVisualPageId(editor: Editor): string | undefined {
   return editor.Pages.getSelected()?.getId();
+}
+
+export function createVisualPage(
+  editor: Editor,
+  page: { id: string; name: string; slug: string; componentHtml: string },
+) {
+  if (editor.Pages.get(page.id)) {
+    throw new Error("Page id already exists");
+  }
+  const added = editor.Pages.add({
+    id: page.id,
+    name: page.name,
+    component: page.componentHtml,
+  });
+  const created = Array.isArray(added) ? added[0] : added;
+  if (!created) throw new Error("Failed to create page");
+  try {
+    (created as unknown as { set: (k: string, v: unknown) => void }).set(
+      "slug",
+      page.slug,
+    );
+  } catch {
+    // ignore
+  }
+  editor.Pages.select(created);
+  return created.getId();
+}
+
+export function renameVisualPage(
+  editor: Editor,
+  pageId: string,
+  patch: { name?: string; slug?: string },
+) {
+  const page = editor.Pages.get(pageId);
+  if (!page) throw new Error("Page not found");
+  if (patch.name !== undefined) page.setName(patch.name);
+  if (patch.slug !== undefined) {
+    try {
+      (page as unknown as { set: (k: string, v: unknown) => void }).set(
+        "slug",
+        patch.slug,
+      );
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function deleteVisualPage(editor: Editor, pageId: string) {
+  if (pageId === "home") throw new Error("Home page cannot be deleted");
+  const all = editor.Pages.getAll();
+  if (all.length <= 1) throw new Error("Cannot delete the last remaining page");
+  const page = editor.Pages.get(pageId);
+  if (!page) throw new Error("Page not found");
+  const wasSelected = editor.Pages.getSelected()?.getId() === pageId;
+  editor.Pages.remove(page);
+  if (wasSelected) {
+    const next = editor.Pages.getAll()[0];
+    if (next) editor.Pages.select(next);
+  }
+}
+
+export function duplicateVisualPage(
+  editor: Editor,
+  sourcePageId: string,
+  next: { id: string; name: string; slug: string },
+) {
+  if (editor.Pages.get(next.id)) throw new Error("Page id already exists");
+  const source = editor.Pages.get(sourcePageId);
+  if (!source) throw new Error("Page not found");
+  // Prefer component HTML export for a genuine independent tree
+  const componentHtml =
+    typeof (source as unknown as { getMainComponent?: () => { toHTML?: () => string } }).getMainComponent ===
+    "function"
+      ? (source as unknown as { getMainComponent: () => { toHTML: () => string } })
+          .getMainComponent()
+          .toHTML()
+      : `<body data-website-page="${next.id}" data-page-slug="${next.slug}"><h1>${next.name}</h1></body>`;
+
+  let html = componentHtml;
+  html = html
+    .replace(
+      new RegExp(`data-website-page="${sourcePageId}"`, "g"),
+      `data-website-page="${next.id}"`,
+    )
+    .replace(/data-page-slug="[^"]*"/g, `data-page-slug="${next.slug}"`);
+
+  return createVisualPage(editor, {
+    id: next.id,
+    name: next.name,
+    slug: next.slug,
+    componentHtml: html,
+  });
+}
+
+export function reorderVisualPages(editor: Editor, orderedIds: string[]) {
+  const pages = editor.Pages.getAll();
+  const byId = new Map(pages.map((p) => [p.getId(), p]));
+  // GrapesJS Pages order: remove+re-add is heavy; set order via move when available
+  const manager = editor.Pages as unknown as {
+    getAll: () => typeof pages;
+    move?: (page: unknown, opts: { at: number }) => void;
+  };
+  let at = 0;
+  for (const id of orderedIds) {
+    const page = byId.get(id);
+    if (!page) continue;
+    if (typeof manager.move === "function") {
+      manager.move(page, { at });
+    }
+    at += 1;
+  }
 }
 
 export function serializeVisualProject(editor: Editor): ProjectData {

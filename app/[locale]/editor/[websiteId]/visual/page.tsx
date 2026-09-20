@@ -14,8 +14,10 @@ import { VisualEditorLoading } from "@/components/visual-editor/VisualEditorLoad
  */
 export default async function VisualEditorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; websiteId: string }>;
+  searchParams: Promise<{ page?: string | string[] }>;
 }) {
   const { locale: raw, websiteId } = await params;
   const locale = parseLocale(raw);
@@ -28,6 +30,15 @@ export default async function VisualEditorPage({
     session.workspace.id,
   );
   if (!website) notFound();
+
+  const sp = await searchParams;
+  const pageRaw = sp.page;
+  const initialPage =
+    typeof pageRaw === "string"
+      ? pageRaw
+      : Array.isArray(pageRaw)
+        ? pageRaw[0]
+        : null;
 
   void recordProductEvent({
     eventName: "editor_opened",
@@ -46,7 +57,11 @@ export default async function VisualEditorPage({
           <VisualEditorLoading label="Loading website editor…" />
         }
       >
-        <VisualEditorShell website={website} locale={locale} />
+        <VisualEditorShell
+          website={website}
+          locale={locale}
+          initialPage={initialPage}
+        />
       </Suspense>
     </VisualEditorErrorBoundary>
   );

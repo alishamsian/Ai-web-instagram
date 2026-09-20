@@ -510,22 +510,24 @@ ${
     id,
   }));
 
-  const pages: ProjectData["pages"] = [
+  const pages = [
     {
       id: VISUAL_PAGE_HOME,
       name: "Home",
+      slug: "",
       component: body,
     },
-  ];
+  ] as ProjectData["pages"];
 
   if (
     config.content.about?.title?.trim() ||
     config.content.about?.body?.trim()
   ) {
-    pages.push({
+    pages!.push({
       id: VISUAL_PAGE_ABOUT,
       name: "About",
-      component: `<body data-website-page="${VISUAL_PAGE_ABOUT}" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
+      slug: "about",
+      component: `<body data-website-page="${VISUAL_PAGE_ABOUT}" data-page-slug="about" data-ve-source="website-config" data-ve-adapter="2" dir="${dir}" lang="${lang}" style="margin:0;font-family:system-ui,-apple-system,sans-serif;color:${escapeHtml(
         fg,
       )};background:${escapeHtml(bg)};">
 ${renderAbout(
@@ -537,7 +539,7 @@ ${renderAbout(
   },
 )}
 </body>`,
-    });
+    } as never);
   }
 
   return {

@@ -20,6 +20,7 @@ import {
   VISUAL_PAGE_HOME,
   type VisualCollectionKey,
 } from "@/lib/visual-editor/ids";
+import { syncPagesMetaFromProject } from "@/lib/visual-editor/pages";
 
 function decodeEntities(value: string): string {
   return value
@@ -948,6 +949,9 @@ export function syncWebsiteConfigFromVisualProject(
       options?.activePageId ?? config.visualEditor?.activePageId ?? "home",
     sourceFingerprint: websiteConfigSourceFingerprint(next),
   };
+
+  // Keep canonical page metadata aligned with GrapesJS pages (identity + order)
+  next.pages = syncPagesMetaFromProject(next, project);
 
   return next;
 }
