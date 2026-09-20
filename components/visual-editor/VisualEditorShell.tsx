@@ -142,6 +142,8 @@ export function VisualEditorShell({
   const switchingPageRef = useRef(false);
 
   const initialPageFromUrlRef = useRef(initialPage);
+  /** Defer full chrome until after hydration — GrapesJS hosts are client-only. */
+  const [shellHydrated, setShellHydrated] = useState(false);
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<VisualSaveState>("clean");
@@ -679,6 +681,11 @@ export function VisualEditorShell({
   }, [editorInstance]);
 
   useEffect(() => {
+    setShellHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!shellHydrated) return;
     const mountId = ++editorMountIdRef.current;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -890,7 +897,7 @@ export function VisualEditorShell({
         setEditorInstance(null);
       }
     };
-  }, [locale, website.id]);
+  }, [locale, website.id, shellHydrated]);
 
   useEffect(() => {
     const ed = editorRef.current;
@@ -936,6 +943,31 @@ export function VisualEditorShell({
           >
             {isFa ? "بازگشت به Classic" : "Open Classic Editor"}
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!shellHydrated) {
+    return (
+      <div
+        className="ve-shell"
+        dir={isFa ? "rtl" : "ltr"}
+        lang={locale}
+        aria-busy="true"
+      >
+        <div
+          className="ve-loading"
+          style={{
+            minHeight: "100vh",
+            display: "grid",
+            placeItems: "center",
+            background: "#09090b",
+            color: "#8a8a93",
+            fontSize: 14,
+          }}
+        >
+          {isFa ? "در حال بارگذاری ویرایشگر…" : "Loading website editor…"}
         </div>
       </div>
     );
