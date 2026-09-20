@@ -39,6 +39,7 @@ import {
 } from "@/lib/website/canonical-render";
 import { cn } from "@/lib/utils";
 import { VisualCustomPagePreview } from "@/components/visual-editor/VisualCustomPagePreview";
+import { SectionRenderProvider } from "@/components/website/SectionRenderContext";
 
 const sectionMap = {
   hero: HeroSection,
@@ -105,8 +106,14 @@ function SectionList({
             className={cn(
               !section.visible && mode === "editor" && "opacity-45",
             )}
+            data-section-id={section.id}
+            data-section-type={section.type}
+            data-section-variant={section.variant || undefined}
+            data-visible={section.visible !== false ? "true" : "false"}
           >
-            <Comp config={view} />
+            <SectionRenderProvider section={section}>
+              <Comp config={view} />
+            </SectionRenderProvider>
           </div>
         );
         if (mode !== "editor") return <div key={section.id}>{body}</div>;

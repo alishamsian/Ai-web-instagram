@@ -1,10 +1,14 @@
 /**
  * Sync GrapesJS project HTML/JSON → WebsiteConfig content fields.
- * Preserves all sections not present in the canvas (never silently drops).
  *
  * Phase 2.1:
  * - Page-aware extraction (custom pages cannot overwrite reserved canonical content)
  * - Stable collection item identity (reorder-safe products / faq / testimonials)
+ *
+ * Phase 3.1.2:
+ * - Page-aware section structure sync into WebsiteConfig.pages[].sections
+ * - Template/multi-page sites drop canvas-missing sections (remove/reorder work)
+ * - Legacy single-page sites still write top-level WebsiteConfig.sections
  *
  * GrapesJS getProjectData() stores pages as frames[].component JSON trees
  * (not HTML strings). Extraction walks both shapes.
@@ -48,13 +52,119 @@ export type VisualPageRoots = {
 
 export type PageContentPathMap = Record<string, Record<string, string>>;
 
-type SectionMeta = {
+export type SectionMeta = {
   id: string;
   type?: string;
   visible: boolean;
   variant?: string;
   settings?: Record<string, unknown>;
 };
+
+/**
+ * Merge canvas section meta onto an existing SectionConfig list.
+ * Preserves content-bearing fields on known ids; applies order/visibility/variant/settings.
+ * When dropMissing is true, sections absent from the canvas are removed (remove ops).
+ */
+export function mergeSectionsFromMeta(
+  existing: SectionConfig[],
+  meta: SectionMeta[],
+  options: { dropMissing: boolean },
+): SectionConfig[] {
+  const byId = new Map(existing.map((s) => [s.id, s]));
+  const ordered: SectionConfig[] = [];
+  const seen = new Set<string>();
+
+  for (const m of meta) {
+    if (!m.id || seen.has(m.id)) continue;
+    const prev = byId.get(m.id);
+    if (!prev) {
+      if (!m.type) continue;
+      ordered.push({
+        id: m.id,
+        type: m.type as SectionConfig["type"],
+        visible: m.visible,
+        variant: m.variant,
+        settings: m.settings ? structuredClone(m.settings) : undefined,
+      });
+      seen.add(m.id);
+      continue;
+    }
+    ordered.push({
+      ...structuredClone(prev),
+      visible: m.visible,
+      variant: m.variant ?? prev.variant,
+      settings:
+        m.settings !== undefined
+          ? structuredClone(m.settings)
+          : prev.settings
+            ? structuredClone(prev.settings)
+            : undefined,
+    });
+    seen.add(m.id);
+  }
+
+  if (!options.dropMissing) {
+    for (const section of existing) {
+      if (!seen.has(section.id)) {
+        ordered.push(structuredClone(section));
+      }
+    }
+  }
+
+  const body = ordered.filter((s) => s.type !== "footer");
+  const footers = ordered.filter((s) => s.type === "footer");
+  return [...body, ...footers];
+}
+
+/**
+ * Write extracted per-page section meta into pages[].sections and mirror home
+ * into top-level sections for legacy + dual-write compatibility.
+ */
+export function applyPageSectionsFromProject(
+  config: WebsiteConfig,
+  project: ProjectData | Record<string, unknown>,
+): void {
+  const byPage = extractPageSectionMeta(project);
+  const isCatalog = Boolean(config.templateCatalogId?.trim());
+  const pageList = config.pages ?? [];
+
+  for (const page of pageList) {
+    const meta = byPage[page.id];
+    if (!meta || meta.length === 0) continue;
+    const existing =
+      page.sections && page.sections.length > 0
+        ? page.sections
+        : page.id === VISUAL_PAGE_HOME
+          ? config.sections
+          : [];
+    // Template / page-aware: drop missing so remove/reorder stick.
+    // Legacy home-only projects also drop when meta is authoritative.
+    page.sections = mergeSectionsFromMeta(existing, meta, {
+      dropMissing: true,
+    });
+  }
+
+  const homeMeta =
+    byPage[VISUAL_PAGE_HOME] ??
+    (Object.keys(byPage).length === 1
+      ? byPage[Object.keys(byPage)[0]!]
+      : undefined);
+
+  if (homeMeta && homeMeta.length > 0) {
+    const homePage = pageList.find((p) => p.id === VISUAL_PAGE_HOME);
+    const existingTop =
+      isCatalog && homePage?.sections && homePage.sections.length > 0
+        ? homePage.sections
+        : config.sections;
+    const merged = mergeSectionsFromMeta(existingTop, homeMeta, {
+      dropMissing: true,
+    });
+    config.sections = merged;
+    if (homePage) {
+      homePage.sections = structuredClone(merged);
+    }
+  }
+}
 
 type ItemFieldHit = {
   collection: VisualCollectionKey;
@@ -878,8 +988,8 @@ function applyCollectionOrders(
  * - stores project under visualEditor (adapter v2)
  * - syncs canonical content only from reserved pages
  * - syncs collection fields/order by stable item id
- * - updates section visibility/order/settings from home only
- * - NEVER drops sections missing from canvas (orphans preserved)
+ * - syncs section order/visibility/variant/settings into pages[].sections
+ *   (and mirrors home into top-level sections for legacy compatibility)
  */
 export function syncWebsiteConfigFromVisualProject(
   config: WebsiteConfig,
@@ -917,42 +1027,9 @@ export function syncWebsiteConfigFromVisualProject(
     next.content.gallery.imageIds = galleryIds;
   }
 
-  const sectionMeta = extractSectionMeta(project);
-  if (sectionMeta.length > 0) {
-    const byId = new Map(next.sections.map((s) => [s.id, s]));
-    const ordered: SectionConfig[] = [];
-    const seen = new Set<string>();
-    for (const meta of sectionMeta) {
-      const existing = byId.get(meta.id);
-      if (!existing) {
-        // New section inserted in Visual Editor (home only reaches here)
-        if (meta.type) {
-          ordered.push({
-            id: meta.id,
-            type: meta.type as SectionConfig["type"],
-            visible: meta.visible,
-            variant: meta.variant,
-            settings: meta.settings,
-          });
-          seen.add(meta.id);
-        }
-        continue;
-      }
-      ordered.push({
-        ...existing,
-        visible: meta.visible,
-        variant: meta.variant ?? existing.variant,
-        settings: meta.settings ?? existing.settings,
-      });
-      seen.add(meta.id);
-    }
-    for (const section of next.sections) {
-      if (!seen.has(section.id)) ordered.push(section);
-    }
-    const body = ordered.filter((s) => s.type !== "footer");
-    const footers = ordered.filter((s) => s.type === "footer");
-    next.sections = [...body, ...footers];
-  }
+  // 5) Align page metadata first, then sync per-page section structure
+  next.pages = syncPagesMetaFromProject(next, project);
+  applyPageSectionsFromProject(next, project);
 
   next.visualEditor = {
     engine: "grapesjs",
@@ -962,9 +1039,6 @@ export function syncWebsiteConfigFromVisualProject(
       options?.activePageId ?? config.visualEditor?.activePageId ?? "home",
     sourceFingerprint: websiteConfigSourceFingerprint(next),
   };
-
-  // Keep canonical page metadata aligned with GrapesJS pages (identity + order)
-  next.pages = syncPagesMetaFromProject(next, project);
 
   return next;
 }

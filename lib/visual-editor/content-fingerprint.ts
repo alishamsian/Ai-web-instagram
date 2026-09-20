@@ -29,14 +29,24 @@ function stableStringify(value: unknown): string {
  * Correctness > micro-optimization; a future pass may hash this payload
  * without changing the comparison contract.
  */
+function sectionFingerprintSlice(
+  sections: WebsiteConfig["sections"] | undefined,
+) {
+  return (sections ?? []).map((s) => ({
+    id: s.id,
+    type: s.type,
+    visible: s.visible !== false,
+    variant: s.variant ?? null,
+    settings: s.settings ?? null,
+  }));
+}
+
 export function websiteConfigSourceFingerprint(config: WebsiteConfig): string {
   const payload = {
-    sections: config.sections.map((s) => ({
-      id: s.id,
-      type: s.type,
-      visible: s.visible !== false,
-      variant: s.variant ?? null,
-      settings: s.settings ?? null,
+    sections: sectionFingerprintSlice(config.sections),
+    pages: (config.pages ?? []).map((p) => ({
+      id: p.id,
+      sections: sectionFingerprintSlice(p.sections),
     })),
     content: config.content,
     media: Object.fromEntries(

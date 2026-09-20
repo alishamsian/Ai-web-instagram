@@ -27,6 +27,9 @@ export {
   extractCollectionOrder,
   collectPagesWithRoots,
   visualProjectFingerprint,
+  mergeSectionsFromMeta,
+  applyPageSectionsFromProject,
+  type SectionMeta,
 } from "@/lib/visual-editor/sync-from-project";
 export { websiteConfigSourceFingerprint } from "@/lib/visual-editor/content-fingerprint";
 export { mergeProjectedWithSavedProject } from "@/lib/visual-editor/merge-project";

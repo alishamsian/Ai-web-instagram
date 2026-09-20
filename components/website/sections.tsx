@@ -10,6 +10,17 @@ import {
   productHref,
 } from "@/lib/website/product";
 import { StoreProductCard } from "@/components/website/StoreProductCard";
+import {
+  useSectionRender,
+  useSectionSettings,
+} from "@/components/website/SectionRenderContext";
+import {
+  resolveAboutVariant,
+  resolveGalleryVariant,
+  resolveHeroVisualMode,
+  resolveTestimonialVariant,
+} from "@/lib/website/section-variant";
+import type { CSSProperties } from "react";
 
 function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return <p className="vitrin-eyebrow">{children}</p>;
@@ -34,15 +45,19 @@ function formatPrice(config: WebsiteConfig, price: number, currency: string | nu
 }
 
 export function HeroSection({ config }: { config: WebsiteConfig }) {
+  const section = useSectionRender();
   const hero = config.content.hero;
   const image = siteMedia(config, hero.imageId);
   const c = config.brand.colors;
   const isStore = config.template === "store";
-  const isEditorial =
-    isStore ||
-    config.template === "restaurant" ||
-    config.brand.typography.scale === "editorial";
-  const style = isEditorial ? "overlay" : hero.style;
+  const mode = resolveHeroVisualMode(config, section);
+  const isEditorial = mode === "editorial";
+  const style =
+    mode === "editorial" || mode === "overlay"
+      ? "overlay"
+      : mode === "minimal" || mode === "centered"
+        ? "minimal"
+        : "split";
   const isFa = config.settings.language === "fa";
   const shopHref = config.content.products?.items.length ? "#products" : "#contact";
   const primaryCta = isEditorial
@@ -55,10 +70,12 @@ export function HeroSection({ config }: { config: WebsiteConfig }) {
         : hero.cta
     : hero.cta;
 
-  if ((style === "overlay" || style === "menu") && image) {
+  if (style === "overlay" && image) {
     return (
       <section
-        className={`vitrin-hero vitrin-hero--overlay ${isEditorial ? "vitrin-hero--editorial" : ""} ${isStore ? "vitrin-hero--store" : ""}`}
+        className={`vitrin-hero vitrin-hero--overlay ${isEditorial ? "vitrin-hero--editorial" : ""} ${isStore ? "vitrin-hero--store" : ""} ${mode === "centered" ? "vitrin-hero--centered" : ""}`}
+        data-section="hero"
+        data-variant={mode}
       >
         <SiteMedia
           media={image}
@@ -151,6 +168,8 @@ export function HeroSection({ config }: { config: WebsiteConfig }) {
       <section
         className="vitrin-hero vitrin-hero--editorial-plain"
         style={{ background: c.foreground, color: c.background }}
+        data-section="hero"
+        data-variant={mode}
       >
         <div className="vitrin-wrap vitrin-hero__content">
           <p className={`vitrin-hero__brand ${headingFont(config)}`}>
@@ -189,7 +208,11 @@ export function HeroSection({ config }: { config: WebsiteConfig }) {
 
   if (style === "minimal") {
     return (
-      <section className="vitrin-hero vitrin-hero--minimal vitrin-hero--editorial-plain">
+      <section
+        className={`vitrin-hero vitrin-hero--minimal vitrin-hero--editorial-plain ${mode === "centered" ? "vitrin-hero--centered" : ""}`}
+        data-section="hero"
+        data-variant={mode}
+      >
         <div className="vitrin-wrap vitrin-hero__content">
           <p className={`vitrin-hero__brand ${headingFont(config)}`}>
             {config.brand.name}
@@ -238,7 +261,11 @@ export function HeroSection({ config }: { config: WebsiteConfig }) {
   }
 
   return (
-    <section className="vitrin-hero vitrin-hero--split">
+    <section
+      className="vitrin-hero vitrin-hero--split"
+      data-section="hero"
+      data-variant={mode}
+    >
       <div className="vitrin-hero__split-copy">
         <div className="vitrin-hero__split-inner">
           <p className={`vitrin-hero__brand vitrin-hero__brand--split ${headingFont(config)}`}>
@@ -286,13 +313,20 @@ export function HeroSection({ config }: { config: WebsiteConfig }) {
 }
 
 export function AboutSection({ config }: { config: WebsiteConfig }) {
+  const section = useSectionRender();
+  const variant = resolveAboutVariant(section);
   const about = config.content.about;
   if (!about) return null;
   const image = siteMedia(config, about.imageId);
   const isFa = config.settings.language === "fa";
   const isStore = config.template === "store";
   return (
-    <section id="about" className={`vitrin-section ${isStore ? "vitrin-about-section--store" : ""}`}>
+    <section
+      id="about"
+      className={`vitrin-section ${isStore ? "vitrin-about-section--store" : ""} ${variant === "split" ? "vitrin-about--split" : "vitrin-about--story"}`}
+      data-section="about"
+      data-variant={variant}
+    >
       <div className="vitrin-wrap vitrin-about">
         {image ? (
           <div className="vitrin-about__media">
@@ -541,8 +575,17 @@ export function ServicesSection({ config }: { config: WebsiteConfig }) {
 }
 
 export function GallerySection({ config }: { config: WebsiteConfig }) {
+  const section = useSectionRender();
+  const variant = resolveGalleryVariant(section);
+  const settings = useSectionSettings();
   const gallery = config.content.gallery;
   if (!gallery?.imageIds.length) return null;
+  const columns =
+    typeof settings?.columns === "number"
+      ? settings.columns
+      : typeof settings?.columns === "string" && /^\d+$/.test(settings.columns)
+        ? Number(settings.columns)
+        : undefined;
   const isStore = config.template === "store";
   const isEditorial =
     isStore ||
@@ -553,6 +596,9 @@ export function GallerySection({ config }: { config: WebsiteConfig }) {
     <section
       id="gallery"
       className={`vitrin-section ${isEditorial ? "vitrin-gallery-section--store" : "vitrin-section--soft"}`}
+      data-section="gallery"
+      data-variant={variant}
+      data-columns={columns != null ? String(columns) : undefined}
     >
       <div className="vitrin-wrap">
         <div
@@ -565,7 +611,20 @@ export function GallerySection({ config }: { config: WebsiteConfig }) {
             <EditableText path="gallery.title" value={gallery.title} as="span" />
           </SectionTitle>
         </div>
-        <div className={isEditorial ? "vitrin-gallery vitrin-gallery--store" : "vitrin-gallery"}>
+        <div
+          className={
+            isEditorial
+              ? `vitrin-gallery vitrin-gallery--store vitrin-gallery--${variant}`
+              : `vitrin-gallery vitrin-gallery--${variant}`
+          }
+          style={
+            columns
+              ? ({
+                  ["--vitrin-gallery-cols" as string]: String(columns),
+                } as CSSProperties)
+              : undefined
+          }
+        >
           {gallery.imageIds.slice(0, isEditorial ? 7 : 9).map((id, index) => {
             const image = siteMedia(config, id);
             if (!image) return null;
@@ -707,11 +766,18 @@ export function ContactSection({ config }: { config: WebsiteConfig }) {
 }
 
 export function TestimonialsSection({ config }: { config: WebsiteConfig }) {
+  const section = useSectionRender();
+  const variant = resolveTestimonialVariant(section);
   const testimonials = config.content.testimonials;
   if (!testimonials?.items.length) return null;
   const isFa = config.settings.language === "fa";
   return (
-    <section id="testimonials" className="vitrin-section vitrin-section--soft">
+    <section
+      id="testimonials"
+      className={`vitrin-section vitrin-section--soft vitrin-testimonials--${variant}`}
+      data-section="testimonials"
+      data-variant={variant}
+    >
       <div className="vitrin-wrap">
         <div className="vitrin-section__head">
           <SectionEyebrow>{isFa ? "نظرات" : "Testimonials"}</SectionEyebrow>
@@ -723,7 +789,15 @@ export function TestimonialsSection({ config }: { config: WebsiteConfig }) {
             />
           </SectionTitle>
         </div>
-        <div className="vitrin-testimonials">
+        <div
+          className={
+            variant === "cards"
+              ? "vitrin-testimonials vitrin-testimonials--cards"
+              : variant === "carousel"
+                ? "vitrin-testimonials vitrin-testimonials--carousel"
+                : "vitrin-testimonials"
+          }
+        >
           {testimonials.items.map((item, index) => (
             <blockquote key={`${item.author}-${index}`} className="vitrin-testimonial">
               <p className={`vitrin-testimonial__quote ${headingFont(config)}`}>

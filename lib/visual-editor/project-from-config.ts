@@ -15,6 +15,7 @@ import {
   VISUAL_PAGE_HOME,
   stableCollectionItemId,
 } from "@/lib/visual-editor/ids";
+import { resolveHomeSectionsForProjection } from "@/lib/website/canonical-render";
 
 function escapeHtml(value: string): string {
   return value
@@ -905,7 +906,7 @@ export function buildProjectFromWebsiteConfig(
   const pages = pageMetas.map((page) => {
     const sections =
       page.kind === "home"
-        ? config.sections
+        ? resolveHomeSectionsForProjection(config)
         : page.sections && page.sections.length > 0
           ? page.sections
           : page.kind === "about"

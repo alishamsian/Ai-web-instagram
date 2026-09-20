@@ -10,6 +10,8 @@ import { headingFont, siteMedia } from "@/components/website/shell";
 import { SiteMedia } from "@/components/website/SiteImage";
 import { EditableText } from "@/components/editor/EditContext";
 import { sanitizeExternalUrl } from "@/lib/templates/canonical-content";
+import { useSectionRender } from "@/components/website/SectionRenderContext";
+import { resolveCtaVariant } from "@/lib/website/section-variant";
 
 function Title({
   config,
@@ -464,11 +466,25 @@ export function PropertiesSiteSection({ config }: { config: WebsiteConfig }) {
 
 /** Promo/CTA for generic WebsiteRenderer (non-store). */
 export function PromoSiteSection({ config }: { config: WebsiteConfig }) {
+  const section = useSectionRender();
+  const variant = resolveCtaVariant(section);
   const promo = config.content.promo;
   if (!promo?.title && !promo?.cta) return null;
   return (
-    <section className="vitrin-section" data-section="cta">
-      <div className="vitrin-wrap text-center">
+    <section
+      className={`vitrin-section vitrin-cta-section--${variant}`}
+      data-section="cta"
+      data-variant={variant}
+    >
+      <div
+        className={
+          variant === "split"
+            ? "vitrin-wrap grid gap-6 md:grid-cols-2 md:items-center text-start"
+            : variant === "full-width"
+              ? "w-full px-6 py-4 text-center"
+              : "vitrin-wrap text-center"
+        }
+      >
         {promo.kicker ? (
           <p className="vitrin-eyebrow">{promo.kicker}</p>
         ) : null}

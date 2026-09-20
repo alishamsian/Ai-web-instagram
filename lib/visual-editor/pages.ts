@@ -173,7 +173,7 @@ export function syncPagesMetaFromProject(
       title: prev?.title,
       description: prev?.description,
       kind,
-      // Preserve canonical page.sections — GrapesJS project is visual projection only.
+      // Preserve canonical page.sections until applyPageSectionsFromProject runs.
       sections: prev?.sections ? structuredClone(prev.sections) : prev?.sections,
     });
   }

@@ -24,6 +24,31 @@ export function resolveHomeSections(config: WebsiteConfig): SectionConfig[] {
 }
 
 /**
+ * Home sections for Visual Editor projection.
+ * Structure/order comes from resolveHomeSections (page.sections when present).
+ * Matching top-level section meta (visible/variant/settings) is overlaid so
+ * Classic / dual-write edits on config.sections still reach the canvas.
+ */
+export function resolveHomeSectionsForProjection(
+  config: WebsiteConfig,
+): SectionConfig[] {
+  const resolved = resolveHomeSections(config);
+  const top = config.sections ?? [];
+  if (top.length === 0) return resolved;
+  const topById = new Map(top.map((s) => [s.id, s]));
+  return resolved.map((s) => {
+    const overlay = topById.get(s.id);
+    if (!overlay) return s;
+    return {
+      ...s,
+      visible: overlay.visible,
+      variant: overlay.variant ?? s.variant,
+      settings: overlay.settings ?? s.settings,
+    };
+  });
+}
+
+/**
  * New template sites render Home through shared WebsiteRenderer + page.sections.
  * Legacy store sites keep StoreRenderer compatibility.
  */

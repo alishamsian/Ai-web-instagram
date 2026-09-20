@@ -170,7 +170,7 @@ describe("round-trip sync", () => {
     expect(restored.media["img-1"]?.url).toBe("https://example.com/a.jpg");
   });
 
-  it("preserves orphan sections not present in canvas", () => {
+  it("drops canvas-missing sections so remove persists", () => {
     const original = baseConfig();
     original.sections.push({
       id: "mystery-1",
@@ -181,9 +181,8 @@ describe("round-trip sync", () => {
       ...original,
       sections: original.sections.filter((s) => s.id !== "mystery-1"),
     });
-    // Apply onto config that still has mystery — sync should keep orphan
     const restored = applyVisualProjectToWebsiteConfig(original, projected);
-    expect(restored.sections.some((s) => s.id === "mystery-1")).toBe(true);
+    expect(restored.sections.some((s) => s.id === "mystery-1")).toBe(false);
   });
 
   it("extracts content paths from GrapesJS frames JSON trees", () => {
